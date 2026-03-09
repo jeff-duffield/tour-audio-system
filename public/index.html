@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EF Tour Audio - Listen</title>
+    <link rel="icon" type="image/png" href="EF-Logos_EF Logo Pink.png">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
+            background: linear-gradient(135deg, #009EEB 0%, #0077BE 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: #FFFFFF;
+            border-radius: 20px;
+            padding: 24px 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 560px;
+            width: 100%;
+        }
+        .header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+        .logo {
+            height: 50px;
+            flex-shrink: 0;
+        }
+        h1 {
+            color: #003C64;
+            margin: 0;
+            font-size: 32px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 32px;
+            font-size: 18px;
+            font-weight: 400;
+        }
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 24px;
+            padding: 16px;
+            background: #E3EBED;
+            border-radius: 12px;
+        }
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #EFEFEF;
+        }
+        .status-dot.connected { background: #009EEB; animation: pulse 2s infinite; }
+        .status-dot.connecting { background: #009EEB; opacity: 0.6; }
+        .status-dot.error { background: #FF329B; }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .status-text {
+            font-weight: 600;
+            color: #191919;
+            font-size: 15px;
+        }
+        button {
+            width: 100%;
+            padding: 18px;
+            font-size: 17px;
+            font-weight: 700;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-bottom: 12px;
+        }
+        .listen-btn {
+            background: #009EEB;
+            color: #FFFFFF;
+        }
+        .listen-btn:hover {
+            background: #0088CC;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 158, 235, 0.3);
+        }
+        .listen-btn:active { transform: translateY(0); }
+        .stop-btn {
+            background: #003C64;
+            color: #FFFFFF;
+        }
+        .stop-btn:hover {
+            background: #002A47;
+        }
+        .test-btn {
+            background: #FFFFFF;
+            color: #009EEB;
+            border: 2px solid #009EEB;
+            padding: 16px;
+            font-size: 15px;
+        }
+        .test-btn:hover {
+            background: #E3F7FF;
+            transform: translateY(-1px);
+        }
+        .test-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .volume-control {
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid #EFEFEF;
+        }
+        .volume-control label {
+            display: block;
+            margin-bottom: 12px;
+            color: #003C64;
+            font-weight: 600;
+            font-size: 15px;
+        }
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: #E3F7FF;
+            outline: none;
+            -webkit-appearance: none;
+        }
+        /* Webkit (Chrome, Safari, Edge) - Track */
+        input[type="range"]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: linear-gradient(to right, #FF1493 0%, #FF1493 var(--value, 50%), #E3F7FF var(--value, 50%), #E3F7FF 100%);
+        }
+        /* Webkit - Thumb */
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: #FF1493;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            margin-top: -8px;
+        }
+        /* Firefox - Track */
+        input[type="range"]::-moz-range-track {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: #E3F7FF;
+        }
+        /* Firefox - Progress (filled portion) */
+        input[type="range"]::-moz-range-progress {
+            height: 6px;
+            border-radius: 3px;
+            background: #FF1493;
+        }
+        /* Firefox - Thumb */
+        input[type="range"]::-moz-range-thumb {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: #FF1493;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .broadcast-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 16px;
+            background: #E8F5E9;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            font-size: 14px;
+            color: #2E7D32;
+            font-weight: 500;
+        }
+        .broadcast-indicator .pulse-dot {
+            width: 10px;
+            height: 10px;
+            background: #4CAF50;
+            border-radius: 50%;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+        .mini-visualizer {
+            display: flex;
+            align-items: center;
+            gap: 2px;
+            height: 20px;
+        }
+        .mini-visualizer .mini-bar {
+            width: 3px;
+            background: #4CAF50;
+            border-radius: 2px;
+            transition: height 0.1s ease;
+            height: 5px;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.2); }
+        }
+        .status-box {
+            padding: 14px 16px;
+            border-radius: 8px;
+            text-align: left;
+            line-height: 1.6;
+            margin-left: -28px;
+            margin-right: -28px;
+            width: calc(100% + 56px);
+        }
+        .volume-value {
+            text-align: center;
+            margin-top: 12px;
+            color: #009EEB;
+            font-weight: 700;
+            font-size: 16px;
+        }
+        .test-status {
+            text-align: center;
+            margin-top: 12px;
+            font-size: 14px;
+            color: #003C64;
+            min-height: 20px;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="EF-Logos_EF Logo Pink.png" alt="EF Tours" class="logo">
+            <h1>Tour Audio</h1>
+        </div>
+        <p class="subtitle">Listen to your guide</p>
+
+        <!-- Broadcast indicator (shown when receiving audio) -->
+        <div id="broadcastIndicator" class="broadcast-indicator" style="display: none;">
+            <div class="pulse-dot"></div>
+            <div class="mini-visualizer" id="miniVisualizer">
+                <div class="mini-bar"></div>
+                <div class="mini-bar"></div>
+                <div class="mini-bar"></div>
+                <div class="mini-bar"></div>
+                <div class="mini-bar"></div>
+                <div class="mini-bar"></div>
+            </div>
+            <span>🎧 Receiving audio</span>
+        </div>
+
+        <div class="status">
+            <div class="status-dot" id="statusDot"></div>
+            <div class="status-text" id="statusText">Not connected</div>
+        </div>
+
+        <button id="toggleBtn" class="listen-btn" onclick="toggleListening()">
+            Start Listening
+        </button>
+
+        <button id="testBtn" class="test-btn" onclick="testAudio()">
+            🔊 Test Audio
+        </button>
+
+        <div class="test-status" id="testStatus"></div>
+
+        <div class="volume-control">
+            <label for="volumeSlider">Volume</label>
+            <input type="range" id="volumeSlider" min="0" max="100" value="80" oninput="setVolume(this.value)">
+            <div class="volume-value" id="volumeValue">80%</div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let isListening = false;
+        let audioContext = null;
+        let gainNode = null;
+        let nextPlayTime = 0;
+        let wakeLock = null;
+
+        function updateStatus(state, text) {
+            document.getElementById('statusDot').className = 'status-dot ' + state;
+            document.getElementById('statusText').textContent = text;
+        }
+
+        function updateButton() {
+            const btn = document.getElementById('toggleBtn');
+            if (isListening) {
+                btn.textContent = 'Stop Listening';
+                btn.className = 'stop-btn';
+            } else {
+                btn.textContent = 'Start Listening';
+                btn.className = 'listen-btn';
+            }
+        }
+
+        function setVolume(value) {
+            if (gainNode) {
+                gainNode.gain.value = value / 100;
+            }
+            document.getElementById('volumeValue').textContent = value + '%';
+
+            // Update slider fill color (for webkit browsers)
+            const slider = document.getElementById('volumeSlider');
+            if (slider) {
+                slider.style.setProperty('--value', value + '%');
+            }
+        }
+
+        // Initialize slider fill on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            setVolume(80); // Set initial volume
+        });
+
+        // Request wake lock to prevent screen from sleeping
+        async function requestWakeLock() {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    console.log('Wake Lock acquired - screen will stay on');
+
+                    // Re-acquire wake lock if it's released (e.g., user switches tabs)
+                    wakeLock.addEventListener('release', () => {
+                        console.log('Wake Lock released');
+                    });
+                } else {
+                    console.log('Wake Lock API not supported on this device');
+                }
+            } catch (err) {
+                console.error('Failed to acquire Wake Lock:', err);
+            }
+        }
+
+        // Release wake lock
+        async function releaseWakeLock() {
+            if (wakeLock !== null) {
+                try {
+                    await wakeLock.release();
+                    wakeLock = null;
+                    console.log('Wake Lock released manually');
+                } catch (err) {
+                    console.error('Failed to release Wake Lock:', err);
+                }
+            }
+        }
+
+        // Update mini visualizer based on audio data
+        function updateMiniVisualizer(audioData) {
+            const bars = document.querySelectorAll('.mini-bar');
+            if (!bars.length || !audioData || audioData.length === 0) return;
+
+            // Sample audio data at different points for each bar
+            const samplesPerBar = Math.floor(audioData.length / bars.length);
+
+            bars.forEach((bar, i) => {
+                // Get average amplitude for this bar's section of audio
+                const startIdx = i * samplesPerBar;
+                const endIdx = Math.min(startIdx + samplesPerBar, audioData.length);
+
+                let sum = 0;
+                for (let j = startIdx; j < endIdx; j++) {
+                    sum += Math.abs(audioData[j]);
+                }
+                const average = sum / (endIdx - startIdx);
+
+                // Convert to height (5px min, 20px max)
+                const height = Math.max(5, Math.min(20, average * 30000));
+                bar.style.height = height + 'px';
+            });
+        }
+
+        async function startListening() {
+            try {
+                updateStatus('connecting', 'Connecting...');
+
+                // Create AudioContext in response to user interaction (required for iOS)
+                audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+                console.log('AudioContext created, state:', audioContext.state);
+
+                // CRITICAL for iOS: Resume AudioContext immediately after user interaction
+                if (audioContext.state === 'suspended') {
+                    console.log('Attempting to resume AudioContext for iOS...');
+                    await audioContext.resume();
+                    console.log('AudioContext resumed, new state:', audioContext.state);
+                }
+
+                // Play a silent sound to "unlock" audio on iOS
+                const silentBuffer = audioContext.createBuffer(1, 1, audioContext.sampleRate);
+                const silentSource = audioContext.createBufferSource();
+                silentSource.buffer = silentBuffer;
+                silentSource.connect(audioContext.destination);
+                silentSource.start(0);
+                console.log('Silent sound played to unlock iOS audio');
+
+                // Detect if device might be in silent mode (iOS-specific check)
+                checkSilentMode();
+
+                // Request wake lock to keep screen on during audio playback
+                await requestWakeLock();
+
+                gainNode = audioContext.createGain();
+                gainNode.connect(audioContext.destination);
+                setVolume(document.getElementById('volumeSlider').value);
+
+                nextPlayTime = audioContext.currentTime;
+
+                const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+                ws = new WebSocket(protocol + '//' + location.host);
+                ws.binaryType = 'arraybuffer';
+
+                console.log('WebSocket connecting to:', protocol + '//' + location.host);
+
+                let receivedPacketCount = 0;
+
+                ws.onopen = () => {
+                    isListening = true;
+                    updateStatus('connected', 'Connected - Listening');
+                    updateButton();
+                    console.log('WebSocket connected, waiting for audio...');
+                };
+
+                ws.onmessage = (event) => {
+                    try {
+                        receivedPacketCount++;
+
+                        // Show broadcast indicator on first packet
+                        if (receivedPacketCount === 1) {
+                            document.getElementById('broadcastIndicator').style.display = 'inline-flex';
+                            console.log('First audio packet received - showing indicator');
+                        }
+
+                        // Log every 50th packet
+                        if (receivedPacketCount % 50 === 0) {
+                            console.log('Received audio packet #' + receivedPacketCount);
+                        }
+
+                        // Convert Int16Array back to Float32Array
+                        const pcmData = new Int16Array(event.data);
+                        const floatData = new Float32Array(pcmData.length);
+                        for (let i = 0; i < pcmData.length; i++) {
+                            floatData[i] = pcmData[i] / 32768;
+                        }
+
+                        // Update mini visualizer with audio data
+                        updateMiniVisualizer(floatData);
+
+                        // Create audio buffer
+                        const audioBuffer = audioContext.createBuffer(1, floatData.length, audioContext.sampleRate);
+                        audioBuffer.getChannelData(0).set(floatData);
+
+                        // Create and schedule source
+                        const source = audioContext.createBufferSource();
+                        source.buffer = audioBuffer;
+                        source.connect(gainNode);
+
+                        // Schedule for seamless playback with minimal latency
+                        if (receivedPacketCount === 1) {
+                            // First packet: start immediately for lowest latency
+                            nextPlayTime = audioContext.currentTime;
+                            console.log('First audio packet - starting immediately');
+                        }
+
+                        const playTime = Math.max(nextPlayTime, audioContext.currentTime);
+
+                        // Prevent buffer drift: if we're getting too far behind, reset to current time
+                        const drift = playTime - audioContext.currentTime;
+                        if (drift > 0.5) {  // If more than 500ms behind, reset
+                            console.log('Latency drift detected (' + Math.round(drift * 1000) + 'ms), resetting to current time');
+                            nextPlayTime = audioContext.currentTime;
+                            source.start(audioContext.currentTime);
+                        } else {
+                            source.start(playTime);
+                        }
+
+                        nextPlayTime = playTime + audioBuffer.duration;
+
+                    } catch (e) {
+                        console.error('Audio playback error:', e);
+                    }
+                };
+                
+                ws.onclose = () => {
+                    if (isListening) {
+                        updateStatus('error', 'Disconnected - Tap to reconnect');
+                        isListening = false;
+                        updateButton();
+                    }
+                };
+                
+                ws.onerror = () => {
+                    updateStatus('error', 'Connection error');
+                    isListening = false;
+                    updateButton();
+                };
+                
+            } catch (err) {
+                updateStatus('error', 'Error: ' + err.message);
+                console.error(err);
+            }
+        }
+
+        function stopListening() {
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+            if (audioContext) {
+                audioContext.close();
+                audioContext = null;
+            }
+
+            // Release wake lock when stopping
+            releaseWakeLock();
+
+            // Hide broadcast indicator
+            document.getElementById('broadcastIndicator').style.display = 'none';
+
+            gainNode = null;
+            isListening = false;
+            updateStatus('', 'Not connected');
+            updateButton();
+        }
+
+        function toggleListening() {
+            if (isListening) {
+                stopListening();
+            } else {
+                startListening();
+            }
+        }
+
+        // Test audio functionality - plays a pleasant chime (iOS/Safari compatible)
+        async function testAudio() {
+            const testBtn = document.getElementById('testBtn');
+            const testStatus = document.getElementById('testStatus');
+
+            try {
+                testBtn.disabled = true;
+                testStatus.textContent = 'Playing test chime...';
+
+                // Create AudioContext if not exists
+                const testAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+                console.log('Test AudioContext state:', testAudioContext.state);
+
+                // Resume if suspended (required for iOS/Safari)
+                if (testAudioContext.state === 'suspended') {
+                    await testAudioContext.resume();
+                    console.log('Test AudioContext resumed:', testAudioContext.state);
+                }
+
+                // Create a pleasant three-tone chime (C-E-G major chord arpeggio)
+                const notes = [523.25, 659.25, 783.99]; // C5, E5, G5
+                const volume = document.getElementById('volumeSlider').value / 100;
+
+                // Play all notes
+                let playedNotes = 0;
+                for (let i = 0; i < notes.length; i++) {
+                    await playTone(testAudioContext, notes[i], 0.3, volume, i * 0.25);
+                    playedNotes++;
+                }
+
+                console.log('Played', playedNotes, 'notes');
+
+                // Wait for all notes to finish
+                setTimeout(() => {
+                    testStatus.textContent = 'Audio test complete! ✓';
+                    testBtn.disabled = false;
+
+                    // Don't close context immediately on iOS - causes issues
+                    setTimeout(() => {
+                        testAudioContext.close();
+                    }, 500);
+
+                    setTimeout(() => {
+                        testStatus.textContent = '';
+                    }, 3000);
+                }, 1500);
+
+            } catch (err) {
+                testStatus.textContent = 'Error: ' + err.message;
+                testBtn.disabled = false;
+                console.error('Audio test error:', err);
+            }
+        }
+
+        function playTone(context, frequency, duration, volume, delay) {
+            return new Promise((resolve) => {
+                setTimeout(() => {
+                    try {
+                        const oscillator = context.createOscillator();
+                        const gainNode = context.createGain();
+
+                        oscillator.connect(gainNode);
+                        gainNode.connect(context.destination);
+
+                        oscillator.frequency.value = frequency;
+                        oscillator.type = 'sine';
+
+                        // Envelope for smooth sound
+                        const now = context.currentTime;
+                        gainNode.gain.setValueAtTime(0, now);
+                        gainNode.gain.linearRampToValueAtTime(volume * 0.3, now + 0.05);
+                        gainNode.gain.exponentialRampToValueAtTime(0.01, now + duration);
+
+                        oscillator.start(now);
+                        oscillator.stop(now + duration);
+
+                        oscillator.onended = () => {
+                            console.log('Tone ended:', frequency);
+                            resolve();
+                        };
+                    } catch (err) {
+                        console.error('Error playing tone:', err);
+                        resolve();
+                    }
+                }, delay * 1000);
+            });
+        }
+
+        // Check for iOS silent mode
+        function checkSilentMode() {
+            // Only check on iOS devices
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+
+            if (!isIOS) {
+                console.log('Not an iOS device, skipping silent mode check');
+                return;
+            }
+
+            console.log('iOS device detected, checking for silent mode...');
+
+            // Show warning about silent mode
+            const silentModeWarning = document.createElement('div');
+            silentModeWarning.className = 'status-box';
+            silentModeWarning.style.backgroundColor = '#FFF4E5';
+            silentModeWarning.style.borderLeft = '4px solid #F48024';
+            silentModeWarning.style.marginTop = '16px';
+            silentModeWarning.innerHTML = `
+                <div style="font-weight: 600; margin-bottom: 8px; color: #F48024;">iPhone Users:</div>
+                <div style="font-size: 14px; line-height: 1.6; color: #333;">
+                    If you can't hear audio, check that your iPhone is <strong>NOT in silent mode</strong>.
+                    The silent switch on the side of your phone must be OFF for audio to play.
+                    <br><br>
+                    Alternatively, you can use <strong>headphones or earbuds</strong> - they work even in silent mode.
+                </div>
+            `;
+
+            // Insert warning after the volume control
+            const volumeControl = document.querySelector('.volume-control');
+            if (volumeControl && volumeControl.parentNode) {
+                volumeControl.parentNode.insertBefore(silentModeWarning, volumeControl.nextSibling);
+            }
+        }
+
+        // Initialize volume
+        setVolume(80);
+    </script>
+</body>
+</html>

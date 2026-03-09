@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EF Tour Audio - Guide</title>
+    <link rel="icon" type="image/png" href="EF-Logos_EF Logo Pink.png">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
+            background: linear-gradient(135deg, #FF69B4 0%, #FF1493 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: #FFFFFF;
+            border-radius: 20px;
+            padding: 48px 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 560px;
+            width: 100%;
+        }
+        h1 {
+            color: #003C64;
+            margin-bottom: 8px;
+            font-size: 32px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 32px;
+            font-size: 18px;
+            font-weight: 400;
+        }
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 24px;
+            padding: 16px;
+            background: #E3EBED;
+            border-radius: 12px;
+        }
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #EFEFEF;
+        }
+        .status-dot.broadcasting { background: #009EEB; animation: pulse 1.5s infinite; }
+        .status-dot.connected { background: #009EEB; }
+        .status-dot.error { background: #FF329B; }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.3); opacity: 0.6; }
+        }
+        .status-text {
+            font-weight: 600;
+            color: #191919;
+            font-size: 15px;
+        }
+        .visualizer {
+            height: 100px;
+            background: #E3F7FF;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            padding: 16px;
+        }
+        .bar {
+            width: 5px;
+            background: #009EEB;
+            border-radius: 3px;
+            transition: height 0.1s ease;
+        }
+        button {
+            width: 100%;
+            padding: 18px;
+            font-size: 17px;
+            font-weight: 700;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-bottom: 12px;
+        }
+        .broadcast-btn {
+            background: #009EEB;
+            color: #FFFFFF;
+        }
+        .broadcast-btn:hover {
+            background: #0088CC;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 158, 235, 0.3);
+        }
+        .broadcast-btn:active { transform: translateY(0); }
+        .stop-btn {
+            background: #003C64;
+            color: #FFFFFF;
+        }
+        .stop-btn:hover {
+            background: #002A47;
+        }
+        .test-btn {
+            background: #FFFFFF;
+            color: #009EEB;
+            border: 2px solid #009EEB;
+            padding: 16px;
+            font-size: 15px;
+        }
+        .test-btn:hover {
+            background: #E3F7FF;
+            transform: translateY(-1px);
+        }
+        .test-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .test-status {
+            text-align: center;
+            margin-top: 12px;
+            font-size: 14px;
+            color: #003C64;
+            min-height: 20px;
+            font-weight: 500;
+        }
+        .broadcast-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: #FFE8F5;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            font-size: 14px;
+            color: #C2185B;
+            font-weight: 500;
+        }
+        .broadcast-indicator .pulse-dot {
+            width: 10px;
+            height: 10px;
+            background: #FF1493;
+            border-radius: 50%;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.2); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <img src="EF-Logos_EF Logo Pink.png" alt="EF Tours" style="height: 60px; margin-bottom: 16px;">
+        <h1>Tour Guide</h1>
+        <p class="subtitle">Broadcast to your group</p>
+
+        <!-- Broadcast indicator (shown when broadcasting) -->
+        <div id="broadcastIndicator" class="broadcast-indicator" style="display: none;">
+            <div class="pulse-dot"></div>
+            <span>🎙️ Broadcasting</span>
+        </div>
+
+        <div class="status">
+            <div class="status-dot" id="statusDot"></div>
+            <div class="status-text" id="statusText">Ready to broadcast</div>
+        </div>
+
+        <div class="visualizer" id="visualizer">
+            <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+            <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+            <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+            <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+            <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+            <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+        </div>
+
+        <button id="toggleBtn" class="broadcast-btn" onclick="toggleBroadcast()">
+            Start Broadcasting
+        </button>
+
+        <button id="testBtn" class="test-btn" onclick="testMicrophone()">
+            🎤 Test Microphone
+        </button>
+
+        <div class="test-status" id="testStatus"></div>
+    </div>
+
+    <script>
+        let ws = null;
+        let isStreaming = false;
+        let audioContext = null;
+        let analyser = null;
+        let scriptProcessor = null;
+        let stream = null;
+
+        function updateUI() {
+            const btn = document.getElementById('toggleBtn');
+            const statusText = document.getElementById('statusText');
+            const statusDot = document.getElementById('statusDot');
+            
+            if (isStreaming) {
+                btn.textContent = 'Stop Broadcasting';
+                btn.className = 'stop-btn';
+                statusText.textContent = 'Broadcasting live';
+                statusDot.className = 'status-dot broadcasting';
+            } else {
+                btn.textContent = 'Start Broadcasting';
+                btn.className = 'broadcast-btn';
+                statusText.textContent = 'Ready to broadcast';
+                statusDot.className = 'status-dot';
+            }
+        }
+
+        function updateVisualizer() {
+            if (!analyser || !isStreaming) return;
+
+            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+            analyser.getByteTimeDomainData(dataArray);  // Changed to time domain for better responsiveness
+
+            const bars = document.querySelectorAll('.bar');
+
+            // Calculate average amplitude
+            let sum = 0;
+            for (let i = 0; i < dataArray.length; i++) {
+                sum += Math.abs(dataArray[i] - 128);
+            }
+            const average = sum / dataArray.length;
+
+            // Update bars with some variation
+            bars.forEach((bar, i) => {
+                const offset = Math.sin(Date.now() / 200 + i) * 10;
+                const value = dataArray[i * 3] || 128;
+                const amplitude = Math.abs(value - 128);
+                const height = Math.max(5, (amplitude / 128) * 50 + offset + (average / 2));
+                bar.style.height = height + 'px';
+            });
+
+            requestAnimationFrame(updateVisualizer);
+        }
+
+        async function startBroadcast() {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true
+                    }
+                });
+
+                console.log('Microphone stream obtained:', stream);
+                console.log('Audio tracks:', stream.getAudioTracks());
+
+                audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+                console.log('AudioContext created, state:', audioContext.state);
+
+                // Resume AudioContext if suspended
+                if (audioContext.state === 'suspended') {
+                    await audioContext.resume();
+                    console.log('AudioContext resumed, new state:', audioContext.state);
+                }
+
+                // Create analyser for visualizer
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 256;
+                analyser.smoothingTimeConstant = 0.3;
+
+                const source = audioContext.createMediaStreamSource(stream);
+                source.connect(analyser);
+                // Don't connect analyser to destination - it's only for visualization
+
+                console.log('Analyser connected, starting visualizer');
+
+                // Create script processor for PCM audio (reduced buffer for lower latency)
+                scriptProcessor = audioContext.createScriptProcessor(1024, 1, 1);  // Reduced from 4096 to 1024 (64ms latency)
+                source.connect(scriptProcessor);
+
+                // Create a gain node set to 0 to prevent feedback while keeping scriptProcessor active
+                const silentGain = audioContext.createGain();
+                silentGain.gain.value = 0; // Mute the output
+                scriptProcessor.connect(silentGain);
+                silentGain.connect(audioContext.destination);
+
+                console.log('ScriptProcessor created and connected (muted to prevent feedback)');
+
+                const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+                ws = new WebSocket(protocol + '//' + location.host);
+
+                console.log('WebSocket connecting to:', protocol + '//' + location.host);
+
+                let audioPacketCount = 0;
+
+                ws.onopen = () => {
+                    console.log('WebSocket connected!');
+
+                    scriptProcessor.onaudioprocess = (e) => {
+                        if (ws && ws.readyState === WebSocket.OPEN) {
+                            const inputData = e.inputBuffer.getChannelData(0);
+
+                            // Check if there's actual audio data
+                            let hasAudio = false;
+                            for (let i = 0; i < inputData.length; i++) {
+                                if (Math.abs(inputData[i]) > 0.01) {
+                                    hasAudio = true;
+                                    break;
+                                }
+                            }
+
+                            // Convert Float32Array to Int16Array for smaller size
+                            const pcmData = new Int16Array(inputData.length);
+                            for (let i = 0; i < inputData.length; i++) {
+                                pcmData[i] = Math.max(-32768, Math.min(32767, inputData[i] * 32768));
+                            }
+                            ws.send(pcmData.buffer);
+
+                            // Log every 50th packet to avoid console spam
+                            audioPacketCount++;
+                            if (audioPacketCount % 50 === 0) {
+                                console.log('Sent audio packet #' + audioPacketCount + ', has audio:', hasAudio);
+                            }
+                        }
+                    };
+
+                    isStreaming = true;
+                    updateUI();
+
+                    // Show broadcast indicator
+                    document.getElementById('broadcastIndicator').style.display = 'inline-flex';
+
+                    // Start visualizer after streaming is set to true
+                    updateVisualizer();
+
+                    console.log('Broadcasting started');
+                };
+                
+                ws.onerror = () => {
+                    document.getElementById('statusText').textContent = 'Connection error';
+                    document.getElementById('statusDot').className = 'status-dot error';
+                };
+                
+                ws.onclose = () => {
+                    if (isStreaming) {
+                        stopBroadcast();
+                    }
+                };
+                
+            } catch (err) {
+                alert('Could not access microphone: ' + err.message);
+            }
+        }
+
+        function stopBroadcast() {
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+            if (scriptProcessor) {
+                scriptProcessor.disconnect();
+                scriptProcessor = null;
+            }
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+            if (audioContext) {
+                audioContext.close();
+                audioContext = null;
+            }
+            
+            isStreaming = false;
+            updateUI();
+
+            // Hide broadcast indicator
+            document.getElementById('broadcastIndicator').style.display = 'none';
+
+            const bars = document.querySelectorAll('.bar');
+            bars.forEach(bar => bar.style.height = '5px');
+        }
+
+        function toggleBroadcast() {
+            if (isStreaming) {
+                stopBroadcast();
+            } else {
+                startBroadcast();
+            }
+        }
+
+        // Microphone test functionality - iOS/Safari compatible
+        let testRecorder = null;
+        let testChunks = [];
+        let testAudioContext = null;
+        let testRecordedBuffers = [];
+
+        async function testMicrophone() {
+            const testBtn = document.getElementById('testBtn');
+            const testStatus = document.getElementById('testStatus');
+
+            try {
+                testBtn.disabled = true;
+                testStatus.textContent = 'Accessing microphone...';
+
+                // Get microphone access
+                const testStream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true
+                    }
+                });
+
+                testStatus.textContent = 'Recording 3 seconds...';
+
+                // Use Web Audio API for iOS compatibility (MediaRecorder not fully supported)
+                testAudioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+
+                // Resume if suspended
+                if (testAudioContext.state === 'suspended') {
+                    await testAudioContext.resume();
+                }
+
+                const source = testAudioContext.createMediaStreamSource(testStream);
+                const processor = testAudioContext.createScriptProcessor(4096, 1, 1);
+
+                testRecordedBuffers = [];
+
+                processor.onaudioprocess = (e) => {
+                    // Store audio data
+                    const inputData = e.inputBuffer.getChannelData(0);
+                    const buffer = new Float32Array(inputData.length);
+                    buffer.set(inputData);
+                    testRecordedBuffers.push(buffer);
+                };
+
+                source.connect(processor);
+                processor.connect(testAudioContext.destination);
+
+                // Record for 3 seconds
+                setTimeout(() => {
+                    processor.disconnect();
+                    source.disconnect();
+                    testStream.getTracks().forEach(track => track.stop());
+
+                    // Play back the recorded audio
+                    playbackRecording();
+                }, 3000);
+
+            } catch (err) {
+                testStatus.textContent = 'Error: ' + err.message;
+                testBtn.disabled = false;
+                console.error('Microphone test error:', err);
+            }
+        }
+
+        function playbackRecording() {
+            const testBtn = document.getElementById('testBtn');
+            const testStatus = document.getElementById('testStatus');
+
+            try {
+                testStatus.textContent = 'Playing back...';
+
+                if (testRecordedBuffers.length === 0) {
+                    testStatus.textContent = 'No audio recorded';
+                    testBtn.disabled = false;
+                    return;
+                }
+
+                // Combine all buffers
+                const totalLength = testRecordedBuffers.reduce((acc, buf) => acc + buf.length, 0);
+                const combinedBuffer = new Float32Array(totalLength);
+                let offset = 0;
+                for (const buffer of testRecordedBuffers) {
+                    combinedBuffer.set(buffer, offset);
+                    offset += buffer.length;
+                }
+
+                // Create audio buffer for playback
+                const audioBuffer = testAudioContext.createBuffer(1, combinedBuffer.length, testAudioContext.sampleRate);
+                audioBuffer.getChannelData(0).set(combinedBuffer);
+
+                // Play it back
+                const source = testAudioContext.createBufferSource();
+                source.buffer = audioBuffer;
+                source.connect(testAudioContext.destination);
+
+                source.onended = () => {
+                    testStatus.textContent = 'Test complete! ✓';
+                    testBtn.disabled = false;
+                    testAudioContext.close();
+                    testAudioContext = null;
+                    testRecordedBuffers = [];
+
+                    setTimeout(() => {
+                        testStatus.textContent = '';
+                    }, 3000);
+                };
+
+                source.start(0);
+
+            } catch (err) {
+                testStatus.textContent = 'Playback error: ' + err.message;
+                testBtn.disabled = false;
+                console.error('Playback error:', err);
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EF Tour Audio - Welcome</title>
+    <link rel="icon" type="image/png" href="EF-Logos_EF Logo Pink.png">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
+            background: linear-gradient(135deg, #009EEB 0%, #0077BE 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 12px;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 20px 16px;
+            max-width: 560px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            text-align: center;
+        }
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+        .logo {
+            height: 40px;
+            flex-shrink: 0;
+        }
+        h1 {
+            color: #003C64;
+            font-size: 22px;
+            font-weight: 700;
+            margin: 0;
+        }
+        .subtitle {
+            color: #666;
+            font-size: 16px;
+            margin-bottom: 20px;
+            font-weight: 400;
+        }
+        .instruction-box {
+            background: #E3F7FF;
+            border-left: 4px solid #009EEB;
+            padding: 14px 12px;
+            margin-bottom: 16px;
+            text-align: left;
+            border-radius: 8px;
+        }
+        .instruction-box h2 {
+            color: #003C64;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+        .step {
+            margin-bottom: 8px;
+            line-height: 1.5;
+            color: #333;
+            font-size: 14px;
+        }
+        .step strong {
+            color: #009EEB;
+        }
+        .warning-box {
+            background: #FFF4E5;
+            border-left: 4px solid #F48024;
+            padding: 12px;
+            margin-bottom: 16px;
+            border-radius: 8px;
+            text-align: left;
+        }
+        .warning-box .title {
+            font-weight: 600;
+            color: #F48024;
+            margin-bottom: 6px;
+            font-size: 14px;
+        }
+        .warning-box .content {
+            font-size: 13px;
+            line-height: 1.5;
+            color: #333;
+        }
+        .continue-btn {
+            display: inline-block;
+            background: #009EEB;
+            color: white;
+            padding: 16px 48px;
+            border-radius: 12px;
+            text-decoration: none;
+            font-size: 18px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0, 158, 235, 0.3);
+        }
+        .continue-btn:hover {
+            background: #0088cc;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0, 158, 235, 0.4);
+        }
+        .guide-link {
+            margin-top: 24px;
+            padding-top: 24px;
+            border-top: 1px solid #E3EBED;
+        }
+        .guide-link a {
+            color: #009EEB;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .guide-link a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="EF-Logos_EF Logo Pink.png" alt="EF Tours" class="logo">
+            <h1>Welcome to Tour Audio</h1>
+        </div>
+        <p class="subtitle">Listen to your guide in real-time</p>
+
+        <div class="instruction-box">
+            <h2>Quick Setup (10 seconds)</h2>
+            <div class="step">
+                <strong>Step 1:</strong> Click the blue button below
+            </div>
+            <div class="step">
+                <strong>Step 2:</strong> You'll see a security warning - <strong>this is normal!</strong>
+            </div>
+            <div class="step">
+                <strong>Step 3:</strong> Click <strong>"Advanced"</strong> or <strong>"Details"</strong>
+            </div>
+            <div class="step">
+                <strong>Step 4:</strong> Click <strong>"Proceed to ef.tour"</strong> or <strong>"Visit this website"</strong>
+            </div>
+            <div class="step">
+                <strong>Step 5:</strong> Click <strong>"Start Listening"</strong> and enjoy!
+            </div>
+        </div>
+
+        <div class="warning-box">
+            <div class="title">Why do I see a security warning?</div>
+            <div class="content">
+                This is a <strong>private tour audio system</strong> that only works on our WiFi network. 
+                The security warning appears because it's not a public website, but your connection 
+                is completely safe and encrypted. Just click through the warning as shown above!
+            </div>
+        </div>
+
+        <a href="https://ef.tour/index.html" class="continue-btn">
+            Start Listening
+        </a>
+
+        <div class="guide-link">
+            <p style="color: #666; font-size: 14px;">
+                Are you the tour guide? 
+                <a href="https://ef.tour/guide.html">Click here to broadcast</a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>
+
