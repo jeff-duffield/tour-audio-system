@@ -19,7 +19,7 @@
         .container {
             background: #FFFFFF;
             border-radius: 20px;
-            padding: 48px 40px;
+            padding: 32px 40px;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
             max-width: 560px;
             width: 100%;
@@ -156,11 +156,39 @@
             0%, 100% { opacity: 1; transform: scale(1); }
             50% { opacity: 0.5; transform: scale(1.2); }
         }
+        .listener-counter {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            background: linear-gradient(135deg, #E3F7FF 0%, #E3EBED 100%);
+            border-radius: 12px;
+            margin-bottom: 16px;
+            border: 2px solid #009EEB;
+        }
+        .counter-text {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+        }
+        .counter-number {
+            font-size: 28px;
+            font-weight: 700;
+            color: #003C64;
+            line-height: 1;
+        }
+        .counter-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <img src="EF-Logos_EF Logo Pink.png" alt="EF Tours" style="height: 60px; margin-bottom: 16px;">
+        <img src="EF-Logos_EF Logo Pink.png" alt="EF Tours" style="height: 60px; margin-bottom: 8px;">
         <h1>Tour Guide</h1>
         <p class="subtitle">Broadcast to your group</p>
 
@@ -168,6 +196,14 @@
         <div id="broadcastIndicator" class="broadcast-indicator" style="display: none;">
             <div class="pulse-dot"></div>
             <span>🎙️ Broadcasting</span>
+        </div>
+
+        <!-- Listener counter -->
+        <div class="listener-counter" id="listenerCounter">
+            <div class="counter-text">
+                <div class="counter-number" id="listenerCount">0</div>
+                <div class="counter-label">Listeners</div>
+            </div>
         </div>
 
         <div class="status">
@@ -207,7 +243,7 @@
             const btn = document.getElementById('toggleBtn');
             const statusText = document.getElementById('statusText');
             const statusDot = document.getElementById('statusDot');
-            
+
             if (isStreaming) {
                 btn.textContent = 'Stop Broadcasting';
                 btn.className = 'stop-btn';
@@ -219,6 +255,18 @@
                 statusText.textContent = 'Ready to broadcast';
                 statusDot.className = 'status-dot';
             }
+        }
+
+        function updateListenerCount(count) {
+            // Subtract 1 to exclude the guide from the count
+            const listenerCount = Math.max(0, count - 1);
+            const countElement = document.getElementById('listenerCount');
+            const labelElement = document.querySelector('.counter-label');
+
+            countElement.textContent = listenerCount;
+            labelElement.textContent = listenerCount === 1 ? 'Listener' : 'Listeners';
+
+            console.log('Listener count updated:', listenerCount);
         }
 
         function updateVisualizer() {
@@ -342,12 +390,24 @@
 
                     console.log('Broadcasting started');
                 };
-                
+
+                ws.onmessage = (event) => {
+                    // Handle client count updates from server
+                    try {
+                        const message = JSON.parse(event.data);
+                        if (message.type === 'client-count') {
+                            updateListenerCount(message.count);
+                        }
+                    } catch (e) {
+                        // Not JSON, ignore (might be audio data echo, but guide shouldn't receive audio)
+                    }
+                };
+
                 ws.onerror = () => {
                     document.getElementById('statusText').textContent = 'Connection error';
                     document.getElementById('statusDot').className = 'status-dot error';
                 };
-                
+
                 ws.onclose = () => {
                     if (isStreaming) {
                         stopBroadcast();

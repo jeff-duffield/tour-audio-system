@@ -437,6 +437,16 @@
 
                 ws.onmessage = (event) => {
                     try {
+                        // Check if it's a text message (client count update)
+                        if (typeof event.data === 'string') {
+                            const message = JSON.parse(event.data);
+                            if (message.type === 'client-count') {
+                                // Listener page doesn't display count, just ignore
+                                return;
+                            }
+                        }
+
+                        // It's binary audio data
                         receivedPacketCount++;
 
                         // Show broadcast indicator on first packet

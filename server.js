@@ -62,11 +62,36 @@ app.get('/success.txt', (req, res) => {
 
 const clients = new Set();
 
+// Helper function to broadcast client count to all connected clients
+function broadcastClientCount() {
+    const count = clients.size;
+    const countMessage = JSON.stringify({ type: 'client-count', count: count });
+
+    clients.forEach((client) => {
+        if (client.readyState === WebSocket.OPEN) {
+            try {
+                client.send(countMessage);
+            } catch (error) {
+                console.error('Error sending client count:', error);
+            }
+        }
+    });
+}
+
 wss.on('connection', (ws) => {
     clients.add(ws);
     console.log('Client connected. Total clients:', clients.size);
 
+    // Send updated count to all clients
+    broadcastClientCount();
+
     ws.on('message', (data) => {
+        // Check if it's a text message (JSON) or binary audio data
+        if (typeof data === 'string' || data instanceof Buffer && data[0] === 0x7B) {
+            // Might be JSON, but we only handle audio here
+            // Audio data is binary, so just broadcast it
+        }
+
         // Broadcast audio to all OTHER connected clients
         clients.forEach((client) => {
             if (client !== ws && client.readyState === WebSocket.OPEN) {
@@ -78,11 +103,17 @@ wss.on('connection', (ws) => {
     ws.on('close', () => {
         clients.delete(ws);
         console.log('Client disconnected. Total clients:', clients.size);
+
+        // Send updated count to remaining clients
+        broadcastClientCount();
     });
 
     ws.on('error', (error) => {
         console.error('WebSocket error:', error);
         clients.delete(ws);
+
+        // Send updated count to remaining clients
+        broadcastClientCount();
     });
 });
 
