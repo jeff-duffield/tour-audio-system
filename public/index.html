@@ -446,7 +446,7 @@
                             }
                         }
 
-                        // It's binary audio data
+                        // It's binary audio data (PCM)
                         receivedPacketCount++;
 
                         // Show broadcast indicator on first packet
@@ -457,7 +457,7 @@
 
                         // Log every 50th packet
                         if (receivedPacketCount % 50 === 0) {
-                            console.log('Received audio packet #' + receivedPacketCount);
+                            console.log('Received packet #' + receivedPacketCount);
                         }
 
                         // Convert Int16Array back to Float32Array
@@ -479,26 +479,26 @@
                         source.buffer = audioBuffer;
                         source.connect(gainNode);
 
-                        // Schedule for seamless playback with minimal latency
+                        // Schedule for seamless playback with small buffer
                         if (receivedPacketCount === 1) {
-                            // First packet: start immediately for lowest latency
-                            nextPlayTime = audioContext.currentTime;
-                            console.log('First audio packet - starting immediately');
+                            // First packet: add 100ms buffer to prevent underruns
+                            nextPlayTime = audioContext.currentTime + 0.1;
+                            console.log('First audio packet - starting with 100ms buffer');
                         }
 
-                        const playTime = Math.max(nextPlayTime, audioContext.currentTime);
+                        // Always schedule at nextPlayTime (don't skip ahead)
+                        source.start(nextPlayTime);
+                        nextPlayTime = nextPlayTime + audioBuffer.duration;
 
-                        // Prevent buffer drift: if we're getting too far behind, reset to current time
-                        const drift = playTime - audioContext.currentTime;
-                        if (drift > 0.5) {  // If more than 500ms behind, reset
-                            console.log('Latency drift detected (' + Math.round(drift * 1000) + 'ms), resetting to current time');
-                            nextPlayTime = audioContext.currentTime;
-                            source.start(audioContext.currentTime);
-                        } else {
-                            source.start(playTime);
+                        // Check for drift: if we're falling too far behind, reset
+                        const drift = nextPlayTime - audioContext.currentTime;
+                        if (drift > 1.0) {  // If more than 1 second ahead, reset
+                            console.log('Buffer overflow detected (' + Math.round(drift * 1000) + 'ms ahead), resetting');
+                            nextPlayTime = audioContext.currentTime + 0.1;
+                        } else if (drift < 0) {  // If we're behind current time, catch up
+                            console.log('Buffer underrun detected, resetting');
+                            nextPlayTime = audioContext.currentTime + 0.05;  // Small buffer
                         }
-
-                        nextPlayTime = playTime + audioBuffer.duration;
 
                     } catch (e) {
                         console.error('Audio playback error:', e);

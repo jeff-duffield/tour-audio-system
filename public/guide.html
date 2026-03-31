@@ -238,6 +238,39 @@
         let analyser = null;
         let scriptProcessor = null;
         let stream = null;
+        let wakeLock = null;
+
+        // Request wake lock to prevent screen from sleeping during broadcast
+        async function requestWakeLock() {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    console.log('Wake Lock acquired - screen will stay on during broadcast');
+
+                    // Re-acquire wake lock if it's released (e.g., user switches tabs)
+                    wakeLock.addEventListener('release', () => {
+                        console.log('Wake Lock released');
+                    });
+                } else {
+                    console.log('Wake Lock API not supported on this device');
+                }
+            } catch (err) {
+                console.error('Failed to acquire Wake Lock:', err);
+            }
+        }
+
+        // Release wake lock
+        async function releaseWakeLock() {
+            if (wakeLock !== null) {
+                try {
+                    await wakeLock.release();
+                    wakeLock = null;
+                    console.log('Wake Lock released - screen can sleep now');
+                } catch (err) {
+                    console.error('Failed to release Wake Lock:', err);
+                }
+            }
+        }
 
         function updateUI() {
             const btn = document.getElementById('toggleBtn');
@@ -309,6 +342,7 @@
                 console.log('Microphone stream obtained:', stream);
                 console.log('Audio tracks:', stream.getAudioTracks());
 
+                // Create AudioContext for visualizer only
                 audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
                 console.log('AudioContext created, state:', audioContext.state);
 
@@ -329,8 +363,9 @@
 
                 console.log('Analyser connected, starting visualizer');
 
-                // Create script processor for PCM audio (reduced buffer for lower latency)
-                scriptProcessor = audioContext.createScriptProcessor(1024, 1, 1);  // Reduced from 4096 to 1024 (64ms latency)
+                // Create script processor for audio streaming
+                // Using 1024 samples for stable, continuous audio
+                scriptProcessor = audioContext.createScriptProcessor(1024, 1, 1);
                 source.connect(scriptProcessor);
 
                 // Create a gain node set to 0 to prevent feedback while keeping scriptProcessor active
@@ -339,48 +374,48 @@
                 scriptProcessor.connect(silentGain);
                 silentGain.connect(audioContext.destination);
 
-                console.log('ScriptProcessor created and connected (muted to prevent feedback)');
+                console.log('ScriptProcessor created (1024 samples = 64ms latency)');
 
                 const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
                 ws = new WebSocket(protocol + '//' + location.host);
+                ws.binaryType = 'arraybuffer';
 
                 console.log('WebSocket connecting to:', protocol + '//' + location.host);
 
                 let audioPacketCount = 0;
+                let droppedPackets = 0;
 
-                ws.onopen = () => {
+                ws.onopen = async () => {
                     console.log('WebSocket connected!');
 
                     scriptProcessor.onaudioprocess = (e) => {
                         if (ws && ws.readyState === WebSocket.OPEN) {
                             const inputData = e.inputBuffer.getChannelData(0);
 
-                            // Check if there's actual audio data
-                            let hasAudio = false;
-                            for (let i = 0; i < inputData.length; i++) {
-                                if (Math.abs(inputData[i]) > 0.01) {
-                                    hasAudio = true;
-                                    break;
-                                }
-                            }
-
-                            // Convert Float32Array to Int16Array for smaller size
+                            // Optimized PCM encoding - convert Float32 to Int16
                             const pcmData = new Int16Array(inputData.length);
                             for (let i = 0; i < inputData.length; i++) {
-                                pcmData[i] = Math.max(-32768, Math.min(32767, inputData[i] * 32768));
+                                const s = Math.max(-1, Math.min(1, inputData[i]));
+                                pcmData[i] = s < 0 ? s * 32768 : s * 32767;
                             }
+
+                            // Send PCM data - ALWAYS send, no backpressure check
+                            // (backpressure will be handled on server side)
                             ws.send(pcmData.buffer);
 
-                            // Log every 50th packet to avoid console spam
+                            // Log every 100th packet
                             audioPacketCount++;
-                            if (audioPacketCount % 50 === 0) {
-                                console.log('Sent audio packet #' + audioPacketCount + ', has audio:', hasAudio);
+                            if (audioPacketCount % 100 === 0) {
+                                console.log('Sent packet #' + audioPacketCount + ', buffer: ' + ws.bufferedAmount + ' bytes');
                             }
                         }
                     };
 
                     isStreaming = true;
                     updateUI();
+
+                    // Request wake lock to keep screen on during broadcast
+                    await requestWakeLock();
 
                     // Show broadcast indicator
                     document.getElementById('broadcastIndicator').style.display = 'inline-flex';
@@ -420,13 +455,13 @@
         }
 
         function stopBroadcast() {
-            if (ws) {
-                ws.close();
-                ws = null;
-            }
             if (scriptProcessor) {
                 scriptProcessor.disconnect();
                 scriptProcessor = null;
+            }
+            if (ws) {
+                ws.close();
+                ws = null;
             }
             if (stream) {
                 stream.getTracks().forEach(track => track.stop());
@@ -436,9 +471,12 @@
                 audioContext.close();
                 audioContext = null;
             }
-            
+
             isStreaming = false;
             updateUI();
+
+            // Release wake lock when stopping broadcast
+            releaseWakeLock();
 
             // Hide broadcast indicator
             document.getElementById('broadcastIndicator').style.display = 'none';

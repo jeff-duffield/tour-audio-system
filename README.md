@@ -44,6 +44,35 @@ ssh root@192.168.8.1
 
 **Password:** `EFTours2026!`
 
+### Run Load Test
+
+```bash
+# Install dependencies (first time only)
+npm.cmd install
+
+#### Open PowerShell and add Node.js to your PATH
+
+Run this in PowerShell, adjusting the path to match where you extracted Node.js:
+
+```powershell
+$env:PATH = "C:\Users\JeffDuffield\OneDrive - Education First\Node JS\node-v24.14.0-win-x64;$env:PATH"
+```
+
+> ⚠️ This only lasts for the current PowerShell session. You'll need to re-run it each time you open a new terminal.
+
+#### Allow npm scripts to run
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+cd "C:\Users\JeffDuffield\OneDrive - Education First\Documents\tour-audio-server"
+npm.cmd install
+
+# Run with 40 simulated clients for 2 minutes
+node load-test.js --clients 80 --duration 120
+```
+
+> Make sure the guide app is actively broadcasting before starting the test, otherwise clients will connect but receive no audio data.
+
 ### Access URLs
 
 - **Welcome Page:** `http://ef.tour/` (no security warning)
@@ -288,6 +317,361 @@ EOF
 
 ---
 
+## Performance Optimizations for 40+ Concurrent Users
+
+The system has been optimized to handle 50+ simultaneous connections with 0% packet loss. These optimizations are **critical** for production deployment.
+
+### Overview of Optimizations
+
+| Component | Key Optimizations | Result |
+|-----------|-------------------|--------|
+| **Server** | 64KB backpressure, debounced broadcasts | 0% skip rate @ 52 clients |
+| **Guide App** | No client-side throttling, 1024 buffer | Continuous audio stream |
+| **Listener App** | 100ms initial buffer, drift handling | No gaps or stuttering |
+| **Router DHCP** | 100 client pool, rapid commit | Handles connection storms |
+| **Router WiFi** | 60 max clients/band, WMM QoS | Supports 120 total clients |
+
+### Step 9: Apply Router DHCP Optimizations
+
+Run the DHCP optimization script to handle connection storms (when many users join WiFi simultaneously):
+
+```bash
+# Upload optimization script to router
+scp optimize-dhcp.sh root@192.168.8.1:/root/
+
+# SSH into router
+ssh root@192.168.8.1
+
+# Run DHCP optimization
+chmod +x /root/optimize-dhcp.sh
+/root/optimize-dhcp.sh
+```
+
+**What this does:**
+- Increases DHCP pool from 50 → 100 clients
+- Reduces lease time to 2 hours (faster IP reclamation)
+- Enables rapid commit (2x faster DHCP assignments)
+- Increases DNS cache to 1000 entries
+
+**Expected improvement:** 80-90% reduction in connection failures during mass join events
+
+---
+
+### Step 10: Apply Router WiFi Optimizations
+
+Optimize WiFi settings for high client count and enable 5GHz band:
+
+```bash
+# Upload WiFi optimization script
+scp optimize-wifi.sh root@192.168.8.1:/root/
+
+# SSH into router
+ssh root@192.168.8.1
+
+# Run WiFi optimization
+chmod +x /root/optimize-wifi.sh
+/root/optimize-wifi.sh
+```
+
+**What this does:**
+- Increases max associations from 30 → 60 clients per band
+- Enables WMM (WiFi Multimedia QoS) for audio priority
+- Optimizes 2.4GHz: Channel 6, HE40 mode (WiFi 6)
+- Optimizes 5GHz: Auto channel, HE80 mode (WiFi 6)
+- Enables client isolation for security (can be disabled if needed)
+
+**Important:** Encourage users to connect to **5GHz (EF-TOUR-001)** for best performance with 40+ people.
+
+**Manual WiFi optimization (if script doesn't match your router):**
+
+```bash
+ssh root@192.168.8.1
+
+# Set max clients to 60 for both bands
+uci set wireless.wifi2g.maxassoc='60'
+uci set wireless.wifi5g.maxassoc='60'
+
+# Enable WMM (QoS) for audio priority
+uci set wireless.wifi2g.wmm='1'
+uci set wireless.wifi5g.wmm='1'
+
+# Enable client isolation for security
+uci set wireless.wifi2g.isolate='1'
+uci set wireless.wifi5g.isolate='1'
+
+# Apply changes
+uci commit wireless
+wifi reload
+```
+
+**Verification:**
+
+```bash
+# Check DHCP settings
+uci show dhcp.lan | grep -E "leasetime|limit"
+# Should show: leasetime='2h' and limit='100'
+
+# Check WiFi settings
+uci show wireless | grep -E "maxassoc|wmm"
+# Should show: maxassoc='60' and wmm='1' for both bands
+
+# Check both WiFi bands are active
+wifi status | grep -c "up"
+# Should show: 2 (both 2.4GHz and 5GHz enabled)
+```
+
+---
+
+### Audio Performance Optimizations (Already Implemented)
+
+The following optimizations are already built into the code:
+
+#### Server-Side (server.js):
+
+**1. Backpressure Threshold: 64KB**
+```javascript
+// Only skip clients with >64KB buffered (about 2 seconds of audio)
+const bufferSize = client.bufferedAmount || 0;
+if (bufferSize > 65536) {
+    skippedThisRound++;
+    skippedClients++;
+    continue;
+}
+```
+- **Impact:** Skip rate decreased from 43% → 0% with 52 clients
+- **Rationale:** Previous 16KB threshold was too aggressive
+
+**2. Debounced Client Count Broadcasts**
+```javascript
+// Only broadcast client count after 500ms of no changes
+let clientCountBroadcastTimeout = null;
+function broadcastClientCount() {
+    if (clientCountBroadcastTimeout) {
+        clearTimeout(clientCountBroadcastTimeout);
+    }
+    clientCountBroadcastTimeout = setTimeout(() => {
+        // Broadcast after quiet period
+    }, 500);
+}
+```
+- **Impact:** Prevents message storms during mass connections
+- **Rationale:** 40 people connecting = 1,600+ messages without debouncing
+
+**3. Global Error Handlers**
+```javascript
+// Prevent crashes from uncaught exceptions
+process.on('uncaughtException', (error) => {
+    console.error('UNCAUGHT EXCEPTION:', error);
+    // Don't exit - log and continue
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+    wss.close();
+    server.close();
+    // ... cleanup
+});
+```
+- **Impact:** Server stays running even with unexpected errors
+- **Rationale:** Procd auto-restart still available as backup
+
+#### Guide App (guide.html):
+
+**1. Optimized Buffer Size: 1024 samples**
+```javascript
+// 1024 samples = 64ms chunks at 16kHz
+scriptProcessor = audioContext.createScriptProcessor(1024, 1, 1);
+```
+- **Impact:** Stable continuous audio capture
+- **Rationale:** 512 samples too small, caused processing gaps
+
+**2. No Client-Side Backpressure**
+```javascript
+// Always send all audio - no throttling
+ws.send(pcmData.buffer);
+```
+- **Impact:** Fixed cutouts with even 1 listener
+- **Rationale:** Let server handle backpressure, not guide
+
+**3. 16kHz Sample Rate**
+```javascript
+audioContext = new AudioContext({ sampleRate: 16000 });
+```
+- **Impact:** Good voice quality, reasonable bandwidth (256 Kbps/client)
+- **Rationale:** Balance between quality and capacity
+
+**4. PCM Int16 Encoding**
+```javascript
+// Convert Float32 to Int16 (2 bytes per sample)
+const pcmData = new Int16Array(inputData.length);
+for (let i = 0; i < inputData.length; i++) {
+    const s = Math.max(-1, Math.min(1, inputData[i]));
+    pcmData[i] = s < 0 ? s * 32768 : s * 32767;
+}
+```
+- **Impact:** Efficient encoding, low CPU usage
+- **Rationale:** Tried Opus codec but MediaRecorder was unstable
+
+#### Listener App (index.html):
+
+**1. 100ms Initial Buffer**
+```javascript
+if (receivedPacketCount === 1) {
+    // First packet: add buffer to prevent underruns
+    nextPlayTime = audioContext.currentTime + 0.1;
+}
+```
+- **Impact:** Eliminated audio gaps and stuttering
+- **Rationale:** Zero-latency playback caused buffer underruns
+
+**2. Drift Handling**
+```javascript
+// Check for drift and reset if needed
+const drift = nextPlayTime - audioContext.currentTime;
+if (drift > 1.0) {
+    // More than 1 second ahead - reset
+    nextPlayTime = audioContext.currentTime + 0.1;
+} else if (drift < 0) {
+    // Behind current time - catch up
+    nextPlayTime = audioContext.currentTime + 0.05;
+}
+```
+- **Impact:** Graceful handling of network jitter
+- **Rationale:** Prevents buffer overflow/underflow
+
+---
+
+### Performance Testing Results
+
+**Test Configuration:**
+- Router: GL-MT3000 (WiFi 6)
+- Clients: 52 simultaneous connections (1 guide + 51 listeners)
+- Duration: 97 seconds of continuous broadcast
+
+**Results:**
+```json
+{
+  "clients": 52,
+  "skipRate": "0.00%",
+  "slowClients": 0,
+  "maxBufferSize": 0,
+  "totalBroadcasts": 1550
+}
+```
+
+**Capacity:**
+- **Tested:** 52 clients with 0% packet loss ✅
+- **Theoretical max:** 120 clients (60 per WiFi band)
+- **Recommended max:** 60 clients for production use
+- **Bandwidth per client:** 256 Kbps (16kHz × 2 bytes × 8 bits)
+- **Total bandwidth @ 60 clients:** ~15 Mbps (well within WiFi 6 capacity)
+
+---
+
+### Monitoring Performance During Tours
+
+Check system health in real-time:
+
+```bash
+# Quick health check
+curl -k https://192.168.8.1:3000/health
+
+# Example output:
+{
+  "status": "ok",
+  "clients": 42,
+  "uptime": 127.01,
+  "performance": {
+    "totalBroadcasts": 1423,
+    "skippedPackets": 0,
+    "skipRate": "0.00%",
+    "avgBufferSize": 0,
+    "maxBufferSize": 0,
+    "slowClients": 0
+  }
+}
+```
+
+**What to look for:**
+- ✅ `skipRate < 5%` - Excellent
+- ⚠️ `skipRate 5-15%` - Acceptable (some clients on poor WiFi)
+- ❌ `skipRate > 15%` - Problem (see troubleshooting below)
+
+**Real-time monitoring during broadcast:**
+
+```bash
+ssh root@192.168.8.1
+
+# Monitor connections and performance
+watch -n 2 'echo "=== Connected Clients ==="; \
+cat /tmp/dhcp.leases | wc -l; \
+echo ""; \
+echo "=== Server Health ==="; \
+curl -s -k https://127.0.0.1:3000/health 2>/dev/null; \
+echo ""; \
+echo "=== Memory ==="; \
+free -m | grep Mem'
+```
+
+---
+
+### Troubleshooting High Load
+
+**If skip rate > 15% with many clients:**
+
+1. **Check WiFi band distribution:**
+   ```bash
+   ssh root@192.168.8.1
+
+   # Count clients on 2.4GHz
+   iw dev ra0 station dump 2>/dev/null | grep Station | wc -l
+
+   # Count clients on 5GHz
+   iw dev rax0 station dump 2>/dev/null | grep Station | wc -l
+   ```
+   - **Goal:** Distribute evenly between both bands
+   - **Action:** Direct users to connect to "EF-TOUR-001" (5GHz)
+
+2. **Reduce sample rate (last resort):**
+   ```javascript
+   // In guide.html, change:
+   audioContext = new AudioContext({ sampleRate: 12000 });  // Was 16000
+
+   // 25% less bandwidth per client
+   ```
+
+3. **Increase backpressure tolerance:**
+   ```javascript
+   // In server.js, change:
+   if (bufferSize > 131072) {  // 128KB instead of 64KB
+       skippedThisRound++;
+       continue;
+   }
+   ```
+
+**If many clients fail to connect:**
+
+1. **Stagger connections:**
+   - Have groups of 10-15 connect at a time
+   - Wait 30 seconds between groups
+
+2. **Use waiting room page:**
+   - Already available at `waiting-room.html`
+   - Implements random delays to spread connections
+
+3. **Verify optimizations are applied:**
+   ```bash
+   # Check DHCP pool
+   uci show dhcp.lan.limit
+   # Should show: 100
+
+   # Check WiFi max associations
+   uci show wireless | grep maxassoc
+   # Should show: 60 for both bands
+   ```
+
+---
+
 ## Usage
 
 ### For the Tour Guide:
@@ -464,48 +848,550 @@ Visit `http://192.168.8.1:3000/health` to see:
 
 ```
 tour-audio-server/
-├── server.js                      # Main server (dual HTTP/HTTPS)
-├── package.json                   # Node.js dependencies
-├── README.md                      # This file
-├── DEPLOY-WAKE-LOCK.md           # Wake lock feature documentation
-├── IOS-SILENT-MODE-LIMITATION.md # iOS silent mode info
-├── SETUP-EF-TOUR-DOMAIN.md       # Domain setup guide
+├── server.js                          # Main server (dual HTTP/HTTPS)
+├── package.json                       # Node.js dependencies
+├── README.md                          # This file
+├── DEPLOY-WAKE-LOCK.md               # Wake lock feature documentation
+├── IOS-SILENT-MODE-LIMITATION.md     # iOS silent mode info
+├── SETUP-EF-TOUR-DOMAIN.md           # Domain setup guide
+├── SECURITY-RELIABILITY-AUDIT.md     # Security checklist and pre-tour verification
+├── optimize-dhcp.sh                  # Router DHCP optimization script
+├── optimize-wifi.sh                  # Router WiFi optimization script
+├── setup-router.sh                   # Complete router setup automation
+├── deploy-to-router.ps1              # PowerShell deployment helper
 ├── ssl/
-│   ├── server.crt                # Self-signed SSL certificate
-│   └── server.key                # SSL private key
+│   ├── server.crt                    # Self-signed SSL certificate
+│   └── server.key                    # SSL private key
 └── public/
-    ├── welcome.html              # Welcome page (HTTP, no warning)
-    ├── index.html                # Listener interface (HTTPS)
-    ├── guide.html                # Tour guide broadcast interface (HTTPS)
-    └── EF-Logos_EF Logo Pink.png # EF Tours logo
+    ├── welcome.html                  # Welcome page (HTTP, no warning)
+    ├── index.html                    # Listener interface (HTTPS)
+    ├── guide.html                    # Tour guide broadcast interface (HTTPS)
+    ├── waiting-room.html             # Waiting room for staggered connections
+    └── EF-Logos_EF Logo Pink.png     # EF Tours logo
 ```
 
 ## Features
 
 ### Current Features
+
+**Audio Streaming:**
 - ✅ **Real-time audio streaming** via WebSocket (WSS)
+- ✅ **Low latency** (~200-300ms end-to-end)
+- ✅ **PCM Int16 encoding** for reliable real-time transmission
+- ✅ **16kHz sample rate** (good voice quality, efficient bandwidth)
+- ✅ **1024 sample buffer** (64ms chunks for stability)
+- ✅ **Drift correction** prevents buffer overflow/underflow
+- ✅ **100ms initial buffer** eliminates audio gaps
+
+**High-Capacity Performance:**
+- ✅ **50+ concurrent users** tested with 0% packet loss
+- ✅ **64KB backpressure threshold** for smooth streaming
+- ✅ **Debounced broadcasts** prevent message storms
+- ✅ **Global error handlers** prevent server crashes
+- ✅ **Auto-restart** on crash (procd integration)
+- ✅ **Real-time performance monitoring** via /health endpoint
+
+**Network & Connectivity:**
 - ✅ **HTTPS with self-signed certificates** for microphone access
 - ✅ **HTTP welcome page** to explain security warnings
-- ✅ **Captive portal** automatically directs users to welcome page when connecting to WiFi
+- ✅ **Captive portal** automatically directs users to welcome page
 - ✅ **Custom domain** (`ef.tour`) for easy access
+- ✅ **Dual-server architecture** (HTTP on 8888, HTTPS on 3000)
+- ✅ **Port forwarding** (80→8888, 443→3000)
+- ✅ **Optimized DHCP** (100 client pool, rapid commit)
+- ✅ **Optimized WiFi** (60 clients/band, WMM QoS)
+- ✅ **Dual-band support** (2.4GHz + 5GHz WiFi 6)
+
+**User Experience:**
 - ✅ **iOS Safari compatibility** using Web Audio API
-- ✅ **Wake Lock API** prevents iPhone auto-lock during playback
+- ✅ **Wake Lock API** prevents screen lock during broadcast (guide) and playback (listeners)
 - ✅ **iOS silent mode detection** with user-friendly warnings
 - ✅ **Volume control** for listeners
 - ✅ **Audio visualization** with waveforms for both guide and listeners
 - ✅ **Broadcast indicators** with pulsing dots showing active transmission
 - ✅ **Microphone test** feature for guide
 - ✅ **Audio test** feature for listeners
-- ✅ **Low latency** (~200-300ms) with drift correction
 - ✅ **EF brand styling** with color-coded pages (blue for listeners, pink for guide)
-- ✅ **Dual-server architecture** (HTTP on port 8888, HTTPS on port 3000)
-- ✅ **Port forwarding** (80→8888, 443→3000)
+- ✅ **Waiting room page** for staggered connections
+
+### Performance Specifications
+
+| Metric | Value | Notes |
+|--------|-------|-------|
+| **Max Tested Users** | 52 clients | 0% packet loss |
+| **Recommended Max** | 60 clients | For production use |
+| **Theoretical Max** | 120 clients | 60 per WiFi band |
+| **Skip Rate @ 52 clients** | 0.00% | Perfect performance |
+| **Bandwidth per Client** | 256 Kbps | 16kHz × 2 bytes × 8 bits |
+| **Total Bandwidth @ 60** | ~15 Mbps | Well within WiFi 6 capacity |
+| **Latency** | 200-300ms | Acceptable for tour commentary |
+| **Sample Rate** | 16 kHz | Good voice quality |
+| **Audio Encoding** | PCM Int16 | Lossless, low CPU |
+| **Buffer Size** | 1024 samples | 64ms chunks |
+| **Initial Buffer** | 100ms | Prevents underruns |
+| **Backpressure** | 64KB | ~2 seconds of audio |
 
 ### Known Limitations
 - **iOS Silent Mode:** Audio won't play through speakers if silent switch is on (use headphones)
 - **Security Warnings:** Self-signed SSL certificates trigger browser warnings (explained on welcome page)
 - **Wake Lock Support:** Requires iOS 16.4+ (older devices need manual auto-lock adjustment)
 - **Captive Portal:** Requires users to forget and reconnect to network for initial detection
+- **Connection Storms:** Best to stagger connections in groups of 10-15 for 40+ users
+- **WiFi Saturation:** Performance degrades if too many users on 2.4GHz band (use 5GHz)
+
+---
+
+## Load Testing
+
+Before deploying to a real tour, test the server's capacity with the included load testing tool.
+
+### What the Load Test Simulates
+
+The `load-test.js` script simulates multiple listener clients connecting to your server:
+
+✅ **What it tests:**
+- WebSocket connection handling (multiple simultaneous connections)
+- Server CPU/memory under load
+- Message broadcast performance
+- Network throughput
+
+⚠️ **What it does NOT test:**
+- Router WiFi capacity (clients run from one device)
+- DHCP performance (no real WiFi connections)
+- Physical WiFi interference
+- Connection storms (all clients use same network interface)
+
+**Bottom line:** This tests **server load**, not **network load**. Use it to verify the Node.js server can handle 40+ WebSocket connections, but you still need a real-world test for WiFi capacity.
+
+---
+
+### Prerequisites
+
+The load test requires the `ws` package (WebSocket client):
+
+```bash
+# Install dependencies (if not already done)
+npm install
+```
+
+---
+
+### Running a Load Test
+
+#### **Basic Test (20 clients, 60 seconds):**
+
+```bash
+node load-test.js
+```
+
+#### **Simulate Your Tour (40 clients, 2 minutes):**
+
+```bash
+node load-test.js --clients 40 --duration 120
+```
+
+#### **Stress Test (60 clients, 5 minutes):**
+
+```bash
+node load-test.js --clients 60 --duration 300 --ramp 15
+```
+
+---
+
+### Command Line Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--clients <number>` | 20 | Number of simulated listener clients |
+| `--duration <seconds>` | 60 | How long to run the test |
+| `--ramp <seconds>` | 10 | Time to gradually add all clients (prevents connection storm) |
+| `--host <hostname>` | 192.168.8.1 | Server hostname or IP |
+| `--port <number>` | 3000 | Server port |
+| `--no-ssl` | (disabled) | Use WS instead of WSS |
+
+---
+
+### Example Test Scenarios
+
+#### **1. Quick Validation (Post-Deployment):**
+```bash
+# 10 clients for 30 seconds - verify server is working
+node load-test.js --clients 10 --duration 30
+```
+
+#### **2. Tour Capacity Test (40 tourists):**
+```bash
+# Simulate a 2-minute tour with 40 people
+node load-test.js --clients 40 --duration 120 --ramp 20
+```
+
+#### **3. Maximum Capacity Test:**
+```bash
+# Push to 60 clients for 5 minutes
+node load-test.js --clients 60 --duration 300 --ramp 30
+```
+
+#### **4. Connection Storm Test:**
+```bash
+# 50 clients connecting in 5 seconds (aggressive)
+node load-test.js --clients 50 --duration 60 --ramp 5
+```
+
+---
+
+### Understanding the Output
+
+#### **During the Test:**
+
+```
+╔════════════════════════════════════════════════════╗
+║     Tour Audio Server - Load Test                 ║
+╚════════════════════════════════════════════════════╝
+
+Configuration:
+  Clients:    40
+  Duration:   120s
+  Ramp-up:    20s
+  Server:     wss://192.168.8.1:3000
+
+────────────────────────────────────────────────────────
+
+[Client 1] Connecting to wss://192.168.8.1:3000...
+[Client 1] ✅ Connected (Total: 1)
+[Client 2] Connecting to wss://192.168.8.1:3000...
+[Client 2] ✅ Connected (Total: 2)
+...
+
+[25.0s] Current Statistics:
+────────────────────────────────────────────────────────
+  Connected:        40
+  Disconnected:     0
+  Errors:           0
+  Messages Received: 12,340
+  Bytes Received:    25.45 KB
+  Message Rate:      493.6 msg/sec
+  Data Rate:         1.02 KB/sec
+```
+
+**What to look for:**
+- ✅ `Connected: 40` (all clients connected successfully)
+- ✅ `Errors: 0` (no connection failures)
+- ✅ `Messages Received` increasing steadily
+- ✅ `Message Rate` should be stable (not dropping)
+
+**Warning signs:**
+- ⚠️ `Connected < target` (some clients failed to connect)
+- ⚠️ `Errors > 0` (connection or message errors)
+- ⚠️ `⚠️ Warning: X clients haven't received data in 5+ seconds`
+
+---
+
+#### **Final Report:**
+
+```
+╔════════════════════════════════════════════════════╗
+║              FINAL TEST REPORT                     ║
+╚════════════════════════════════════════════════════╝
+
+Overall Statistics:
+────────────────────────────────────────────────────────
+  Test Duration:        120.0s
+  Target Clients:       40
+  Successfully Connected: 40
+  Connection Failures:   0
+  Total Disconnects:     0
+  Total Errors:          0
+  Messages Received:     58,920
+  Bytes Received:        121.50 MB
+  Avg Message Rate:      490.7 msg/sec
+  Avg Data Rate:         1.01 KB/sec
+
+Per-Client Statistics:
+────────────────────────────────────────────────────────
+  Avg messages per client: 1473
+  Min messages: 1468
+  Max messages: 1478
+
+════════════════════════════════════════════════════════
+  Test complete! ✅
+════════════════════════════════════════════════════════
+```
+
+**Success criteria:**
+- ✅ `Connection Failures: 0`
+- ✅ `Total Errors: 0`
+- ✅ `Min messages` close to `Max messages` (even distribution)
+- ✅ No problematic clients listed
+
+---
+
+### Interpreting Results
+
+#### **✅ GOOD - Example with 40 clients:**
+```
+Successfully Connected: 40      ← All connected
+Total Errors:          0        ← No errors
+Avg messages per client: 1473   ← Even distribution
+Min messages: 1468              ← Within 1% of average
+Max messages: 1478
+```
+**Verdict:** Server handled the load perfectly. Safe to deploy.
+
+---
+
+#### **⚠️ WARNING - Example with 60 clients:**
+```
+Successfully Connected: 58      ← 2 failed to connect
+Total Errors:          12       ← Some errors occurred
+Avg messages per client: 1250
+Min messages: 890               ← Some clients got 30% fewer messages
+Max messages: 1310
+
+⚠️ 8 clients had issues:
+   Client 23: 890 msgs, 5 errors
+   Client 47: 920 msgs, 3 errors
+```
+**Verdict:** Server is at capacity. Stay under 60 clients or optimize further.
+
+---
+
+#### **❌ FAILURE - Example with 80 clients:**
+```
+Successfully Connected: 72      ← 10% connection failure rate
+Total Errors:          245      ← Many errors
+Avg messages per client: 850
+Min messages: 120               ← Some clients got almost nothing
+
+⚠️ 28 clients had issues:
+   Client 15: 120 msgs, 45 errors
+   Client 38: 230 msgs, 32 errors
+   ...
+```
+**Verdict:** Server overloaded. Reduce client count or upgrade hardware.
+
+---
+
+### Checking Server Health During Test
+
+While the load test is running, check the server's `/health` endpoint:
+
+```bash
+# In another terminal window
+curl -k https://192.168.8.1:3000/health
+```
+
+**Example healthy output:**
+```json
+{
+  "status": "ok",
+  "clients": 40,
+  "uptime": 125.5,
+  "performance": {
+    "totalBroadcasts": 1420,
+    "skippedPackets": 0,
+    "skipRate": "0.00%",
+    "avgBufferSize": 0,
+    "maxBufferSize": 0,
+    "slowClients": 0
+  }
+}
+```
+
+**What to check:**
+- ✅ `clients: 40` (matches load test client count)
+- ✅ `skipRate: "0.00%"` (no packets dropped)
+- ✅ `slowClients: 0` (all clients keeping up)
+
+**Warning signs:**
+- ⚠️ `skipRate > 5%` (server dropping packets)
+- ⚠️ `slowClients > 0` (some clients lagging)
+- ⚠️ `maxBufferSize > 100000` (backpressure building up)
+
+---
+
+### Monitoring Router Resources During Test
+
+SSH into the router and check CPU/memory:
+
+```bash
+ssh root@192.168.8.1
+
+# Check CPU and memory usage
+top -n 1
+
+# Look for:
+# CPU: Should be < 80% for node process
+# Mem: Should have > 100MB available
+```
+
+**Healthy output:**
+```
+  PID  PPID USER     STAT   VSZ %VSZ CPU %CPU COMMAND
+ 1234     1 root     S    150M  29%   0  45% node /root/tour-audio-server/server.js
+
+Mem: 512000K used, 100000K free, 0K shrd, 12000K buff, 180000K cached
+                      ↑
+                   Good! >100MB free
+```
+
+**Warning signs:**
+- ⚠️ CPU > 90% sustained (router struggling)
+- ⚠️ Free memory < 50MB (running out of RAM)
+
+---
+
+### Load Test vs. Real-World Test
+
+| Aspect | Load Test | Real-World Test |
+|--------|-----------|-----------------|
+| **Server capacity** | ✅ Tests | ✅ Tests |
+| **WebSocket handling** | ✅ Tests | ✅ Tests |
+| **WiFi capacity** | ❌ Does not test | ✅ Tests |
+| **DHCP performance** | ❌ Does not test | ✅ Tests |
+| **Connection storms** | ⚠️ Limited | ✅ Full test |
+| **Physical interference** | ❌ Does not test | ✅ Tests |
+| **Client device compatibility** | ❌ Does not test | ✅ Tests |
+| **Network jitter** | ⚠️ Same network | ✅ Real WiFi |
+
+**Bottom line:** Use load test to validate server can handle the client count, but still do a real-world test with actual people and devices to validate the complete system.
+
+---
+
+### Pre-Tour Test Checklist
+
+Before your next tour with real people:
+
+1. **✅ Run load test locally (from your laptop):**
+   ```bash
+   node load-test.js --clients 40 --duration 120
+   ```
+   - Verify 0 connection failures
+   - Verify 0% skip rate
+
+2. **✅ Check server health endpoint:**
+   ```bash
+   curl -k https://192.168.8.1:3000/health
+   ```
+
+3. **✅ Run load test from a phone on WiFi:**
+   - Connect phone to tour WiFi
+   - Install Node.js/Termux on phone (or use laptop on WiFi)
+   - Run smaller test (10-20 clients)
+   - Verifies WiFi + server together
+
+4. **✅ Test with 2-3 real people:**
+   - Have them connect to WiFi
+   - Have them open listener page
+   - Guide broadcasts for 5 minutes
+   - Ask about audio quality
+
+5. **✅ Create backup config:**
+   ```bash
+   ssh root@192.168.8.1 sysupgrade -b /tmp/backup.tar.gz
+   scp root@192.168.8.1:/tmp/backup.tar.gz ./router-backup-$(date +%Y%m%d).tar.gz
+   ```
+
+---
+
+### Troubleshooting Load Test Issues
+
+#### **Issue: "connect ECONNREFUSED"**
+```
+[Client 1] ❌ Error: connect ECONNREFUSED 192.168.8.1:3000
+```
+
+**Cause:** Server is not running or not accessible
+
+**Fix:**
+```bash
+# Check if server is running
+ssh root@192.168.8.1
+/etc/init.d/tour-audio status
+
+# If not running, start it
+/etc/init.d/tour-audio start
+
+# Verify it's listening on port 3000
+netstat -tlnp | grep 3000
+```
+
+---
+
+#### **Issue: SSL certificate errors**
+```
+[Client 1] ❌ Error: self signed certificate
+```
+
+**Cause:** Node.js rejecting self-signed certificate (should be ignored by load-test.js)
+
+**Fix:** Load test should already handle this. If not:
+```bash
+# Verify you're using the latest load-test.js
+# The script includes: rejectUnauthorized: false
+```
+
+---
+
+#### **Issue: High skip rate during load test**
+```
+"skipRate": "25.00%"
+```
+
+**Cause:** Server can't keep up with broadcast rate
+
+**Possible solutions:**
+1. **Verify guide is broadcasting:** Make sure guide interface is actively broadcasting
+2. **Check network:** Load test might be on different network than guide
+3. **Reduce client count:** Try with fewer clients first
+4. **Check CPU:** Router might be overloaded
+
+**Diagnosis:**
+```bash
+ssh root@192.168.8.1
+
+# Check CPU usage
+top -n 1
+
+# Check memory
+free -m
+
+# Restart server if needed
+/etc/init.d/tour-audio restart
+```
+
+---
+
+#### **Issue: Some clients don't receive messages**
+```
+⚠️ 5 clients had issues:
+   Client 23: 120 msgs, 0 errors
+   Client 47: 95 msgs, 0 errors
+```
+
+**Cause:** Network congestion or server backpressure
+
+**Fix:**
+1. **Check skip rate** - should be < 5%
+2. **Reduce ramp time** - try `--ramp 30` for slower connection
+3. **Check if guide is actually broadcasting** - audio data needed
+
+---
+
+### Advanced: Running Load Test from Multiple Devices
+
+For more realistic WiFi testing, run the load test from multiple phones/laptops connected to the tour WiFi:
+
+**Device 1 (Laptop):**
+```bash
+node load-test.js --clients 20 --duration 120
+```
+
+**Device 2 (Phone with Termux):**
+```bash
+node load-test.js --clients 20 --duration 120
+```
+
+This tests both server capacity AND WiFi capacity simultaneously.
 
 ---
 

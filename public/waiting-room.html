@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>EF Tours - Audio Tour</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            text-align: center;
+        }
+
+        .logo {
+            width: 120px;
+            height: 120px;
+            margin: 0 auto 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 48px;
+        }
+
+        h1 {
+            color: #2d3748;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        .status {
+            color: #718096;
+            margin-bottom: 30px;
+            font-size: 16px;
+        }
+
+        .ready-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            padding: 18px 50px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+            transition: all 0.3s ease;
+            width: 100%;
+            max-width: 300px;
+        }
+
+        .ready-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 40px rgba(102, 126, 234, 0.4);
+        }
+
+        .ready-btn:active {
+            transform: translateY(0);
+        }
+
+        .info {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f7fafc;
+            border-radius: 10px;
+            color: #4a5568;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .countdown {
+            font-size: 48px;
+            font-weight: bold;
+            color: #667eea;
+            margin: 20px 0;
+        }
+
+        .waiting {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">🎧</div>
+        <h1>Welcome to EF Tours Audio</h1>
+        <p class="status" id="status">You're connected! Tap below when you're ready to start listening.</p>
+        
+        <div id="readySection">
+            <button class="ready-btn" onclick="startListening()">I'm Ready to Listen</button>
+            
+            <div class="info">
+                <strong>📱 Before you start:</strong><br>
+                • Turn up your volume<br>
+                • Keep your screen on<br>
+                • Stay connected to WiFi
+            </div>
+        </div>
+
+        <div id="countdownSection" class="waiting">
+            <p class="status">Starting audio in...</p>
+            <div class="countdown" id="countdown">3</div>
+        </div>
+    </div>
+
+    <script>
+        function startListening() {
+            // Add random delay (0-3 seconds) to stagger WebSocket connections
+            const randomDelay = Math.floor(Math.random() * 3000);
+            
+            document.getElementById('readySection').style.display = 'none';
+            document.getElementById('countdownSection').style.display = 'block';
+            
+            let count = 3;
+            const countdownEl = document.getElementById('countdown');
+            
+            const interval = setInterval(() => {
+                count--;
+                countdownEl.textContent = count;
+                
+                if (count === 0) {
+                    clearInterval(interval);
+                    // Redirect to actual listener page after random delay
+                    setTimeout(() => {
+                        window.location.href = '/index.html';
+                    }, randomDelay);
+                }
+            }, 1000);
+        }
+    </script>
+</body>
+</html>
+
