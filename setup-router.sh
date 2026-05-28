@@ -19,7 +19,7 @@ echo "[2/6] Installing OpenSSL..."
 opkg update
 opkg install openssl-util
 
-# Step 3: Generate SSL certificates with ef.tour domain
+# Step 3: Generate SSL certificates with audio.eftours.travel domain
 echo "[3/6] Generating SSL certificates..."
 if [ -f ssl/server.key ]; then
     echo "Backing up existing certificates..."
@@ -32,8 +32,8 @@ openssl req -x509 -newkey rsa:2048 \
   -out ssl/server.crt \
   -days 365 \
   -nodes \
-  -subj "/C=US/ST=State/L=City/O=EF Tours/CN=ef.tour" \
-  -addext "subjectAltName=DNS:ef.tour,DNS:192.168.8.1,IP:192.168.8.1"
+  -subj "/C=US/ST=State/L=City/O=EF Tours/CN=audio.eftours.travel" \
+  -addext "subjectAltName=DNS:audio.eftours.travel,DNS:192.168.8.1,IP:192.168.8.1"
 
 echo "SSL certificates generated:"
 ls -lh ssl/server.key ssl/server.crt
@@ -42,36 +42,39 @@ ls -lh ssl/server.key ssl/server.crt
 echo "[4/6] Installing Node.js dependencies..."
 npm install --production
 
-# Step 5: Configure DNS for ef.tour domain
-echo "[5/6] Configuring DNS for ef.tour domain..."
+# Step 5: Configure DNS for audio.eftours.travel domain
+echo "[5/6] Configuring DNS for audio.eftours.travel domain..."
 # Check if entry already exists
-if ! uci show dhcp | grep -q "ef.tour"; then
-    uci add_list dhcp.@dnsmasq[0].address='/ef.tour/192.168.8.1'
+if ! uci show dhcp | grep -q "audio.eftours.travel"; then
+    uci add_list dhcp.@dnsmasq[0].address='/audio.eftours.travel/192.168.8.1'
     uci commit dhcp
     /etc/init.d/dnsmasq restart
-    echo "DNS entry added for ef.tour"
+    echo "DNS entry added for audio.eftours.travel"
 else
-    echo "DNS entry for ef.tour already exists"
+    echo "DNS entry for audio.eftours.travel already exists"
 fi
 
-# Step 6: Configure port forwarding (443 → 3000)
+# Step 6: Configure port forwarding (targeted to router IP only)
 echo "[6/6] Configuring port forwarding..."
-# Add to firewall.user if not already there
-if ! grep -q "REDIRECT --to-port 3000" /etc/firewall.user 2>/dev/null; then
-    cat >> /etc/firewall.user << 'EOF'
-# Port forwarding for tour-audio-server (HTTPS 443 → 3000)
-iptables -t nat -A PREROUTING -p tcp --dport 443 -j REDIRECT --to-port 3000
+# Remove any old broad redirect rules first
+sed -i '/REDIRECT --to-port[s]* 8888/d' /etc/firewall.user 2>/dev/null
+sed -i '/REDIRECT --to-port[s]* 3000/d' /etc/firewall.user 2>/dev/null
+
+# Add targeted rules (only redirect traffic destined for 192.168.8.1)
+cat >> /etc/firewall.user << 'EOF'
+# Port forwarding for tour-audio-server (targeted to router IP only)
+iptables -t nat -A PREROUTING -i br-lan -d 192.168.8.1 -p tcp --dport 80  -j REDIRECT --to-ports 8888
+iptables -t nat -A PREROUTING -i br-lan -d 192.168.8.1 -p tcp --dport 443 -j REDIRECT --to-ports 3000
 EOF
-    echo "Port forwarding rule added to /etc/firewall.user"
-else
-    echo "Port forwarding rule already exists"
-fi
+echo "Port forwarding rules added to /etc/firewall.user"
 
-# Apply port forwarding immediately
-iptables -t nat -C PREROUTING -p tcp --dport 443 -j REDIRECT --to-port 3000 2>/dev/null || \
-    iptables -t nat -A PREROUTING -p tcp --dport 443 -j REDIRECT --to-port 3000
+# Apply immediately (remove old broad rules, add targeted ones)
+while iptables -t nat -D PREROUTING -p tcp --dport 443 -j REDIRECT --to-port 3000 2>/dev/null; do true; done
+while iptables -t nat -D PREROUTING -p tcp --dport 80  -j REDIRECT --to-port 8888 2>/dev/null; do true; done
+iptables -t nat -A PREROUTING -i br-lan -d 192.168.8.1 -p tcp --dport 80  -j REDIRECT --to-ports 8888
+iptables -t nat -A PREROUTING -i br-lan -d 192.168.8.1 -p tcp --dport 443 -j REDIRECT --to-ports 3000
 
-echo "Port forwarding configured (443 → 3000)"
+echo "Port forwarding configured (80→8888, 443→3000, targeted to 192.168.8.1 only)"
 
 # Restart the server
 echo ""
@@ -88,9 +91,9 @@ if ps | grep -v grep | grep -q "node.*server.js"; then
     echo "✓ Server is running!"
     echo ""
     echo "Access the tour audio system at:"
-    echo "  Guide:   https://ef.tour/guide.html"
-    echo "  Tourist: https://ef.tour/tourist.html"
-    echo "  Health:  https://ef.tour/health"
+    echo "  Guide:   https://audio.eftours.travel/guide.html"
+    echo "  Tourist: https://audio.eftours.travel/"
+    echo "  Health:  https://audio.eftours.travel/health"
     echo ""
     echo "Or using IP address:"
     echo "  Guide:   https://192.168.8.1:3000/guide.html"

@@ -4,7 +4,9 @@ Real-time audio streaming from tour guide to tourists' smartphones via local WiF
 
 ## Quick Reference
 
-**Router Password:** `EFTours2026!`
+**Router Password:** EFTours2026!
+
+**EF-TOUR-001 Network Password:** EFLearnFun
 
 ### Deploy Updates to Router
 
@@ -75,9 +77,70 @@ node load-test.js --clients 80 --duration 120
 
 ### Access URLs
 
-- **Welcome Page:** `http://ef.tour/` (no security warning)
-- **Listener Page:** `https://ef.tour/` or `https://ef.tour/index.html`
-- **Guide Page:** `https://ef.tour/guide.html`
+- **Listener Page:** `https://audio.eftours.travel/` or `https://audio.eftours.travel/index.html`
+- **Guide Page:** `https://audio.eftours.travel/guide.html`
+- **Audio System Admin:** `https://audio.eftours.travel/admin?token=<token>` (see below)
+- **Health Check:** `https://audio.eftours.travel/health`
+
+---
+
+## Audio System Admin Portal
+
+The Audio System Admin portal lets a Tour Director connect the router to hotel Wi-Fi and install SSL certificate updates — without needing to know the router password or use SSH.
+
+### How Access Works
+
+Access is granted via a **bearer token** baked into the URL. The token is generated once and saved permanently to `/etc/ef-admin-token` on the router, so the same link works across reboots until you deliberately rotate it. Sessions last 8 hours after opening the link.
+
+### Generating the Access Link and QR Code
+
+Run this on the router (or on your computer after copying `admin-qr.js` there):
+
+```bash
+ssh root@192.168.8.1
+node /root/tour-audio-server/admin-qr.js
+```
+
+The script prints:
+
+```
+════════════════════════════════════════════════════════════════════════
+ AUDIO SYSTEM ADMIN ACCESS URL
+════════════════════════════════════════════════════════════════════════
+
+ https://audio.eftours.travel/admin?token=<48-char-hex-token>
+
+════════════════════════════════════════════════════════════════════════
+ QUICKEST WAY TO GET THE QR CODE
+════════════════════════════════════════════════════════════════════════
+ Open this link in any browser — it loads the QR image directly:
+
+ https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=...
+```
+
+**On a phone:** open the QR image link in your browser, right-click → Save → print onto the TD onboarding card.
+
+**On a computer:** copy the admin URL and paste it directly into any browser on the tour Wi-Fi network.
+
+### On-Screen QR Code + URL Page
+
+Once logged into the admin portal, tap **"📱 Show QR code for this device"** at the bottom of the page. This opens `/admin/qr`, which shows:
+
+- The **QR code** (scannable from another phone)
+- The full **admin URL** in a copyable text box
+- A **"📋 Copy URL"** button — tap to copy to clipboard
+
+This page works for both scenarios: a TD on their phone scans the QR, a TD on a laptop copies the URL.
+
+### Rotating the Token (e.g. if a card is lost)
+
+```bash
+ssh root@192.168.8.1
+node /root/tour-audio-server/admin-qr.js --rotate
+/etc/init.d/tour-audio restart
+```
+
+This invalidates all existing QR codes and printed cards. Print new cards from the new output.
 
 ---
 
@@ -208,112 +271,84 @@ chmod +x /etc/init.d/tour-audio
 /etc/init.d/tour-audio start
 ```
 
-### Step 5: Set Up SSL Certificates
+### Step 5: Set Up SSL Certificate
 
-Generate self-signed SSL certificates for HTTPS (required for microphone access):
+The SSL certificate for `audio.eftours.travel` is a **CA-signed Let's Encrypt certificate** managed by EF IT. It is installed via the Audio System Admin portal — no manual OpenSSL steps needed.
 
+**One-time setup (done by IT over SSH):**
 ```bash
-# SSH into the router
+# Place the certificate API token on the router
 ssh root@192.168.8.1
-
-# Create SSL directory
-cd /root/tour-audio-server
-mkdir -p ssl
-
-# Generate self-signed certificate
-openssl req -x509 -newkey rsa:2048 -nodes \
-  -keyout ssl/server.key \
-  -out ssl/server.crt \
-  -days 365 \
-  -subj "/C=US/ST=State/L=City/O=EF Tours/CN=ef.tour"
-
-# Verify files were created
-ls -l ssl/
+echo 'YOUR_CERT_TOKEN_HERE' > /etc/ef-cert-token
 ```
 
-### Step 6: Configure DNS for ef.tour Domain
+The certificate is then installed by the Tour Director via the admin portal:
+1. Open the **Audio System Admin** URL on a device connected to the tour WiFi
+2. Connect the router to internet (Step 1 in the portal)
+3. Tap **Update Device Now** (Step 2 in the portal)
+4. The router fetches a fresh certificate from `https://api.eftours.travel/router-cert` and installs it automatically
 
-Set up local DNS resolution so users can access the app via `ef.tour`:
+**Certificate details:**
+- Domain: `audio.eftours.travel`
+- Issuer: Let's Encrypt (trusted by all browsers — no security warnings)
+- Renewal: Certificate expires every ~90 days; TD runs "Update Device" to renew
+- Token file: `/etc/ef-cert-token`
+
+### Step 6: Configure DNS for audio.eftours.travel
+
+Set up local DNS so devices on the tour WiFi resolve `audio.eftours.travel` to the router:
 
 ```bash
-# Add DNS entry for ef.tour
-cat >> /etc/dnsmasq.conf << 'EOF'
+# Add DNS entry
+echo 'address=/audio.eftours.travel/192.168.8.1' >> /etc/dnsmasq.conf
 
-# Local domain for tour audio
-address=/ef.tour/192.168.8.1
-EOF
+# Also add via UCI for persistence across firmware updates
+uci add_list dhcp.@dnsmasq[0].address='/audio.eftours.travel/192.168.8.1'
+uci commit dhcp
 
 # Restart dnsmasq
 /etc/init.d/dnsmasq restart
 
-# Test DNS resolution
-nslookup ef.tour 127.0.0.1
+# Test DNS resolution (should return 192.168.8.1)
+nslookup audio.eftours.travel 127.0.0.1
 ```
 
-Should return `192.168.8.1`.
+**Important:** Do NOT add wildcard DNS entries (`address=/#/`) or captive portal check domains (`connectivitycheck.gstatic.com`, etc.). These cause Chrome and Android to block all internet traffic on the router's WiFi.
 
 ### Step 7: Set Up Port Forwarding
 
-Forward standard HTTP/HTTPS ports to the audio server:
+Forward standard ports to the audio server — **targeted to the router's IP only** so internet traffic passes through normally:
 
 ```bash
-# Add port forwarding rules (restrict to LAN interface)
-iptables -t nat -A PREROUTING -i br-lan -p tcp --dport 80 -j REDIRECT --to-ports 8888
-iptables -t nat -A PREROUTING -i br-lan -p tcp --dport 443 -j REDIRECT --to-ports 3000
-
-# Make rules persistent
+# Add targeted port forwarding rules
 cat >> /etc/firewall.user << 'EOF'
-# Port forwarding for tour audio server
-iptables -t nat -A PREROUTING -i br-lan -p tcp --dport 80 -j REDIRECT --to-ports 8888
-iptables -t nat -A PREROUTING -i br-lan -p tcp --dport 443 -j REDIRECT --to-ports 3000
+# Port forwarding for tour-audio-server (targeted to router IP only)
+iptables -t nat -A PREROUTING -i br-lan -d 192.168.8.1 -p tcp --dport 80  -j REDIRECT --to-ports 8888
+iptables -t nat -A PREROUTING -i br-lan -d 192.168.8.1 -p tcp --dport 443 -j REDIRECT --to-ports 3000
 EOF
+
+# Apply immediately
+iptables -t nat -A PREROUTING -i br-lan -d 192.168.8.1 -p tcp --dport 80  -j REDIRECT --to-ports 8888
+iptables -t nat -A PREROUTING -i br-lan -d 192.168.8.1 -p tcp --dport 443 -j REDIRECT --to-ports 3000
 
 # Verify rules
-iptables -t nat -L PREROUTING -n -v
+iptables -t nat -L PREROUTING -n -v | grep REDIRECT
 ```
 
-**Note:** The `-i br-lan` flag restricts port forwarding to LAN traffic only, preventing conflicts with the router's WAN connection.
+**Why `-d 192.168.8.1`:** This restricts redirection to traffic destined for the router itself. Without this, ALL internet traffic on port 80/443 gets intercepted, breaking internet access for connected devices.
 
-### Step 8: Set Up Captive Portal (Recommended)
+### Step 8: Enable NTP Auto-Sync
 
-Configure automatic captive portal detection so users are automatically directed to the welcome page when they connect to WiFi:
+The router has no battery-backed clock and resets to the past after a reboot. NTP sync is required for SSL certificate validation to succeed:
 
 ```bash
-# Add captive portal detection URLs to dnsmasq
-cat >> /etc/dnsmasq.conf << 'EOF'
-
-# Captive portal detection URLs
-address=/#/192.168.8.1
-address=/captive.apple.com/192.168.8.1
-address=/connectivitycheck.gstatic.com/192.168.8.1
-address=/www.msftconnecttest.com/192.168.8.1
-address=/detectportal.firefox.com/192.168.8.1
-address=/clients3.google.com/192.168.8.1
-address=/play.googleapis.com/192.168.8.1
-EOF
-
-# Restart dnsmasq
-/etc/init.d/dnsmasq restart
-
-# Restart tour audio server to load captive portal handlers
-/etc/init.d/tour-audio restart
+uci set system.ntp.enabled=1
+uci set system.ntp.enable_server=0
+uci commit system
+/etc/init.d/sysntpd restart
 ```
 
-**How it works:**
-- The wildcard DNS entry (`address=/#/192.168.8.1`) redirects ALL domain requests to the router
-- When devices connect to WiFi, they check specific URLs to detect captive portals
-- The router redirects these checks, triggering the "Sign in to network" notification
-- Tapping the notification opens the welcome page automatically
-- The server.js includes handlers that redirect captive portal checks to the welcome page
-
-**Testing the captive portal:**
-1. On a phone, **forget the WiFi network** (important!)
-2. Turn WiFi off, wait 10 seconds, turn WiFi on
-3. Reconnect to the network
-4. Should see "Sign in to network" notification
-5. Tapping it opens the welcome page at `http://ef.tour/`
-
-**Note:** Users must forget and reconnect to the network for captive portal detection to trigger. Once connected, they can bookmark `ef.tour` for easy access.
+This ensures the router's clock is always correct on boot, preventing SSL handshake failures.
 
 ---
 
@@ -678,59 +713,45 @@ free -m | grep Mem'
 1. Power on the router (connect USB battery pack)
 2. Wait ~30 seconds for it to boot
 3. Connect your phone to the tour WiFi network
-4. Open browser and go to `https://ef.tour/guide.html`
-5. Click through security warning (Advanced → Proceed)
-6. Tap **Start Broadcasting**
-7. Speak — your voice streams to all connected tourists
+4. Open browser and go to `https://audio.eftours.travel/guide.html`
+5. Tap **Start Broadcasting**
+6. Speak — your voice streams to all connected tourists
 
 ### For Tourists:
-
-**With Captive Portal (Automatic):**
-1. Connect to the tour WiFi network (e.g., `EF-Tour-Paris`)
-2. Tap the "Sign in to network" notification that appears
-3. Welcome page opens automatically
-4. Tap "Start Listening"
-5. Click through security warning (Advanced → Proceed)
-6. Tap **Start Listening** on audio page
-7. Use headphones for best experience
-8. Adjust volume as needed
-
-**Without Captive Portal (Manual):**
-1. Connect to the tour WiFi network
+1. Connect to the tour WiFi network (e.g., `EF-TOUR-001`)
 2. Open any browser
-3. Type: `ef.tour`
-4. Follow steps 4-8 above
+3. Navigate to `audio.eftours.travel` — the browser will automatically use HTTPS
+4. Tap **Start Listening**
+5. Use headphones for best experience
+6. Adjust volume as needed
 
-**Note:** The screen will stay on while listening to prevent audio interruption on iPhone.
+**Note:** No security warnings or click-throughs needed — the site uses a trusted CA-signed certificate. The screen will stay on while listening to prevent audio interruption on iPhone.
 
 ---
 
 ## Network Diagram
 
 ```
-                    +--------------------------------+
-                    |   GL-MT3000 Router             |
-                    |                                |
-                    |  [WiFi Access Point]           |
-                    |  [Node.js Dual Server]         |
-                    |    - HTTP (8888): Welcome      |
-                    |    - HTTPS (3000): Audio App   |
-                    |  [dnsmasq DNS + Captive Portal]|
-                    |  [Port Forwarding: 80→8888,    |
-                    |                    443→3000]   |
-                    +-----+----------+---------------+
-                          |          |
-                     WiFi |          | WiFi
-                          |          |
-                    +-----+--+  +---+--------+
-                    | Guide  |  | Tourist    |
-                    | Phone  |  | Phones     |
-                    | (mic)  |  | (speakers) |
-                    +--------+  +------------+
-                                     |
-                          "Sign in to network"
-                          notification appears
-                          automatically!
+                    +------------------------------------------+
+                    |   GL-MT3000 Router (192.168.8.1)         |
+                    |                                          |
+                    |  [WiFi Access Point]                     |
+                    |  [Node.js Dual Server]                   |
+                    |    - HTTP  (8888): Welcome/redirect      |
+                    |    - HTTPS (3000): Audio App             |
+                    |  [dnsmasq: audio.eftours.travel→router]  |
+                    |  [Port Forwarding: 80→8888, 443→3000]    |
+                    |    (targeted to 192.168.8.1 only)        |
+                    |  [Let's Encrypt cert via ef-update.sh]   |
+                    +-----+--------------------+---------------+
+                          |                    |
+                     WiFi |          WiFi      | Uplink (hotel/hotspot)
+                          |                    |
+                    +-----+--+  +---+------+   +------------------+
+                    | Guide  |  | Tourist  |   | api.eftours.travel|
+                    | Phone  |  | Phones   |   | (cert renewal API)|
+                    | (mic)  |  | (listen) |   +------------------+
+                    +--------+  +----------+
 ```
 
 No Raspberry Pi. No ethernet cables. One device does everything.
@@ -739,18 +760,26 @@ No Raspberry Pi. No ethernet cables. One device does everything.
 
 ## Troubleshooting
 
-### Captive portal not appearing
-- **Forget the network first:** Devices must forget and reconnect for captive portal detection
-- Check DNS configuration: `cat /etc/dnsmasq.conf | grep -A 10 "Captive portal"`
-- Verify wildcard DNS is working: `nslookup google.com 127.0.0.1` (should return 192.168.8.1)
-- Restart dnsmasq: `/etc/init.d/dnsmasq restart`
-- Check server captive portal handlers are working: `curl http://192.168.8.1:8888/hotspot-detect.html`
-
-### Can't access ef.tour
-- Check DNS entry: `nslookup ef.tour 127.0.0.1` (should return 192.168.8.1)
-- Verify port forwarding: `iptables -t nat -L PREROUTING -n -v`
+### Can't access audio.eftours.travel
+- Check DNS entry: `nslookup audio.eftours.travel 127.0.0.1` (should return 192.168.8.1)
+- Verify port forwarding: `iptables -t nat -L PREROUTING -n -v | grep REDIRECT`
 - Check both servers are running: `ps | grep node`
 - Test direct access: `http://192.168.8.1:8888/` (HTTP) and `https://192.168.8.1:3000/` (HTTPS)
+
+### "Update Device" fails — "Could not reach update server"
+- Confirm the router is connected to internet (Step 1 in admin portal)
+- Check the cert token file exists: `cat /etc/ef-cert-token`
+- Sync the clock manually: `ntpd -q -p pool.ntp.org` (SSL fails if clock is wrong)
+- Test API directly: `curl -s -H "Authorization: Bearer $(cat /etc/ef-cert-token)" https://api.eftours.travel/router-cert`
+
+### Internet not working for devices connected to the router
+- Verify iptables rules are targeted (not intercepting all traffic):
+  ```bash
+  iptables -t nat -L PREROUTING -n -v | grep REDIRECT
+  # Should show: -d 192.168.8.1 on all REDIRECT rules
+  ```
+- Check no wildcard DNS entries exist: `grep 'address=/#/' /etc/dnsmasq.conf` (should return nothing)
+- Confirm router's uplink is connected: `ubus call repeater info 2>/dev/null`
 
 ### Audio cutting out
 - Move tourists closer to the router
@@ -783,38 +812,6 @@ No Raspberry Pi. No ethernet cables. One device does everything.
 
 ## Advanced Configuration
 
-### Captive Portal Detection Handlers
-
-The server.js file includes routes that redirect captive portal detection requests to the welcome page. These work in conjunction with the DNS configuration:
-
-**HTTP Server (port 8888) - Redirects to welcome page:**
-```javascript
-httpApp.get('/hotspot-detect.html', (req, res) => {
-    res.redirect('/welcome.html');
-});
-
-httpApp.get('/generate_204', (req, res) => {
-    res.redirect(302, '/welcome.html');
-});
-
-httpApp.get('/gen_204', (req, res) => {
-    res.redirect(302, '/welcome.html');
-});
-```
-
-**HTTPS Server (port 3000) - Redirects to HTTP welcome:**
-```javascript
-app.get('/hotspot-detect.html', (req, res) => {
-    res.redirect('http://ef.tour/');
-});
-
-app.get('/generate_204', (req, res) => {
-    res.redirect(302, 'http://ef.tour/');
-});
-```
-
-These handlers are automatically included in server.js and work with the DNS wildcard redirect.
-
 ### Changing the WiFi Network Name
 
 1. SSH into the router or use the admin panel at `192.168.8.1`
@@ -823,7 +820,7 @@ These handlers are automatically included in server.js and work with the DNS wil
 
 ### Monitoring Connected Clients
 
-Visit `http://192.168.8.1:3000/health` to see:
+Visit `https://audio.eftours.travel/health` to see:
 ```json
 {
     "status": "ok",
@@ -849,25 +846,24 @@ Visit `http://192.168.8.1:3000/health` to see:
 ```
 tour-audio-server/
 ├── server.js                          # Main server (dual HTTP/HTTPS)
+├── admin-qr.js                        # Generate/rotate admin token; print QR + URL
+├── ef-update.sh                       # Certificate update script (run by admin portal)
+├── setup-router.sh                    # Complete router setup automation
 ├── package.json                       # Node.js dependencies
 ├── README.md                          # This file
-├── DEPLOY-WAKE-LOCK.md               # Wake lock feature documentation
-├── IOS-SILENT-MODE-LIMITATION.md     # iOS silent mode info
-├── SETUP-EF-TOUR-DOMAIN.md           # Domain setup guide
-├── SECURITY-RELIABILITY-AUDIT.md     # Security checklist and pre-tour verification
-├── optimize-dhcp.sh                  # Router DHCP optimization script
-├── optimize-wifi.sh                  # Router WiFi optimization script
-├── setup-router.sh                   # Complete router setup automation
-├── deploy-to-router.ps1              # PowerShell deployment helper
+├── optimize-dhcp.sh                   # Router DHCP optimization script
+├── optimize-wifi.sh                   # Router WiFi optimization script
 ├── ssl/
-│   ├── server.crt                    # Self-signed SSL certificate
-│   └── server.key                    # SSL private key
+│   ├── server.crt                     # Let's Encrypt certificate (installed via Update Device)
+│   ├── server.key                     # EC private key (installed via Update Device)
+│   └── backup/                        # Timestamped backups of previous certs
 └── public/
-    ├── welcome.html                  # Welcome page (HTTP, no warning)
-    ├── index.html                    # Listener interface (HTTPS)
-    ├── guide.html                    # Tour guide broadcast interface (HTTPS)
-    ├── waiting-room.html             # Waiting room for staggered connections
-    └── EF-Logos_EF Logo Pink.png     # EF Tours logo
+    ├── welcome.html                   # Welcome/landing page (HTTP)
+    ├── index.html                     # Listener interface (HTTPS)
+    ├── guide.html                     # Tour guide broadcast interface (HTTPS)
+    ├── admin.html                     # Audio System Admin portal (Wi-Fi connect, cert update)
+    ├── waiting-room.html              # Waiting room for staggered connections
+    └── EF-Logos_EF Logo Pink.png      # EF Tours logo
 ```
 
 ## Features
@@ -892,15 +888,16 @@ tour-audio-server/
 - ✅ **Real-time performance monitoring** via /health endpoint
 
 **Network & Connectivity:**
-- ✅ **HTTPS with self-signed certificates** for microphone access
-- ✅ **HTTP welcome page** to explain security warnings
-- ✅ **Captive portal** automatically directs users to welcome page
-- ✅ **Custom domain** (`ef.tour`) for easy access
-- ✅ **Dual-server architecture** (HTTP on 8888, HTTPS on 3000)
-- ✅ **Port forwarding** (80→8888, 443→3000)
+- ✅ **CA-signed HTTPS certificate** (Let's Encrypt, no browser warnings)
+- ✅ **Custom domain** (`audio.eftours.travel`) resolved locally via dnsmasq
+- ✅ **Automatic cert renewal** via "Update Device" in admin portal
+- ✅ **Dual-server architecture** (HTTP on 8888 redirects to HTTPS, HTTPS on 3000)
+- ✅ **Targeted port forwarding** (80→8888, 443→3000, router IP only)
+- ✅ **NTP auto-sync** on boot (prevents SSL failures after reboot)
 - ✅ **Optimized DHCP** (100 client pool, rapid commit)
 - ✅ **Optimized WiFi** (60 clients/band, WMM QoS)
 - ✅ **Dual-band support** (2.4GHz + 5GHz WiFi 6)
+- ✅ **Internet passthrough** — connected devices can browse normally when router has uplink
 
 **User Experience:**
 - ✅ **iOS Safari compatibility** using Web Audio API
@@ -933,9 +930,9 @@ tour-audio-server/
 
 ### Known Limitations
 - **iOS Silent Mode:** Audio won't play through speakers if silent switch is on (use headphones)
-- **Security Warnings:** Self-signed SSL certificates trigger browser warnings (explained on welcome page)
 - **Wake Lock Support:** Requires iOS 16.4+ (older devices need manual auto-lock adjustment)
-- **Captive Portal:** Requires users to forget and reconnect to network for initial detection
+- **Certificate Renewal:** Cert expires every ~90 days; TD must run "Update Device" with internet access to renew
+- **Clock Reset:** If NTP sync fails after reboot, SSL certificate validation may fail until clock syncs
 - **Connection Storms:** Best to stagger connections in groups of 10-15 for 40+ users
 - **WiFi Saturation:** Performance degrades if too many users on 2.4GHz band (use 5GHz)
 

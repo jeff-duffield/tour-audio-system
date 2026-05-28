@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EF Tour Audio - Audio System Admin</title>
+    <link rel="icon" type="image/png" href="EF-Logos_EF Logo Pink.png">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
+            background: #FFE8F5;
+            min-height: 100vh;
+            padding: 16px;
+            color: #191919;
+        }
+        .container {
+            background: #FFFFFF; border-radius: 20px; padding: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 640px; margin: 0 auto;
+        }
+        .header { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
+        .logo { height: 48px; flex-shrink: 0; }
+        h1 { color: #003C64; font-size: 24px; font-weight: 700; margin: 0; letter-spacing: -0.5px; }
+        .subtitle { color: #666; margin-bottom: 20px; font-size: 14px; }
+        h2 { color: #003C64; font-size: 16px; font-weight: 700; margin: 0 0 10px; }
+
+        /* Status banner */
+        .banner {
+            display: flex; align-items: center; gap: 12px;
+            padding: 14px 16px; border-radius: 12px; margin-bottom: 14px;
+            font-size: 15px; font-weight: 600;
+        }
+        .banner .icon { font-size: 22px; flex-shrink: 0; }
+        .banner.ready    { background: #E2EFDA; color: #2E5F1A; }
+        .banner.warning  { background: #FFF2CC; color: #7A5800; }
+        .banner.action   { background: #FCE4D6; color: #8B2A1C; }
+        .banner.updating { background: #D6E4F0; color: #0A3D62; }
+        .banner.updating .icon { animation: spin 1.2s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Status cards */
+        .cards { display: grid; grid-template-columns: 1fr; gap: 10px; margin-bottom: 22px; }
+        @media (min-width: 600px) { .cards { grid-template-columns: repeat(3, 1fr); } }
+        .card { padding: 12px 14px; background: #F5F7FA; border-radius: 10px; border-left: 4px solid #009EEB; }
+        .card h3 { font-size: 11px; text-transform: uppercase; color: #666;
+                   letter-spacing: 0.6px; margin-bottom: 6px; font-weight: 600; }
+        .card .value { font-size: 15px; font-weight: 700; color: #003C64; line-height: 1.3; }
+        .card .sub   { font-size: 12px; color: #666; margin-top: 4px; }
+        .card.warn   { border-left-color: #F4A300; }
+        .card.bad    { border-left-color: #D54027; }
+
+        /* Sections */
+        .section { margin-bottom: 22px; }
+        .section-hr { border: none; border-top: 1px solid #EFEFEF; margin: 18px 0; }
+
+        /* Internet + WiFi */
+        .inet-status {
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 14px; background: #F5F7FA; border-radius: 10px;
+            margin-bottom: 12px; font-size: 14px;
+        }
+        .inet-status .dot { width: 10px; height: 10px; border-radius: 50%; background: #999; flex-shrink: 0; }
+        .inet-status.connected .dot { background: #4CAF50; box-shadow: 0 0 0 4px rgba(76,175,80,.15); }
+        .inet-status.checking .dot  { background: #FFB300; }
+        .btn-disconnect {
+            margin-left: auto; flex-shrink: 0;
+            padding: 4px 10px; font-size: 12px; font-weight: 600;
+            border: 1.5px solid #009EEB; border-radius: 8px;
+            background: #FFF; color: #009EEB; cursor: pointer;
+            font-family: inherit; white-space: nowrap;
+        }
+        .btn-disconnect:hover:not(:disabled) { background: #E3F7FF; }
+        .btn-disconnect:disabled { opacity: 0.45; cursor: not-allowed; }
+
+        .form-row { margin-bottom: 10px; }
+        .form-row label { display: block; font-size: 13px; font-weight: 600; color: #003C64; margin-bottom: 6px; }
+        select, input[type="text"], input[type="password"] {
+            width: 100%; padding: 12px 14px; font-size: 15px;
+            border: 1.5px solid #D5DEE3; border-radius: 10px; background: #FFF;
+            font-family: inherit;
+        }
+        select:focus, input:focus { outline: none; border-color: #009EEB; }
+        .pw-row { display: flex; gap: 8px; align-items: stretch; }
+        .pw-row input { flex: 1; }
+        .pw-toggle { padding: 0 14px; background: #F5F7FA; border: 1.5px solid #D5DEE3;
+                     border-radius: 10px; cursor: pointer; font-size: 13px; color: #003C64; }
+
+        .btn {
+            display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+            width: 100%; padding: 14px; min-height: 48px;
+            border: none; border-radius: 10px; cursor: pointer;
+            font-size: 15px; font-weight: 700; font-family: inherit;
+            transition: all 0.15s ease;
+        }
+        .btn-primary   { background: #009EEB; color: #FFF; }
+        .btn-primary:hover:not(:disabled)   { background: #0088CC; }
+        .btn-secondary { background: #FFFFFF; color: #009EEB; border: 1.5px solid #009EEB; }
+        .btn-secondary:hover:not(:disabled) { background: #E3F7FF; }
+        .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+        .btn-update { background: #009EEB; color: #FFF; font-size: 17px; min-height: 56px; }
+        .btn-update:hover:not(:disabled) { background: #0088CC; }
+
+        .inline-msg { font-size: 13px; margin-top: 8px; min-height: 18px; }
+        .inline-msg.ok   { color: #2E5F1A; }
+        .inline-msg.err  { color: #8B2A1C; }
+        .inline-msg.info { color: #003C64; }
+
+        /* Update progress */
+        .progress-list { background: #F5F7FA; border-radius: 10px; padding: 10px 14px; }
+        .step { display: flex; align-items: center; gap: 10px; padding: 6px 0; font-size: 14px; }
+        .step .si { width: 22px; text-align: center; font-size: 16px; flex-shrink: 0; }
+        .step.pending .si::before     { content: '○'; color: #999; }
+        .step.in_progress .si::before { content: '◐'; color: #009EEB; animation: spin 1.5s linear infinite; display: inline-block; }
+        .step.done .si::before        { content: '✓'; color: #2E7D32; }
+        .step.failed .si::before      { content: '✗'; color: #D54027; }
+        .step.pending     { color: #999; }
+        .step.done        { color: #2E5F1A; }
+        .step.failed      { color: #8B2A1C; font-weight: 600; }
+
+        /* Collapsible toggles */
+        .toggle-link {
+            background: none; border: none; padding: 8px 0; cursor: pointer;
+            color: #009EEB; font-size: 13px; font-weight: 600; font-family: inherit;
+            display: flex; align-items: center; gap: 6px;
+        }
+        .toggle-link:hover { text-decoration: underline; }
+        .collapse-body { padding: 10px 0 0; font-size: 13px; color: #444; line-height: 1.55; }
+        .collapse-body ol { padding-left: 22px; }
+        .collapse-body li { margin-bottom: 4px; }
+
+        /* Update log */
+        .log-list { max-height: 260px; overflow-y: auto; }
+        .log-entry { padding: 8px 0; border-bottom: 1px solid #EFEFEF; font-size: 13px; }
+        .log-entry:last-child { border-bottom: none; }
+        .log-entry .time { color: #888; font-size: 11px; }
+        .log-entry .what { color: #003C64; margin-top: 2px; }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="EF-Logos_EF Logo Pink.png" alt="EF Tours" class="logo">
+            <h1>Audio System Admin</h1>
+        </div>
+        <p class="subtitle">Device status &amp; updates</p>
+
+        <!-- Status banner -->
+        <div id="statusBanner" class="banner warning">
+            <span class="icon">⏳</span>
+            <span id="bannerText">Checking device status…</span>
+        </div>
+
+        <!-- Status cards -->
+        <div class="cards">
+            <div class="card" id="cardCert">
+                <h3>Certificate</h3>
+                <div class="value" id="certValue">—</div>
+                <div class="sub" id="certSub"></div>
+            </div>
+            <div class="card" id="cardApp">
+                <h3>App Version</h3>
+                <div class="value" id="appValue">—</div>
+                <div class="sub" id="appSub"></div>
+            </div>
+            <div class="card" id="cardUpd">
+                <h3>Last Updated</h3>
+                <div class="value" id="updValue">—</div>
+                <div class="sub" id="updSub"></div>
+            </div>
+        </div>
+
+        <!-- Section 2: Internet / WiFi -->
+        <div class="section">
+            <h2>Step 1: Connect to Internet</h2>
+            <div id="inetStatus" class="inet-status checking">
+                <span class="dot"></span>
+                <span id="inetText">Checking connection…</span>
+                <button id="disconnectBtn" class="btn-disconnect hidden" onclick="disconnectWifi()">Disconnect</button>
+            </div>
+
+            <button id="scanBtn" class="btn btn-secondary" onclick="scanWifi()">
+                🔍 Scan for Wi-Fi Networks
+            </button>
+
+            <div id="wifiForm" class="hidden" style="margin-top: 12px;">
+                <div class="form-row">
+                    <label for="ssidSelect">Network</label>
+                    <select id="ssidSelect" onchange="onSsidChange()">
+                        <option value="">— Select a network —</option>
+                        <option value="__manual__">✏️ Type network name manually…</option>
+                    </select>
+                </div>
+                <div class="form-row hidden" id="manualRow">
+                    <label for="ssidManual">Network name (SSID)</label>
+                    <input type="text" id="ssidManual" placeholder="e.g. Marriott_Guest" autocomplete="off">
+                </div>
+                <div class="form-row">
+                    <label for="wifiPw">Password</label>
+                    <div class="pw-row">
+                        <input type="password" id="wifiPw" placeholder="Leave blank for open networks" autocomplete="off">
+                        <button type="button" class="pw-toggle" onclick="togglePw()">Show</button>
+                    </div>
+                </div>
+                <button id="connectBtn" class="btn btn-primary" onclick="connectWifi()">Connect</button>
+                <div id="connectMsg" class="inline-msg"></div>
+            </div>
+
+            <button class="toggle-link" onclick="toggleHotspot()" style="margin-top: 12px;">
+                <span id="hsArrow">▶</span> Using your phone as a hotspot instead?
+            </button>
+            <div id="hotspotHelp" class="collapse-body hidden">
+                <strong>iPhone:</strong>
+                <ol>
+                    <li>Settings → Personal Hotspot → turn on "Allow Others to Join"</li>
+                    <li>Note the Wi-Fi password shown on that screen</li>
+                    <li>Scan networks above; your iPhone name should appear</li>
+                </ol>
+                <strong>Android:</strong>
+                <ol>
+                    <li>Settings → Network &amp; Internet → Hotspot &amp; tethering → Wi-Fi hotspot → turn on</li>
+                    <li>Note the hotspot name and password</li>
+                    <li>Scan networks above to find it</li>
+                </ol>
+            </div>
+        </div>
+
+        <hr class="section-hr">
+
+        <!-- Section 3: Update -->
+        <div class="section">
+            <h2>Step 2: Update Device</h2>
+            <div id="updateArea">
+                <button id="updateBtn" class="btn btn-update" onclick="startUpdate()" disabled>
+                    Update Device Now
+                </button>
+                <div id="updateHint" class="inline-msg info">Connect to internet first</div>
+            </div>
+            <div id="progressArea" class="hidden">
+                <div class="progress-list" id="progressList"></div>
+                <div id="updateResult" class="inline-msg"></div>
+                <button id="tryAgainBtn" class="btn btn-secondary hidden" onclick="resetUpdate()" style="margin-top: 10px;">
+                    Try Again
+                </button>
+            </div>
+        </div>
+
+        <hr class="section-hr">
+
+        <!-- Section 4: Update log -->
+        <div class="section">
+            <button class="toggle-link" onclick="toggleLog()">
+                <span id="logArrow">▶</span> Show update details
+            </button>
+            <div style="margin-top: 8px;">
+                <button class="toggle-link" onclick="window.open('/admin/qr', '_blank')">
+                    📱 Show QR code for this device
+                </button>
+            </div>
+            <div id="logPanel" class="collapse-body hidden">
+                <div class="log-list" id="logList">
+                    <div style="color:#888; font-size:13px; text-align:center; padding:12px 0;">No updates recorded yet.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        // ---- API ----------------------------------------------------------
+        async function api(path, opts) {
+            const res = await fetch(path, Object.assign({ credentials: 'same-origin' }, opts || {}));
+            if (res.status === 401) {
+                document.body.innerHTML = '<div style="padding:40px;text-align:center;font-family:system-ui;' +
+                    'color:#fff;background:#003C64;min-height:100vh;display:flex;align-items:center;' +
+                    'justify-content:center"><div><h1>Session expired</h1>' +
+                    '<p style="opacity:.8">Please scan the admin QR code again.</p></div></div>';
+                throw new Error('unauthorized');
+            }
+            return res.json();
+        }
+
+        // ---- Formatters ---------------------------------------------------
+        function fmtDays(n) {
+            if (n === null || n === undefined) return 'Unknown';
+            if (n <= 0) return 'Expired';
+            if (n === 1) return '1 day remaining';
+            return n + ' days remaining';
+        }
+        function fmtRel(iso) {
+            if (!iso) return 'Never';
+            const d = new Date(iso);
+            const days = Math.floor((Date.now() - d.getTime()) / 86400000);
+            const t = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+            if (days === 0) return 'Today at ' + t;
+            if (days === 1) return 'Yesterday at ' + t;
+            if (days < 30) return days + ' days ago';
+            return d.toLocaleDateString();
+        }
+
+        // ---- Banner -------------------------------------------------------
+        function setBanner(overall) {
+            const banner = document.getElementById('statusBanner');
+            const text   = document.getElementById('bannerText');
+            const icon   = banner.querySelector('.icon');
+            banner.className = 'banner ' + overall;
+            const states = {
+                ready:       ['✅', 'Your device is ready for your tour!'],
+                warning:     ['⚠️', 'Your device needs an update'],
+                action:      ['❌', 'Action required — update now'],
+                certmissing: ['❌', 'No certificate installed — please run Update Device to install one'],
+                certexpired: ['❌', 'Certificate expired — please run Update Device to renew it'],
+                updating:    ['🔄', 'Updating your device…']
+            };
+            const [ic, tx] = states[overall] || states.warning;
+            icon.textContent = ic;
+            text.textContent = tx;
+        }
+
+        // ---- Status + cards -----------------------------------------------
+        async function loadStatus() {
+            let d;
+            try { d = await api('/api/admin/status'); }
+            catch (e) { console.error('Status load failed:', e); return; }
+
+            setBanner(d.overall);
+
+            // Certificate card
+            const cert = d.certificate || {};
+            const cardCert = document.getElementById('cardCert');
+            if (cert.daysRemaining === null)        cardCert.className = 'card';
+            else if (cert.daysRemaining <= 0)       cardCert.className = 'card bad';
+            else if (cert.daysRemaining <= 7)       cardCert.className = 'card warn';
+            else                                     cardCert.className = 'card';
+            document.getElementById('certValue').textContent = fmtDays(cert.daysRemaining);
+            document.getElementById('certSub').textContent   = cert.expiresAt
+                ? 'Expires ' + new Date(cert.expiresAt).toLocaleDateString() : '';
+
+            // App version card
+            const app = d.app || {};
+            const cardApp = document.getElementById('cardApp');
+            cardApp.className = 'card' + (app.updateAvailable ? ' warn' : '');
+            if (app.updateAvailable) {
+                document.getElementById('appValue').textContent = 'Update available';
+                document.getElementById('appSub').textContent   = 'v' + app.currentVersion + ' → v' + app.latestVersion;
+            } else {
+                document.getElementById('appValue').textContent = 'Up to date';
+                document.getElementById('appSub').textContent   = 'v' + (app.currentVersion || '?');
+            }
+
+            // Last updated card
+            const lu = d.lastUpdate || {};
+            document.getElementById('cardUpd').className = 'card' + (lu.outcome === 'failed' ? ' bad' : '');
+            document.getElementById('updValue').textContent = lu.timestamp ? fmtRel(lu.timestamp) : 'Never updated';
+            document.getElementById('updSub').textContent   =
+                lu.outcome && lu.outcome !== 'never' ? 'Outcome: ' + lu.outcome : '';
+
+            updateInetUI(d.internet || {});
+        }
+
+        // ---- Internet indicator + update button gate ----------------------
+        function updateInetUI(info) {
+            const el            = document.getElementById('inetStatus');
+            const txt           = document.getElementById('inetText');
+            const updateBtn     = document.getElementById('updateBtn');
+            const hint          = document.getElementById('updateHint');
+            const connectBtn    = document.getElementById('connectBtn');
+            const disconnectBtn = document.getElementById('disconnectBtn');
+            const s = info.connectedSsid || info.ssid;
+            if (info.connected) {
+                el.className = 'inet-status connected';
+                txt.textContent = s ? 'Internet connected — ' + s : 'Internet connected';
+                updateBtn.disabled = false;
+                hint.textContent = 'Ready to update';
+                hint.className = 'inline-msg ok';
+                // Keep Connect button grayed out showing the network name
+                connectBtn.disabled = true;
+                connectBtn.textContent = s ? '✅ Connected to ' + s : '✅ Connected';
+                // Always reset disconnect button to a clean state before showing it
+                disconnectBtn.disabled = false;
+                disconnectBtn.textContent = 'Disconnect';
+                disconnectBtn.classList.remove('hidden');
+            } else {
+                el.className = 'inet-status';
+                txt.textContent = 'Not connected to internet';
+                updateBtn.disabled = true;
+                hint.textContent = 'Connect to internet first';
+                hint.className = 'inline-msg info';
+                // Re-enable Connect button so TD can try again
+                connectBtn.disabled = false;
+                connectBtn.textContent = 'Connect';
+                disconnectBtn.classList.add('hidden');
+            }
+        }
+
+        async function refreshInternet() {
+            try { updateInetUI(await api('/api/admin/internet')); }
+            catch (e) { /* leave last known state */ }
+        }
+
+        // ---- Wi-Fi scan + connect ----------------------------------------
+        async function scanWifi() {
+            const btn = document.getElementById('scanBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳ Scanning… (up to 15s)';
+            try {
+                // Scan can take 10–15 s; use AbortController to avoid browser timeout
+                const controller = new AbortController();
+                const timer = setTimeout(() => controller.abort(), 20000);
+                const d = await api('/api/admin/wifi/scan', { signal: controller.signal });
+                clearTimeout(timer);
+                const sel = document.getElementById('ssidSelect');
+                sel.innerHTML = '<option value="">— Select a network —</option>';
+                for (const n of (d.networks || [])) {
+                    const bar = n.strength === 'strong' ? '▮▮▮' : n.strength === 'medium' ? '▮▮▯' : '▮▯▯';
+                    const lock = n.secured ? '🔒 ' : '';
+                    const o = document.createElement('option');
+                    o.value = n.ssid;
+                    o.textContent = bar + '  ' + lock + n.ssid;
+                    sel.appendChild(o);
+                }
+                const m = document.createElement('option');
+                m.value = '__manual__';
+                m.textContent = '✏️ Type network name manually…';
+                sel.appendChild(m);
+                document.getElementById('wifiForm').classList.remove('hidden');
+                if (!(d.networks || []).length) {
+                    document.getElementById('connectMsg').textContent = 'No networks found. Try moving closer or enter a network name manually.';
+                    document.getElementById('connectMsg').className = 'inline-msg info';
+                }
+            } catch (e) {
+                document.getElementById('connectMsg').textContent = '❌ Scan failed. Try again.';
+                document.getElementById('connectMsg').className = 'inline-msg err';
+                document.getElementById('wifiForm').classList.remove('hidden');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🔍 Scan for Wi-Fi Networks';
+            }
+        }
+
+        function onSsidChange() {
+            const v = document.getElementById('ssidSelect').value;
+            document.getElementById('manualRow').classList.toggle('hidden', v !== '__manual__');
+        }
+
+        function togglePw(ev) {
+            const i = document.getElementById('wifiPw');
+            const btn = (ev && ev.target) || document.querySelector('.pw-toggle');
+            const isText = i.type === 'text';
+            i.type = isText ? 'password' : 'text';
+            btn.textContent = isText ? 'Show' : 'Hide';
+        }
+
+        async function checkCaptivePortal(ssid, msgEl) {
+            try {
+                const cp = await api('/api/admin/captive-check');
+                if (cp.captive && cp.portalUrl) {
+                    // Show a persistent portal-login banner
+                    msgEl.innerHTML =
+                        '⚠️ <strong>Hotel login required.</strong> ' +
+                        'Tap the button below, log in with your room details, then come back here and tap "Check again".' +
+                        '<br><br>' +
+                        '<a href="' + cp.portalUrl + '" target="_blank" rel="noopener" ' +
+                        '   style="display:inline-block;padding:10px 18px;background:#d63384;color:#fff;' +
+                        '          border-radius:8px;text-decoration:none;font-weight:bold;margin-bottom:8px;">' +
+                        '🌐 Open hotel login page</a>' +
+                        '<br>' +
+                        '<button class="btn btn-secondary" style="margin-top:6px;" ' +
+                        '        onclick="recheckInternet(this)">🔄 Check again</button>';
+                    msgEl.className = 'inline-msg info';
+                }
+                // If not captive, the existing "Connected!" message stays and refreshInternet() will update the indicator
+            } catch (e) { /* ignore — non-critical */ }
+        }
+
+        async function recheckInternet(btn) {
+            btn.disabled = true;
+            btn.textContent = '⏳ Checking…';
+            await refreshInternet();
+            const info = await api('/api/admin/internet').catch(() => ({}));
+            const msg = document.getElementById('connectMsg');
+            if (info.connected) {
+                msg.textContent = '✅ Internet connected! You can now run the update.';
+                msg.className = 'inline-msg ok';
+            } else {
+                btn.disabled = false;
+                btn.textContent = '🔄 Check again';
+            }
+        }
+
+        async function connectWifi() {
+            const sel = document.getElementById('ssidSelect');
+            let ssid = sel.value;
+            if (ssid === '__manual__') ssid = document.getElementById('ssidManual').value.trim();
+            const pw = document.getElementById('wifiPw').value;
+            const msg = document.getElementById('connectMsg');
+            if (!ssid) {
+                msg.textContent = 'Select or enter a network name.';
+                msg.className = 'inline-msg err';
+                return;
+            }
+            const btn = document.getElementById('connectBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳ Connecting to ' + ssid + '…';
+            msg.textContent = ''; msg.className = 'inline-msg';
+            try {
+                const r = await api('/api/admin/wifi/connect', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ssid, password: pw })
+                });
+                if (r.success) {
+                    btn.textContent = '✅ Successfully connected to ' + ssid + '!';
+                    // btn stays disabled — connection is established, no reason to reconnect
+                    msg.textContent = 'Checking for hotel login page…';
+                    msg.className = 'inline-msg ok';
+                    await new Promise(res => setTimeout(res, 2500));
+                    await checkCaptivePortal(ssid, msg);
+                    refreshInternet();
+                } else {
+                    msg.textContent = '❌ ' + (r.message || 'Could not connect. Check the password and try again.');
+                    msg.className = 'inline-msg err';
+                    btn.disabled = false;
+                    btn.textContent = 'Connect';
+                }
+            } catch (e) {
+                msg.textContent = '❌ Connection failed.';
+                msg.className = 'inline-msg err';
+                btn.disabled = false;
+                btn.textContent = 'Connect';
+            }
+        }
+
+        // ---- Disconnect --------------------------------------------------
+        async function disconnectWifi() {
+            const btn = document.getElementById('disconnectBtn');
+            const msg = document.getElementById('connectMsg');
+            btn.disabled = true;
+            btn.textContent = '⏳ Disconnecting…';
+            try {
+                await api('/api/admin/wifi/disconnect', { method: 'POST' });
+                msg.textContent = 'Disconnected.';
+                msg.className = 'inline-msg info';
+                // Reset connect button so TD can connect to a different network
+                const connectBtn = document.getElementById('connectBtn');
+                connectBtn.disabled = false;
+                connectBtn.textContent = 'Connect';
+                btn.classList.add('hidden');
+                refreshInternet();
+            } catch (e) {
+                msg.textContent = '❌ Disconnect failed.';
+                msg.className = 'inline-msg err';
+                btn.disabled = false;
+                btn.textContent = 'Disconnect';
+            }
+        }
+
+        // ---- Collapsibles ------------------------------------------------
+        function toggleHotspot() {
+            const b = document.getElementById('hotspotHelp');
+            b.classList.toggle('hidden');
+            document.getElementById('hsArrow').textContent = b.classList.contains('hidden') ? '▶' : '▼';
+        }
+        function toggleLog() {
+            const b = document.getElementById('logPanel');
+            b.classList.toggle('hidden');
+            document.getElementById('logArrow').textContent = b.classList.contains('hidden') ? '▶' : '▼';
+            if (!b.classList.contains('hidden')) loadLog();
+        }
+        async function loadLog() {
+            try {
+                const d = await api('/api/admin/update/log');
+                const list = document.getElementById('logList');
+                if (!d || !d.entries || !d.entries.length) return;
+                list.innerHTML = d.entries.map(function (e) {
+                    return '<div class="log-entry"><div class="time">' +
+                        new Date(e.timestamp).toLocaleString() +
+                        '</div><div class="what">' + (e.summary || '(no summary)') + '</div></div>';
+                }).join('');
+            } catch (e) { /* endpoint may not exist yet (Phase 4) */ }
+        }
+
+        // ---- Update flow -------------------------------------------------
+        async function startUpdate() {
+            document.getElementById('updateArea').classList.add('hidden');
+            document.getElementById('progressArea').classList.remove('hidden');
+            const list   = document.getElementById('progressList');
+            const result = document.getElementById('updateResult');
+            const tryAgain = document.getElementById('tryAgainBtn');
+            list.innerHTML = '';
+            result.textContent = '';
+            tryAgain.classList.add('hidden');
+            setBanner('updating');
+
+            // Helpers to add/update step rows using the existing .step CSS
+            function addStep(text, state) {
+                const d = document.createElement('div');
+                d.className = 'step ' + state;
+                d.innerHTML = '<span class="si"></span>' + text;
+                list.appendChild(d);
+                list.scrollTop = list.scrollHeight;
+                return d;
+            }
+            function markStep(el, state) { if (el) el.className = 'step ' + state; }
+
+            let currentStep = null;
+
+            function handleEvent(msg) {
+                if (msg.type === 'step') {
+                    markStep(currentStep, 'done');
+                    currentStep = addStep(msg.msg, 'in_progress');
+                } else if (msg.type === 'ok') {
+                    markStep(currentStep, 'done');
+                    currentStep = null;
+                } else if (msg.type === 'error') {
+                    markStep(currentStep, 'failed');
+                    currentStep = null;
+                    result.textContent = '❌ ' + msg.msg;
+                    result.className = 'inline-msg err';
+                    tryAgain.textContent = 'Try Again';
+                    tryAgain.classList.remove('hidden');
+                    loadStatus();
+                    return 'error';
+                } else if (msg.type === 'done') {
+                    markStep(currentStep, 'done');
+                    result.textContent = '✅ ' + msg.msg;
+                    result.className = 'inline-msg ok';
+                    // Show countdown — service restarts 3 s after DONE, page reloads after 8 s
+                    let secs = 8;
+                    const cd = document.createElement('div');
+                    cd.className = 'inline-msg info';
+                    cd.style.marginTop = '6px';
+                    cd.textContent = 'Audio service is restarting… page will reload in ' + secs + 's';
+                    document.getElementById('progressArea').appendChild(cd);
+                    const t = setInterval(() => {
+                        secs--;
+                        if (secs <= 0) { clearInterval(t); window.location.reload(); }
+                        else cd.textContent = 'Audio service is restarting… page will reload in ' + secs + 's';
+                    }, 1000);
+                    return 'done';
+                }
+            }
+
+            try {
+                const resp = await fetch('/api/admin/update', { method: 'POST' });
+                const reader  = resp.body.getReader();
+                const decoder = new TextDecoder();
+                let buf = '';
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    buf += decoder.decode(value, { stream: true });
+                    const events = buf.split('\n\n');
+                    buf = events.pop();
+                    for (const ev of events) {
+                        const dataLine = ev.split('\n').find(l => l.startsWith('data:'));
+                        if (!dataLine) continue;
+                        let parsed;
+                        try { parsed = JSON.parse(dataLine.slice(5).trim()); } catch { continue; }
+                        if (parsed.type === 'end') break;
+                        const outcome = handleEvent(parsed);
+                        if (outcome === 'error') return;
+                    }
+                }
+            } catch (e) {
+                markStep(currentStep, 'failed');
+                result.textContent = '❌ Connection lost during update — the service may still be restarting.';
+                result.className = 'inline-msg err';
+                tryAgain.textContent = 'Reload';
+                tryAgain.onclick = () => window.location.reload();
+                tryAgain.classList.remove('hidden');
+            }
+        }
+        function resetUpdate() {
+            document.getElementById('updateArea').classList.remove('hidden');
+            document.getElementById('progressArea').classList.add('hidden');
+            document.getElementById('updateResult').textContent = '';
+            document.getElementById('tryAgainBtn').classList.add('hidden');
+            loadStatus();
+        }
+
+        // ---- Init --------------------------------------------------------
+        loadStatus();
+        setInterval(refreshInternet, 10000);
+    </script>
+</body>
+</html>

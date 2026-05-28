@@ -6,284 +6,302 @@
     <title>EF Tour Audio - Listen</title>
     <link rel="icon" type="image/png" href="EF-Logos_EF Logo Pink.png">
     <style>
+        /* Full-bleed gradient on html prevents white overscroll flash */
+        html { background: #00243C; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
-            background: linear-gradient(135deg, #009EEB 0%, #0077BE 100%);
-            min-height: 100vh;
+            font-family: 'EF Circular', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(180deg, #003C64 0%, #00243C 100%);
+            min-height: 100dvh;
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 20px;
+            padding: 28px 24px;
         }
-        .container {
-            background: #FFFFFF;
-            border-radius: 20px;
-            padding: 24px 40px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            max-width: 560px;
-            width: 100%;
-        }
-        .header {
+        .page {
             display: flex;
+            flex-direction: column;
             align-items: center;
-            gap: 12px;
-            margin-bottom: 8px;
-        }
-        .logo {
-            height: 50px;
-            flex-shrink: 0;
-        }
-        h1 {
-            color: #003C64;
-            margin: 0;
-            font-size: 32px;
-            font-weight: 700;
-            letter-spacing: -0.5px;
-        }
-        .subtitle {
-            color: #666;
-            margin-bottom: 32px;
-            font-size: 18px;
-            font-weight: 400;
-        }
-        .status {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 24px;
-            padding: 16px;
-            background: #E3EBED;
-            border-radius: 12px;
-        }
-        .status-dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: #EFEFEF;
-        }
-        .status-dot.connected { background: #009EEB; animation: pulse 2s infinite; }
-        .status-dot.connecting { background: #009EEB; opacity: 0.6; }
-        .status-dot.error { background: #FF329B; }
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-        .status-text {
-            font-weight: 600;
-            color: #191919;
-            font-size: 15px;
-        }
-        button {
             width: 100%;
-            padding: 18px;
-            font-size: 17px;
-            font-weight: 700;
-            border: none;
-            border-radius: 12px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            margin-bottom: 12px;
+            max-width: 420px;
         }
-        .listen-btn {
-            background: #009EEB;
-            color: #FFFFFF;
+        .logo { height: 60px; margin-bottom: 24px; filter: drop-shadow(0 4px 16px rgba(0,0,0,0.3)); }
+        .headline-group { text-align: center; margin-bottom: 20px; }
+        h1 { color: #fff; font-size: 34px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 6px; }
+        .subtitle { color: rgba(255,255,255,0.6); font-size: 17px; font-weight: 400; margin-bottom: 10px; }
+        .traveler-id {
+            display: inline-block;
+            background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.7);
+            font-size: 12px; font-weight: 600; padding: 4px 12px; border-radius: 20px;
         }
-        .listen-btn:hover {
-            background: #0088CC;
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(0, 158, 235, 0.3);
+        /* Status row */
+        .status-row { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.3); flex-shrink: 0; }
+        .status-dot.connected { background: #FF329B; animation: dotPulse 2s ease-in-out infinite; }
+        .status-dot.connecting { background: #FF329B; opacity: 0.5; }
+        .status-dot.error { background: rgba(255,255,255,0.4); }
+        @keyframes dotPulse {
+            0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(255,50,155,0.4); }
+            50%       { opacity: 0.7; box-shadow: 0 0 0 6px rgba(255,50,155,0); }
         }
-        .listen-btn:active { transform: translateY(0); }
-        .stop-btn {
-            background: #003C64;
-            color: #FFFFFF;
+        .status-text { color: #fff; font-size: 15px; font-weight: 500; }
+        /* Waveform — CSS-animated, shown when receiving audio */
+        .waveform { display: none; align-items: flex-end; gap: 4px; height: 28px; margin-bottom: 20px; }
+        .wave-bar {
+            width: 4px; border-radius: 2px; background: rgba(255,50,155,0.5);
+            transform-origin: 50% 100%;
+            animation: waveBar 1.1s ease-in-out infinite alternate;
         }
-        .stop-btn:hover {
-            background: #002A47;
+        .wave-bar:nth-child(1) { height:  9px; animation-delay: -0.00s; }
+        .wave-bar:nth-child(2) { height: 16px; animation-delay: -0.15s; }
+        .wave-bar:nth-child(3) { height: 23px; animation-delay: -0.30s; }
+        .wave-bar:nth-child(4) { height: 27px; animation-delay: -0.45s; }
+        .wave-bar:nth-child(5) { height: 28px; animation-delay: -0.55s; }
+        .wave-bar:nth-child(6) { height: 27px; animation-delay: -0.45s; }
+        .wave-bar:nth-child(7) { height: 23px; animation-delay: -0.30s; }
+        .wave-bar:nth-child(8) { height: 16px; animation-delay: -0.15s; }
+        .wave-bar:nth-child(9) { height:  9px; animation-delay: -0.00s; }
+        @keyframes waveBar {
+            from { transform: scaleY(0.3); opacity: 0.3; }
+            to   { transform: scaleY(1);   opacity: 0.8; }
         }
-        .test-btn {
-            background: #FFFFFF;
-            color: #009EEB;
-            border: 2px solid #009EEB;
-            padding: 16px;
-            font-size: 15px;
+        /* Buttons */
+        .btn-group { width: 100%; margin-bottom: 28px; }
+        .btn-primary {
+            width: 100%; padding: 16px; font-size: 17px; font-weight: 700;
+            font-family: inherit; border: none; border-radius: 50px; cursor: pointer;
+            background: #FF329B; color: #fff; transition: all 0.2s ease; margin-bottom: 14px;
         }
-        .test-btn:hover {
-            background: #E3F7FF;
-            transform: translateY(-1px);
+        .btn-primary:hover { background: #e0237f; transform: translateY(-1px); box-shadow: 0 8px 24px rgba(255,50,155,0.35); }
+        .btn-primary:active { transform: translateY(0); box-shadow: none; }
+        .btn-secondary-row { display: flex; gap: 12px; }
+        .btn-ghost {
+            flex: 1; padding: 13px; font-size: 14px; font-weight: 600; font-family: inherit;
+            border: 1.5px solid rgba(255,255,255,0.35); border-radius: 50px;
+            cursor: pointer; background: transparent; color: #fff; transition: all 0.2s ease;
+            display: flex; align-items: center; justify-content: center; gap: 6px;
         }
-        .test-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
-        }
-        .volume-control {
-            margin-top: 8px;
-            padding-top: 8px;
-            border-top: 1px solid #EFEFEF;
-        }
+        .btn-ghost:hover { background: rgba(255,255,255,0.1); }
+        .btn-ghost:disabled { opacity: 0.4; cursor: not-allowed; }
+        .test-status { text-align: center; margin-top: 12px; font-size: 14px; color: rgba(255,255,255,0.7); min-height: 20px; }
+        /* Volume */
+        .volume-control { width: 100%; margin-bottom: 24px; }
         .volume-control label {
-            display: block;
-            margin-bottom: 12px;
-            color: #003C64;
-            font-weight: 600;
-            font-size: 15px;
+            display: block; margin-bottom: 12px; color: rgba(255,255,255,0.9);
+            font-weight: 700; font-size: 11px; letter-spacing: 1.5px;
+            text-transform: uppercase; text-align: center;
         }
-        input[type="range"] {
-            width: 100%;
-            height: 6px;
-            border-radius: 3px;
-            background: #E3F7FF;
-            outline: none;
-            -webkit-appearance: none;
-        }
-        /* Webkit (Chrome, Safari, Edge) - Track */
+        input[type="range"] { width: 100%; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.2); outline: none; -webkit-appearance: none; }
         input[type="range"]::-webkit-slider-runnable-track {
-            width: 100%;
-            height: 6px;
-            border-radius: 3px;
-            background: linear-gradient(to right, #FF1493 0%, #FF1493 var(--value, 50%), #E3F7FF var(--value, 50%), #E3F7FF 100%);
+            width: 100%; height: 6px; border-radius: 3px;
+            background: linear-gradient(to right, #FF329B 0%, #FF329B var(--value, 80%), rgba(255,255,255,0.2) var(--value, 80%), rgba(255,255,255,0.2) 100%);
         }
-        /* Webkit - Thumb */
         input[type="range"]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 22px;
-            height: 22px;
-            border-radius: 50%;
-            background: #FF1493;
-            cursor: pointer;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            margin-top: -8px;
+            -webkit-appearance: none; appearance: none; width: 22px; height: 22px;
+            border-radius: 50%; background: #FF329B; cursor: pointer;
+            box-shadow: 0 2px 8px rgba(255,50,155,0.4); margin-top: -8px;
         }
-        /* Firefox - Track */
-        input[type="range"]::-moz-range-track {
-            width: 100%;
-            height: 6px;
-            border-radius: 3px;
-            background: #E3F7FF;
-        }
-        /* Firefox - Progress (filled portion) */
-        input[type="range"]::-moz-range-progress {
-            height: 6px;
-            border-radius: 3px;
-            background: #FF1493;
-        }
-        /* Firefox - Thumb */
+        input[type="range"]::-moz-range-track { width: 100%; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.2); }
+        input[type="range"]::-moz-range-progress { height: 6px; border-radius: 3px; background: #FF329B; }
         input[type="range"]::-moz-range-thumb {
-            width: 22px;
-            height: 22px;
-            border-radius: 50%;
-            background: #FF1493;
-            cursor: pointer;
-            border: none;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            width: 22px; height: 22px; border-radius: 50%; background: #FF329B;
+            cursor: pointer; border: none; box-shadow: 0 2px 8px rgba(255,50,155,0.4);
         }
-        .broadcast-indicator {
-            display: inline-flex;
-            align-items: center;
-            gap: 12px;
-            padding: 8px 16px;
-            background: #E8F5E9;
-            border-radius: 8px;
-            margin-bottom: 16px;
-            font-size: 14px;
-            color: #2E7D32;
-            font-weight: 500;
+        .volume-value { text-align: center; margin-top: 10px; color: #FF329B; font-weight: 700; font-size: 15px; }
+        /* iPhone footnote — always visible */
+        .ios-note { width: 100%; text-align: center; padding-top: 16px; }
+        .ios-note hr { border: none; border-top: 1px solid rgba(255,255,255,0.15); margin-bottom: 12px; }
+        .ios-note p { font-size: 12px; color: rgba(255,255,255,0.5); line-height: 1.6; }
+        .ios-note strong { color: rgba(255,255,255,0.7); }
+        /* Entrance animations — staggered fade + slide up */
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(16px); }
+            to   { opacity: 1; transform: translateY(0); }
         }
-        .broadcast-indicator .pulse-dot {
-            width: 10px;
-            height: 10px;
-            background: #4CAF50;
-            border-radius: 50%;
-            animation: pulse 1.5s ease-in-out infinite;
-        }
-        .mini-visualizer {
+        .anim-0 { animation: fadeUp 0.5s ease both; }
+        .anim-1 { animation: fadeUp 0.5s ease both; animation-delay:  80ms; }
+        .anim-2 { animation: fadeUp 0.5s ease both; animation-delay: 160ms; }
+        .anim-3 { animation: fadeUp 0.5s ease both; animation-delay: 240ms; }
+        .anim-4 { animation: fadeUp 0.5s ease both; animation-delay: 320ms; }
+        .anim-5 { animation: fadeUp 0.5s ease both; animation-delay: 400ms; }
+
+        /* ── Lock Screen ──────────────────────────────────────────────────── */
+        #lockOverlay {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            background: linear-gradient(160deg, #0088CC 0%, #003C64 100%);
             display: flex;
+            flex-direction: column;
             align-items: center;
-            gap: 2px;
-            height: 20px;
-        }
-        .mini-visualizer .mini-bar {
-            width: 3px;
-            background: #4CAF50;
-            border-radius: 2px;
-            transition: height 0.1s ease;
-            height: 5px;
-        }
-        @keyframes pulse {
-            0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.5; transform: scale(1.2); }
-        }
-        .status-box {
-            padding: 14px 16px;
-            border-radius: 8px;
-            text-align: left;
-            line-height: 1.6;
-            margin-left: -28px;
-            margin-right: -28px;
-            width: calc(100% + 56px);
-        }
-        .volume-value {
+            justify-content: center;
             text-align: center;
-            margin-top: 12px;
-            color: #009EEB;
-            font-weight: 700;
-            font-size: 16px;
+            padding: 40px 24px;
+            touch-action: none;
+            -webkit-user-select: none;
+            user-select: none;
+            cursor: pointer;
         }
-        .test-status {
-            text-align: center;
-            margin-top: 12px;
-            font-size: 14px;
-            color: #003C64;
+        .lock-logo-lg {
+            height: 120px;
+            margin-bottom: 52px;
+            pointer-events: none;
+            filter: drop-shadow(0 4px 24px rgba(0,0,0,0.35));
+        }
+        .lock-wave {
+            display: flex;
+            align-items: flex-end;
+            gap: 5px;
+            height: 56px;
+            margin-bottom: 14px;
+        }
+        .lock-wave-bar {
+            width: 6px;
+            border-radius: 3px;
+            background: rgba(255,255,255,0.85);
+            transform-origin: 50% 100%;
+            animation: lockBar 1.1s ease-in-out infinite alternate;
+        }
+        /* Arch heights + staggered phase via negative delays */
+        .lock-wave-bar:nth-child(1) { height: 18px; animation-delay: -0.00s; }
+        .lock-wave-bar:nth-child(2) { height: 30px; animation-delay: -0.15s; }
+        .lock-wave-bar:nth-child(3) { height: 42px; animation-delay: -0.30s; }
+        .lock-wave-bar:nth-child(4) { height: 52px; animation-delay: -0.45s; }
+        .lock-wave-bar:nth-child(5) { height: 56px; animation-delay: -0.55s; }
+        .lock-wave-bar:nth-child(6) { height: 52px; animation-delay: -0.45s; }
+        .lock-wave-bar:nth-child(7) { height: 42px; animation-delay: -0.30s; }
+        .lock-wave-bar:nth-child(8) { height: 30px; animation-delay: -0.15s; }
+        .lock-wave-bar:nth-child(9) { height: 18px; animation-delay: -0.00s; }
+        @keyframes lockBar {
+            from { transform: scaleY(0.3); opacity: 0.45; }
+            to   { transform: scaleY(1);   opacity: 1;    }
+        }
+        .lock-wave.paused .lock-wave-bar {
+            animation-play-state: paused;
+            opacity: 0.2;
+            transform: scaleY(0.3);
+            transition: opacity 0.4s, transform 0.4s;
+        }
+        .lock-audio-label {
+            color: rgba(255,255,255,0.9);
+            font-size: 17px;
+            font-weight: 600;
+            letter-spacing: 0.2px;
+            margin-bottom: 52px;
+        }
+        .lock-unlock-label {
+            color: rgba(255,255,255,0.5);
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin-bottom: 18px;
+        }
+        .lock-dots {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 18px;
+        }
+        .lock-dot {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            border: 2px solid rgba(255,255,255,0.55);
+            background: transparent;
+            transition: background 0.15s, border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+        }
+        .lock-dot.active {
+            background: #FFFFFF;
+            border-color: #FFFFFF;
+            transform: scale(1.3);
+            box-shadow: 0 0 14px rgba(255,255,255,0.55);
+        }
+        .lock-hint {
+            color: rgba(255,255,255,0.5);
+            font-size: 13px;
             min-height: 20px;
-            font-weight: 500;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <img src="EF-Logos_EF Logo Pink.png" alt="EF Tours" class="logo">
+    <div class="page">
+        <img src="EF-Logos_EF Logo Pink.png" alt="EF Tours" class="logo anim-0">
+
+        <div class="headline-group anim-1">
             <h1>Tour Audio</h1>
-        </div>
-        <p class="subtitle">Listen to your guide</p>
-
-        <!-- Broadcast indicator (shown when receiving audio) -->
-        <div id="broadcastIndicator" class="broadcast-indicator" style="display: none;">
-            <div class="pulse-dot"></div>
-            <div class="mini-visualizer" id="miniVisualizer">
-                <div class="mini-bar"></div>
-                <div class="mini-bar"></div>
-                <div class="mini-bar"></div>
-                <div class="mini-bar"></div>
-                <div class="mini-bar"></div>
-                <div class="mini-bar"></div>
-            </div>
-            <span>🎧 Receiving audio</span>
+            <p class="subtitle">Listen to your guide</p>
+            <div class="traveler-id" id="travelerId" style="display:none;">#<span id="travelerNumber"></span></div>
         </div>
 
-        <div class="status">
+        <div class="status-row anim-2">
             <div class="status-dot" id="statusDot"></div>
-            <div class="status-text" id="statusText">Not connected</div>
+            <span class="status-text" id="statusText">Not connected</span>
         </div>
 
-        <button id="toggleBtn" class="listen-btn" onclick="toggleListening()">
-            Start Listening
-        </button>
+        <!-- Waveform — CSS-animated, appears when audio is received -->
+        <div class="waveform" id="waveform">
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+        </div>
 
-        <button id="testBtn" class="test-btn" onclick="testAudio()">
-            🔊 Test Audio
-        </button>
+        <div class="btn-group anim-3">
+            <button id="toggleBtn" class="btn-primary" onclick="toggleListening()">Start Listening</button>
+            <div class="btn-secondary-row">
+                <button id="lockBtn" class="btn-ghost" onclick="enterLockMode()" style="display:none;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    Lock Screen
+                </button>
+                <button id="testBtn" class="btn-ghost" onclick="testAudio()">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"/><path d="M16 9a5 5 0 0 1 0 6"/><path d="M19.364 18.364a9 9 0 0 0 0-12.728"/></svg>
+                    Test Audio
+                </button>
+            </div>
+            <div class="test-status" id="testStatus"></div>
+        </div>
 
-        <div class="test-status" id="testStatus"></div>
-
-        <div class="volume-control">
-            <label for="volumeSlider">Volume</label>
+        <div class="volume-control anim-4">
+            <label for="volumeSlider">VOLUME</label>
             <input type="range" id="volumeSlider" min="0" max="100" value="80" oninput="setVolume(this.value)">
             <div class="volume-value" id="volumeValue">80%</div>
         </div>
+
+        <footer class="ios-note anim-5">
+            <hr>
+            <p>iPhone users: check that your silent switch is <strong>OFF</strong>, or use headphones.</p>
+        </footer>
+    </div>
+
+    <!-- ── Lock Screen Overlay ─────────────────────────────────────── -->
+    <div id="lockOverlay" style="display:none;">
+        <img src="EF-Logos_EF Logo Pink.png" alt="EF Tours" class="lock-logo-lg">
+
+        <div class="lock-wave" id="lockWave">
+            <div class="lock-wave-bar"></div>
+            <div class="lock-wave-bar"></div>
+            <div class="lock-wave-bar"></div>
+            <div class="lock-wave-bar"></div>
+            <div class="lock-wave-bar"></div>
+            <div class="lock-wave-bar"></div>
+            <div class="lock-wave-bar"></div>
+            <div class="lock-wave-bar"></div>
+            <div class="lock-wave-bar"></div>
+        </div>
+        <div class="lock-audio-label" id="lockAudioLabel">🎧 Audio playing</div>
+
+        <div class="lock-unlock-label">Tap 3× to unlock</div>
+        <div class="lock-dots">
+            <div class="lock-dot" id="lockDot1"></div>
+            <div class="lock-dot" id="lockDot2"></div>
+            <div class="lock-dot" id="lockDot3"></div>
+        </div>
+        <div class="lock-hint" id="lockHint"></div>
     </div>
 
     <script>
@@ -294,6 +312,12 @@
         let nextPlayTime = 0;
         let wakeLock = null;
 
+        // Lock screen state
+        let isLocked = false;
+        let lockTapCount = 0;
+        let lockTapTimer = null;
+        let lockTapFlashTimer = null;
+
         function updateStatus(state, text) {
             document.getElementById('statusDot').className = 'status-dot ' + state;
             document.getElementById('statusText').textContent = text;
@@ -301,12 +325,14 @@
 
         function updateButton() {
             const btn = document.getElementById('toggleBtn');
+            const lockBtn = document.getElementById('lockBtn');
+            btn.className = 'btn-primary';
             if (isListening) {
                 btn.textContent = 'Stop Listening';
-                btn.className = 'stop-btn';
+                if (lockBtn) lockBtn.style.display = '';
             } else {
                 btn.textContent = 'Start Listening';
-                btn.className = 'listen-btn';
+                if (lockBtn) lockBtn.style.display = 'none';
             }
         }
 
@@ -360,30 +386,8 @@
             }
         }
 
-        // Update mini visualizer based on audio data
-        function updateMiniVisualizer(audioData) {
-            const bars = document.querySelectorAll('.mini-bar');
-            if (!bars.length || !audioData || audioData.length === 0) return;
-
-            // Sample audio data at different points for each bar
-            const samplesPerBar = Math.floor(audioData.length / bars.length);
-
-            bars.forEach((bar, i) => {
-                // Get average amplitude for this bar's section of audio
-                const startIdx = i * samplesPerBar;
-                const endIdx = Math.min(startIdx + samplesPerBar, audioData.length);
-
-                let sum = 0;
-                for (let j = startIdx; j < endIdx; j++) {
-                    sum += Math.abs(audioData[j]);
-                }
-                const average = sum / (endIdx - startIdx);
-
-                // Convert to height (5px min, 20px max)
-                const height = Math.max(5, Math.min(20, average * 30000));
-                bar.style.height = height + 'px';
-            });
-        }
+        // Waveform is CSS-animated; no JS driving needed
+        function updateMiniVisualizer(audioData) { /* no-op */ }
 
         async function startListening() {
             try {
@@ -432,16 +436,22 @@
                     isListening = true;
                     updateStatus('connected', 'Connected - Listening');
                     updateButton();
+                    updateLockWave();
                     console.log('WebSocket connected, waiting for audio...');
                 };
 
                 ws.onmessage = (event) => {
                     try {
-                        // Check if it's a text message (client count update)
+                        // Check if it's a text message (client count update or client ID)
                         if (typeof event.data === 'string') {
                             const message = JSON.parse(event.data);
                             if (message.type === 'client-count') {
                                 // Listener page doesn't display count, just ignore
+                                return;
+                            }
+                            if (message.type === 'client-id') {
+                                document.getElementById('travelerNumber').textContent = message.id;
+                                document.getElementById('travelerId').style.display = 'inline-block';
                                 return;
                             }
                         }
@@ -449,10 +459,10 @@
                         // It's binary audio data (PCM)
                         receivedPacketCount++;
 
-                        // Show broadcast indicator on first packet
+                        // Show waveform on first packet
                         if (receivedPacketCount === 1) {
-                            document.getElementById('broadcastIndicator').style.display = 'inline-flex';
-                            console.log('First audio packet received - showing indicator');
+                            document.getElementById('waveform').style.display = 'flex';
+                            console.log('First audio packet received - showing waveform');
                         }
 
                         // Log every 50th packet
@@ -510,13 +520,15 @@
                         updateStatus('error', 'Disconnected - Tap to reconnect');
                         isListening = false;
                         updateButton();
+                        updateLockWave();
                     }
                 };
-                
+
                 ws.onerror = () => {
                     updateStatus('error', 'Connection error');
                     isListening = false;
                     updateButton();
+                    updateLockWave();
                 };
                 
             } catch (err) {
@@ -526,6 +538,9 @@
         }
 
         function stopListening() {
+            // Exit lock mode first if active so the UI restores correctly
+            if (isLocked) exitLockMode();
+
             if (ws) {
                 ws.close();
                 ws = null;
@@ -538,8 +553,8 @@
             // Release wake lock when stopping
             releaseWakeLock();
 
-            // Hide broadcast indicator
-            document.getElementById('broadcastIndicator').style.display = 'none';
+            // Hide waveform
+            document.getElementById('waveform').style.display = 'none';
 
             gainNode = null;
             isListening = false;
@@ -644,40 +659,108 @@
             });
         }
 
-        // Check for iOS silent mode
-        function checkSilentMode() {
-            // Only check on iOS devices
-            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        // iOS note is always visible in the footer — nothing to do
+        function checkSilentMode() { /* note is always shown */ }
 
-            if (!isIOS) {
-                console.log('Not an iOS device, skipping silent mode check');
-                return;
+        // ── Lock Screen ───────────────────────────────────────────────────────
+
+        function enterLockMode() {
+            isLocked = true;
+            lockTapCount = 0;
+            resetLockDots();
+            document.getElementById('lockHint').textContent = '';
+            document.getElementById('lockOverlay').style.display = 'flex';
+            updateLockWave();
+
+            // Fullscreen: hides browser chrome on Android (silently fails on iOS)
+            const el = document.documentElement;
+            try {
+                if (el.requestFullscreen)             el.requestFullscreen();
+                else if (el.webkitRequestFullscreen)  el.webkitRequestFullscreen();
+            } catch(e) {}
+
+            // Trap the back button so it can't navigate away while locked
+            history.pushState({ locked: true }, '');
+        }
+
+        function exitLockMode() {
+            isLocked = false;
+            lockTapCount = 0;
+            resetLockDots();
+            clearTimeout(lockTapTimer);
+            clearTimeout(lockTapFlashTimer);
+            document.getElementById('lockOverlay').style.display = 'none';
+            document.getElementById('lockHint').textContent = '';
+
+            // Exit fullscreen if active
+            try {
+                if (document.exitFullscreen)              document.exitFullscreen();
+                else if (document.webkitExitFullscreen)   document.webkitExitFullscreen();
+            } catch(e) {}
+        }
+
+        function handleLockTap() {
+            if (!isLocked) return;
+            clearTimeout(lockTapTimer);
+
+            lockTapCount++;
+            if (lockTapCount <= 3) {
+                document.getElementById('lockDot' + lockTapCount).classList.add('active');
             }
 
-            console.log('iOS device detected, checking for silent mode...');
-
-            // Show warning about silent mode
-            const silentModeWarning = document.createElement('div');
-            silentModeWarning.className = 'status-box';
-            silentModeWarning.style.backgroundColor = '#FFF4E5';
-            silentModeWarning.style.borderLeft = '4px solid #F48024';
-            silentModeWarning.style.marginTop = '16px';
-            silentModeWarning.innerHTML = `
-                <div style="font-weight: 600; margin-bottom: 8px; color: #F48024;">iPhone Users:</div>
-                <div style="font-size: 14px; line-height: 1.6; color: #333;">
-                    If you can't hear audio, check that your iPhone is <strong>NOT in silent mode</strong>.
-                    The silent switch on the side of your phone must be OFF for audio to play.
-                    <br><br>
-                    Alternatively, you can use <strong>headphones or earbuds</strong> - they work even in silent mode.
-                </div>
-            `;
-
-            // Insert warning after the volume control
-            const volumeControl = document.querySelector('.volume-control');
-            if (volumeControl && volumeControl.parentNode) {
-                volumeControl.parentNode.insertBefore(silentModeWarning, volumeControl.nextSibling);
+            const hint = document.getElementById('lockHint');
+            if (lockTapCount >= 3) {
+                hint.textContent = '✓ Unlocked';
+                setTimeout(exitLockMode, 220);
+            } else {
+                hint.textContent = lockTapCount + ' of 3…';
+                // Reset if no further tap within 2 seconds
+                lockTapTimer = setTimeout(() => {
+                    lockTapCount = 0;
+                    resetLockDots();
+                    hint.textContent = '';
+                }, 2000);
             }
         }
+
+        function resetLockDots() {
+            [1, 2, 3].forEach(n =>
+                document.getElementById('lockDot' + n).classList.remove('active'));
+        }
+
+        // Reflect audio connection state in the lock screen wave animation
+        function updateLockWave() {
+            const wave  = document.getElementById('lockWave');
+            const label = document.getElementById('lockAudioLabel');
+            if (!wave || !label) return;
+            if (isListening) {
+                wave.classList.remove('paused');
+                label.textContent = '🎧 Audio playing';
+            } else {
+                wave.classList.add('paused');
+                label.textContent = '⏸ Not connected';
+            }
+        }
+
+        // Prevent swipe-scroll gestures from escaping the lock overlay on iOS
+        document.getElementById('lockOverlay').addEventListener(
+            'touchmove', e => e.preventDefault(), { passive: false });
+
+        // Wire up tap handler via both touch and click for cross-device support
+        document.getElementById('lockOverlay').addEventListener('click', handleLockTap);
+
+        // Intercept hardware back button while locked
+        window.addEventListener('popstate', () => {
+            if (isLocked) {
+                history.pushState({ locked: true }, ''); // re-trap
+                const hint = document.getElementById('lockHint');
+                hint.textContent = 'Tap 3× to exit';
+                clearTimeout(lockTapFlashTimer);
+                lockTapFlashTimer = setTimeout(() => { hint.textContent = ''; }, 2500);
+            }
+        });
+
+        // ── Initialize ────────────────────────────────────────────────────────
 
         // Initialize volume
         setVolume(80);

@@ -24,9 +24,19 @@
             max-width: 560px;
             width: 100%;
         }
+        .header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+        .logo {
+            height: 60px;
+            flex-shrink: 0;
+        }
         h1 {
             color: #003C64;
-            margin-bottom: 8px;
+            margin: 0;
             font-size: 32px;
             font-weight: 700;
             letter-spacing: -0.5px;
@@ -65,7 +75,7 @@
             font-size: 15px;
         }
         .visualizer {
-            height: 100px;
+            height: 50px;
             background: #E3F7FF;
             border-radius: 12px;
             margin-bottom: 24px;
@@ -133,29 +143,6 @@
             min-height: 20px;
             font-weight: 500;
         }
-        .broadcast-indicator {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 8px 16px;
-            background: #FFE8F5;
-            border-radius: 8px;
-            margin-bottom: 16px;
-            font-size: 14px;
-            color: #C2185B;
-            font-weight: 500;
-        }
-        .broadcast-indicator .pulse-dot {
-            width: 10px;
-            height: 10px;
-            background: #FF1493;
-            border-radius: 50%;
-            animation: pulse 1.5s ease-in-out infinite;
-        }
-        @keyframes pulse {
-            0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.5; transform: scale(1.2); }
-        }
         .listener-counter {
             display: flex;
             align-items: center;
@@ -184,25 +171,124 @@
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
+        .metrics-section {
+            margin-top: 16px;
+            border-top: 1px solid #EFEFEF;
+            padding-top: 12px;
+        }
+        .metrics-toggle {
+            width: 100%;
+            background: none;
+            border: none;
+            padding: 8px 0;
+            text-align: left;
+            font-size: 14px;
+            font-weight: 600;
+            color: #666;
+            cursor: pointer;
+            margin-bottom: 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .metrics-toggle:hover { color: #003C64; }
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .metric-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: #F5F5F5;
+            border-radius: 8px;
+        }
+        .metric-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #EFEFEF;
+            flex-shrink: 0;
+        }
+        .metric-label {
+            font-size: 12px;
+            color: #666;
+            font-weight: 500;
+            flex: 1;
+        }
+        .metric-value {
+            font-size: 13px;
+            font-weight: 700;
+            color: #003C64;
+        }
+        .metrics-updated {
+            text-align: center;
+            font-size: 11px;
+            color: #999;
+            margin-top: 8px;
+        }
+        /* Watch mode */
+        .watch-banner {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 16px;
+            background: #FFF3E0;
+            border: 2px solid #FF9800;
+            border-radius: 12px;
+            margin-bottom: 16px;
+        }
+        .watch-banner.ended {
+            background: #E8F5E9;
+            border-color: #4CAF50;
+        }
+        .watch-banner-icon { font-size: 24px; }
+        .watch-banner-title {
+            font-weight: 700;
+            color: #003C64;
+            font-size: 15px;
+        }
+        .watch-banner-sub {
+            font-size: 13px;
+            color: #666;
+            margin-top: 2px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <img src="EF-Logos_EF Logo Pink.png" alt="EF Tours" style="height: 60px; margin-bottom: 8px;">
-        <h1>Tour Guide</h1>
-        <p class="subtitle">Broadcast to your group</p>
-
-        <!-- Broadcast indicator (shown when broadcasting) -->
-        <div id="broadcastIndicator" class="broadcast-indicator" style="display: none;">
-            <div class="pulse-dot"></div>
-            <span>🎙️ Broadcasting</span>
+        <div class="header">
+            <img src="EF-Logos_EF Logo Pink.png" alt="EF Tours" class="logo">
+            <h1>Tour Guide</h1>
         </div>
+        <p class="subtitle">Broadcast to your group</p>
 
         <!-- Listener counter -->
         <div class="listener-counter" id="listenerCounter">
             <div class="counter-text">
                 <div class="counter-number" id="listenerCount">0</div>
                 <div class="counter-label">Listeners</div>
+            </div>
+        </div>
+
+        <!-- Watch mode: another guide is broadcasting -->
+        <div class="watch-banner" id="watchBanner" style="display:none;">
+            <span class="watch-banner-icon">📡</span>
+            <div>
+                <div class="watch-banner-title">Another guide is broadcasting</div>
+                <div class="watch-banner-sub">You are in watch-only mode</div>
+            </div>
+        </div>
+
+        <!-- Watch mode: broadcaster stopped, offer takeover -->
+        <div class="watch-banner ended" id="broadcastEndedBanner" style="display:none;">
+            <span class="watch-banner-icon">⏹️</span>
+            <div>
+                <div class="watch-banner-title">Broadcast has ended</div>
+                <div class="watch-banner-sub">You can now start broadcasting</div>
             </div>
         </div>
 
@@ -229,11 +315,54 @@
         </button>
 
         <div class="test-status" id="testStatus"></div>
+
+        <!-- Performance metrics (collapsible) -->
+        <div class="metrics-section">
+            <button class="metrics-toggle" onclick="toggleMetrics()">
+                <span id="metricsArrow">▶</span> Performance Metrics
+            </button>
+            <div id="metricsPanel" style="display: none;">
+                <div class="metrics-grid">
+                    <div class="metric-item">
+                        <span class="metric-dot" id="dotCpu"></span>
+                        <span class="metric-label">CPU</span>
+                        <span class="metric-value" id="metricCpu">—</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-dot" id="dotRam"></span>
+                        <span class="metric-label">RAM Free</span>
+                        <span class="metric-value" id="metricRam">—</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-dot" id="dotThroughput"></span>
+                        <span class="metric-label">Throughput</span>
+                        <span class="metric-value" id="metricThroughput">—</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-dot" id="dotSkip"></span>
+                        <span class="metric-label">Skip Rate</span>
+                        <span class="metric-value" id="metricSkip">—</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-dot" id="dotClients"></span>
+                        <span class="metric-label">Peak Clients</span>
+                        <span class="metric-value" id="metricClients">—</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-dot" id="dotHeap"></span>
+                        <span class="metric-label">Node Heap</span>
+                        <span class="metric-value" id="metricHeap">—</span>
+                    </div>
+                </div>
+                <div class="metrics-updated" id="metricsUpdated">Tap to refresh</div>
+            </div>
+        </div>
     </div>
 
     <script>
         let ws = null;
         let isStreaming = false;
+        let isWatchMode = false;
         let audioContext = null;
         let analyser = null;
         let scriptProcessor = null;
@@ -276,17 +405,20 @@
             const btn = document.getElementById('toggleBtn');
             const statusText = document.getElementById('statusText');
             const statusDot = document.getElementById('statusDot');
+            const testBtn = document.getElementById('testBtn');
 
             if (isStreaming) {
                 btn.textContent = 'Stop Broadcasting';
                 btn.className = 'stop-btn';
-                statusText.textContent = 'Broadcasting live';
+                statusText.textContent = 'Broadcasting';
                 statusDot.className = 'status-dot broadcasting';
+                testBtn.style.display = 'none';
             } else {
                 btn.textContent = 'Start Broadcasting';
                 btn.className = 'broadcast-btn';
                 statusText.textContent = 'Ready to broadcast';
                 statusDot.className = 'status-dot';
+                testBtn.style.display = '';
             }
         }
 
@@ -417,9 +549,6 @@
                     // Request wake lock to keep screen on during broadcast
                     await requestWakeLock();
 
-                    // Show broadcast indicator
-                    document.getElementById('broadcastIndicator').style.display = 'inline-flex';
-
                     // Start visualizer after streaming is set to true
                     updateVisualizer();
 
@@ -427,14 +556,22 @@
                 };
 
                 ws.onmessage = (event) => {
-                    // Handle client count updates from server
                     try {
                         const message = JSON.parse(event.data);
                         if (message.type === 'client-count') {
                             updateListenerCount(message.count);
+                        } else if (message.type === 'broadcaster_taken') {
+                            // Another guide is already broadcasting — switch to watch mode
+                            enterWatchMode(message.listenerCount);
+                        } else if (message.type === 'watch-status') {
+                            // Periodic status update while in watch mode
+                            updateWatchStatus(message.broadcasterActive, message.listenerCount);
+                        } else if (message.type === 'broadcaster_ended') {
+                            // The active broadcaster disconnected
+                            showBroadcasterEnded();
                         }
                     } catch (e) {
-                        // Not JSON, ignore (might be audio data echo, but guide shouldn't receive audio)
+                        // Not JSON — ignore
                     }
                 };
 
@@ -478,9 +615,6 @@
             // Release wake lock when stopping broadcast
             releaseWakeLock();
 
-            // Hide broadcast indicator
-            document.getElementById('broadcastIndicator').style.display = 'none';
-
             const bars = document.querySelectorAll('.bar');
             bars.forEach(bar => bar.style.height = '5px');
         }
@@ -491,6 +625,76 @@
             } else {
                 startBroadcast();
             }
+        }
+
+        // ── Watch Mode ────────────────────────────────────────────────────────
+
+        // Called when the server rejects us as broadcaster (slot taken)
+        function enterWatchMode(listenerCount) {
+            isWatchMode = true;
+
+            // Stop audio capture but keep the WebSocket open for status updates
+            if (scriptProcessor) { scriptProcessor.disconnect(); scriptProcessor = null; }
+            if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+            if (audioContext) { audioContext.close(); audioContext = null; }
+            isStreaming = false;
+
+            // Update listener counter with the count from the server
+            const lc = Math.max(0, listenerCount || 0);
+            document.getElementById('listenerCount').textContent = lc;
+            document.querySelector('.counter-label').textContent = lc === 1 ? 'Listener' : 'Listeners';
+
+            // Update status bar
+            document.getElementById('statusDot').className = 'status-dot connected';
+            document.getElementById('statusText').textContent = 'Watching broadcast';
+
+            // Show watch banner, hide broadcast controls
+            document.getElementById('watchBanner').style.display = 'flex';
+            document.getElementById('broadcastEndedBanner').style.display = 'none';
+            document.getElementById('toggleBtn').style.display = 'none';
+            document.getElementById('testBtn').style.display = 'none';
+            document.getElementById('visualizer').style.display = 'none';
+
+            // Auto-open metrics panel so watcher can see live data
+            if (!metricsOpen) toggleMetrics();
+        }
+
+        // Called when a watch-status update arrives from the server
+        function updateWatchStatus(broadcasterActive, listenerCount) {
+            if (!isWatchMode) return;
+            const lc = Math.max(0, listenerCount || 0);
+            document.getElementById('listenerCount').textContent = lc;
+            document.querySelector('.counter-label').textContent = lc === 1 ? 'Listener' : 'Listeners';
+            if (!broadcasterActive) showBroadcasterEnded();
+        }
+
+        // Called when the active broadcaster disconnects
+        function showBroadcasterEnded() {
+            isWatchMode = false;
+
+            // Close the watch-mode WS connection cleanly
+            if (ws) { try { ws.close(); } catch(e) {} ws = null; }
+
+            // Stop metrics polling
+            if (metricsInterval) { clearInterval(metricsInterval); metricsInterval = null; }
+            if (metricsOpen) {
+                metricsOpen = false;
+                document.getElementById('metricsPanel').style.display = 'none';
+                document.getElementById('metricsArrow').textContent = '▶';
+            }
+
+            // Update status bar
+            document.getElementById('statusDot').className = 'status-dot';
+            document.getElementById('statusText').textContent = 'Ready to broadcast';
+
+            // Show "ended" banner and restore broadcast controls
+            document.getElementById('watchBanner').style.display = 'none';
+            document.getElementById('broadcastEndedBanner').style.display = 'flex';
+            document.getElementById('toggleBtn').style.display = '';
+            document.getElementById('toggleBtn').className = 'broadcast-btn';
+            document.getElementById('toggleBtn').textContent = 'Start Broadcasting';
+            document.getElementById('testBtn').style.display = '';
+            document.getElementById('visualizer').style.display = '';
         }
 
         // Microphone test functionality - iOS/Safari compatible
@@ -608,6 +812,81 @@
                 testStatus.textContent = 'Playback error: ' + err.message;
                 testBtn.disabled = false;
                 console.error('Playback error:', err);
+            }
+        }
+
+        // ── Performance Metrics ───────────────────────────────────────────────
+        let metricsOpen = false;
+        let metricsInterval = null;
+
+        function toggleMetrics() {
+            metricsOpen = !metricsOpen;
+            document.getElementById('metricsPanel').style.display = metricsOpen ? 'block' : 'none';
+            document.getElementById('metricsArrow').textContent = metricsOpen ? '▼' : '▶';
+            if (metricsOpen) {
+                fetchMetrics();
+                metricsInterval = setInterval(fetchMetrics, 5000);
+            } else {
+                clearInterval(metricsInterval);
+                metricsInterval = null;
+            }
+        }
+
+        function parsePct(str) {
+            return parseFloat(str) || 0;
+        }
+
+        function colorDot(id, value, warnAt, redAt) {
+            const dot = document.getElementById(id);
+            if (value >= redAt)       dot.style.background = '#F44336'; // red
+            else if (value >= warnAt) dot.style.background = '#FF9800'; // yellow
+            else                      dot.style.background = '#4CAF50'; // green
+        }
+
+        async function fetchMetrics() {
+            try {
+                const res = await fetch('/health');
+                const d = await res.json();
+
+                // CPU
+                const cpu = parsePct(d.system?.cpuLoad);
+                document.getElementById('metricCpu').textContent = d.system?.cpuLoad || '—';
+                colorDot('dotCpu', cpu, 50, 80);
+
+                // RAM free (higher = better, so invert thresholds)
+                const ramFree = parsePct(d.system?.memoryFree); // e.g. "179 MB" → 179
+                document.getElementById('metricRam').textContent = d.system?.memoryFree || '—';
+                // green > 150 MB, yellow 80–150 MB, red < 80 MB
+                const dotRam = document.getElementById('dotRam');
+                if (ramFree < 80)       dotRam.style.background = '#F44336';
+                else if (ramFree < 150) dotRam.style.background = '#FF9800';
+                else                    dotRam.style.background = '#4CAF50';
+
+                // Throughput (just display; green if broadcasting, grey if not)
+                const tp = d.broadcast?.throughput || '—';
+                document.getElementById('metricThroughput').textContent = tp;
+                document.getElementById('dotThroughput').style.background =
+                    d.broadcast?.live ? '#4CAF50' : '#EFEFEF';
+
+                // Skip rate
+                const skip = parsePct(d.performance?.skipRate);
+                document.getElementById('metricSkip').textContent = d.performance?.skipRate || '0.00%';
+                colorDot('dotSkip', skip, 1, 5);
+
+                // Peak clients
+                document.getElementById('metricClients').textContent = d.broadcast?.peakClients ?? '—';
+                document.getElementById('dotClients').style.background = '#4CAF50';
+
+                // Node heap
+                document.getElementById('metricHeap').textContent = d.system?.nodeHeap || '—';
+                const heap = parsePct(d.system?.nodeHeap); // e.g. "28.4 MB" → 28.4
+                colorDot('dotHeap', heap, 80, 150);
+
+                document.getElementById('metricsUpdated').textContent =
+                    'Updated ' + new Date().toLocaleTimeString();
+            } catch (err) {
+                document.getElementById('metricsUpdated').textContent = 'Error fetching metrics';
+                console.error('Metrics fetch failed:', err);
             }
         }
     </script>
