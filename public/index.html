@@ -16,7 +16,8 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 28px 24px;
+            padding: 16px 24px;
+            transition: padding-bottom 0.2s ease;
         }
         .page {
             display: flex;
@@ -25,17 +26,17 @@
             width: 100%;
             max-width: 420px;
         }
-        .logo { height: 60px; margin-bottom: 24px; filter: drop-shadow(0 4px 16px rgba(0,0,0,0.3)); }
-        .headline-group { text-align: center; margin-bottom: 20px; }
-        h1 { color: #fff; font-size: 34px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 6px; }
-        .subtitle { color: rgba(255,255,255,0.6); font-size: 17px; font-weight: 400; margin-bottom: 10px; }
+        .logo { height: 52px; margin-bottom: 12px; filter: drop-shadow(0 4px 16px rgba(0,0,0,0.3)); }
+        .headline-group { text-align: center; margin-bottom: 12px; }
+        h1 { color: #fff; font-size: 26px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 4px; }
+        .subtitle { color: rgba(255,255,255,0.6); font-size: 15px; font-weight: 400; margin-bottom: 8px; }
         .traveler-id {
             display: inline-block;
             background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.7);
             font-size: 12px; font-weight: 600; padding: 4px 12px; border-radius: 20px;
         }
         /* Status row */
-        .status-row { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+        .status-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
         .status-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.3); flex-shrink: 0; }
         .status-dot.connected { background: #FF329B; animation: dotPulse 2s ease-in-out infinite; }
         .status-dot.connecting { background: #FF329B; opacity: 0.5; }
@@ -66,11 +67,11 @@
             to   { transform: scaleY(1);   opacity: 0.8; }
         }
         /* Buttons */
-        .btn-group { width: 100%; margin-bottom: 28px; }
+        .btn-group { width: 100%; margin-bottom: 16px; }
         .btn-primary {
-            width: 100%; padding: 16px; font-size: 17px; font-weight: 700;
+            width: 100%; padding: 14px; font-size: 17px; font-weight: 700;
             font-family: inherit; border: none; border-radius: 50px; cursor: pointer;
-            background: #FF329B; color: #fff; transition: all 0.2s ease; margin-bottom: 14px;
+            background: #FF329B; color: #fff; transition: all 0.2s ease; margin-bottom: 10px;
         }
         .btn-primary:hover { background: #e0237f; transform: translateY(-1px); box-shadow: 0 8px 24px rgba(255,50,155,0.35); }
         .btn-primary:active { transform: translateY(0); box-shadow: none; }
@@ -83,11 +84,11 @@
         }
         .btn-ghost:hover { background: rgba(255,255,255,0.1); }
         .btn-ghost:disabled { opacity: 0.4; cursor: not-allowed; }
-        .test-status { text-align: center; margin-top: 12px; font-size: 14px; color: rgba(255,255,255,0.7); min-height: 20px; }
+        .test-status { text-align: center; margin-top: 6px; font-size: 13px; color: rgba(255,255,255,0.7); min-height: 16px; }
         /* Volume */
-        .volume-control { width: 100%; margin-bottom: 24px; }
+        .volume-control { width: 100%; margin-bottom: 16px; }
         .volume-control label {
-            display: block; margin-bottom: 12px; color: rgba(255,255,255,0.9);
+            display: block; margin-bottom: 8px; color: rgba(255,255,255,0.9);
             font-weight: 700; font-size: 11px; letter-spacing: 1.5px;
             text-transform: uppercase; text-align: center;
         }
@@ -109,7 +110,7 @@
         }
         .volume-value { text-align: center; margin-top: 10px; color: #FF329B; font-weight: 700; font-size: 15px; }
         /* iPhone footnote — always visible */
-        .ios-note { width: 100%; text-align: center; padding-top: 16px; }
+        .ios-note { width: 100%; text-align: center; padding-top: 10px; }
         .ios-note hr { border: none; border-top: 1px solid rgba(255,255,255,0.15); margin-bottom: 12px; }
         .ios-note p { font-size: 12px; color: rgba(255,255,255,0.5); line-height: 1.6; }
         .ios-note strong { color: rgba(255,255,255,0.7); }
@@ -141,7 +142,10 @@
             -webkit-user-select: none;
             user-select: none;
             cursor: pointer;
+            transition: background 0.5s ease;
         }
+        /* All lock-screen children can fade smoothly */
+        #lockOverlay > * { transition: opacity 0.5s ease; }
         .lock-logo-lg {
             height: 120px;
             margin-bottom: 52px;
@@ -221,6 +225,395 @@
             font-size: 13px;
             min-height: 20px;
         }
+
+        /* ── Battery Save Mode ────────────────────────────────────────────── */
+        /* Near-black background maximises OLED savings; 0.5 s ease is not jarring */
+        #lockOverlay.battery-save { background: #0A0A0A; }
+        /* Dim all children to 30% … */
+        #lockOverlay.battery-save > * { opacity: 0.3; }
+        /* … except the audio wave and the unlock instruction */
+        #lockOverlay.battery-save #lockWave,
+        #lockOverlay.battery-save .lock-unlock-label { opacity: 1; }
+        /* Stop layout-triggering animations on hidden elements */
+        #lockOverlay.battery-save .lock-logo-lg,
+        #lockOverlay.battery-save .lock-audio-label,
+        #lockOverlay.battery-save .lock-dots,
+        #lockOverlay.battery-save .lock-hint { animation-play-state: paused; }
+
+        /* ── Caption Bar ─────────────────────────────────────────────────── */
+        /* z-index 10000 keeps captions above the lock overlay (9999) so they
+           remain readable in locked / battery-save mode without any extra rules. */
+        #captionBar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0, 0, 0, 0.92);
+            border-top: 2px solid #FF329B;      /* vivid pink top border = "CC is ON" */
+            padding: 10px 16px 28px;            /* extra bottom for iOS home-indicator */
+            display: none;                      /* hidden until guide enables CC */
+            flex-direction: column;
+            gap: 4px;
+            z-index: 10000;
+        }
+        /* Scrollable text area — shows up to ~6 lines, scrollable to read history */
+        #captionText {
+            max-height: 160px;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            /* Fade-out top edge so scroll history looks intentional */
+            -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 12%);
+            mask-image: linear-gradient(to bottom, transparent 0%, black 12%);
+        }
+        .caption-line {
+            color: #FFFFFF;
+            font-size: 17px;
+            line-height: 1.45;
+            font-weight: 500;
+            text-shadow: 0 1px 4px rgba(0,0,0,0.6);
+        }
+        /* Interim results shown in italic at reduced opacity */
+        .caption-line.interim {
+            font-style: italic;
+            color: rgba(255, 255, 255, 0.72);
+            font-weight: 400;
+        }
+
+        /* ── Caption controls row ─────────────────────────────────────────── */
+        .caption-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+        .caption-live-badge {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 11px;
+            font-weight: 700;
+            color: #FF329B;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+        .caption-live-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #FF329B;
+            animation: dotPulse 2s ease-in-out infinite;
+        }
+        .caption-btns { display: flex; gap: 8px; }
+        .caption-ctrl-btn {
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.30);
+            border-radius: 6px;
+            color: #FFFFFF;
+            font-size: 13px;
+            font-weight: 600;
+            padding: 3px 9px;
+            cursor: pointer;
+            line-height: 1.4;
+            -webkit-tap-highlight-color: transparent;
+            transition: background 0.15s;
+        }
+        .caption-ctrl-btn:active { background: rgba(255,255,255,0.30); }
+        .caption-ctrl-btn.active {
+            background: rgba(255, 255, 255, 0.35);
+            border-color: rgba(255,255,255,0.70);
+        }
+
+        /* Large-text mode — bigger, bolder captions */
+        #captionBar.large .caption-line {
+            font-size: 26px;
+            font-weight: 700;
+            line-height: 1.35;
+        }
+        #captionBar.large .caption-line.interim {
+            font-size: 22px;
+            font-weight: 600;
+        }
+        #captionBar.large #captionText { max-height: 220px; }
+
+        /* Restore-subtitles button — inline in page flow, below volume control.
+           Shown only when guide has CC active but traveler has hidden it. */
+        #captionMutedBadge {
+            display: none;
+            width: 100%;
+            text-align: center;
+            background: transparent;
+            border: 1.5px solid #FF329B;
+            border-radius: 50px;
+            color: #FF329B;
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+            padding: 13px 16px;
+            margin-top: 14px;
+            cursor: pointer;
+            font-family: inherit;
+            -webkit-tap-highlight-color: transparent;
+            transition: background 0.15s;
+        }
+        #captionMutedBadge:active { background: rgba(255,50,155,0.12); }
+
+        /* ── Reaction bar ─────────────────────────────────────────────────── */
+        #reactionBar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            display: none;              /* shown when isListening && !isLocked */
+            justify-content: space-around;
+            align-items: center;
+            padding: 10px 4px calc(10px + env(safe-area-inset-bottom));
+            background: rgba(0, 30, 52, 0.96);
+            border-top: 1px solid rgba(255,255,255,0.1);
+            z-index: 9001;
+        }
+        .reaction-btn {
+            min-width: 56px;
+            padding: 6px 4px 4px;
+            border-radius: 12px;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 3px;
+            -webkit-tap-highlight-color: transparent;
+            flex: 1;
+        }
+        .reaction-btn svg { width: 34px; height: 34px; }
+        .reaction-label {
+            font-size: 9.5px;
+            font-weight: 600;
+            color: rgba(255,255,255,0.65);
+            letter-spacing: 0.01em;
+            text-align: center;
+            font-family: inherit;
+            white-space: nowrap;
+        }
+        .reaction-btn.tapped { animation: reactionTap 0.25s ease-out; }
+        .reaction-btn.cooldown {
+            opacity: 0.35;
+            pointer-events: none;
+        }
+        .reaction-btn.cooldown .reaction-label { color: rgba(255,255,255,0.4); }
+        @keyframes reactionTap {
+            0%   { transform: scale(1); }
+            45%  { transform: scale(1.35); }
+            100% { transform: scale(1); }
+        }
+
+        /* ── Floating reaction animations ─────────────────────────────────── */
+        #reactionAnimLayer {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 9000;
+            overflow: hidden;
+        }
+        .floating-reaction {
+            position: absolute;
+            pointer-events: none;
+            animation: floatUp 2s ease-out forwards;
+        }
+        .floating-reaction svg { width: 44px; height: 44px; filter: drop-shadow(0 2px 8px rgba(0,0,0,0.6)); }
+        @keyframes floatUp {
+            0%   { transform: translateY(0)     scale(1);    opacity: 1; }
+            60%  { transform: translateY(-55vh) scale(1.05); opacity: 0.85; }
+            100% { transform: translateY(-80vh) scale(0.75); opacity: 0; }
+        }
+        /* ── /Reaction ────────────────────────────────────────────────────── */
+
+        /* ── Battery Indicator (main UI) ──────────────────────────────────── */
+        .battery-indicator {
+            margin-left: auto;
+            font-size: 12px;
+            font-weight: 600;
+            color: rgba(255,255,255,0.45);
+            letter-spacing: 0.3px;
+            white-space: nowrap;
+        }
+        .battery-warning {
+            font-size: 13px;
+            font-weight: 600;
+            color: #FF329B;
+            text-align: center;
+            margin-bottom: 8px;
+        }
+
+        /* ── Camera ───────────────────────────────────────────────────────── */
+        #cameraBtn {
+            position: fixed;
+            top: 24px;
+            right: 24px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: rgba(0,36,60,0.85);
+            border: 1.5px solid rgba(255,255,255,0.25);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+            transition: transform 0.15s, background 0.15s;
+            z-index: 1000;
+        }
+        #cameraBtn:active { transform: scale(0.92); }
+        #cameraBtn svg { width: 26px; height: 26px; stroke: rgba(255,255,255,0.9); }
+        .camera-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 8000;
+            background: #000;
+            /* NOTE: do NOT add overflow:hidden here — on iOS Safari it triggers
+               a WebKit compositing bug that renders the video layer solid black. */
+        }
+        #cameraVideo {
+            /* Absolutely fill the overlay so iOS doesn't collapse the height
+               when the parent is display:block and has no explicit flex sizing. */
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+            transform-origin: center center; /* pinch-zoom scales from centre */
+        }
+        .camera-overlay-ui {
+            /* Just a container for the denied message — buttons are
+               position:fixed independently so they don't move with the
+               flex layout when the visual viewport changes during zoom. */
+            position: absolute;
+            inset: 0;
+        }
+        .camera-close {
+            /* Fixed to viewport; positionCameraUI() overrides top/left during zoom */
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: rgba(0,0,0,0.5);
+            border: none;
+            cursor: pointer;
+            color: #fff;
+            font-size: 20px;
+            font-family: inherit;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .shutter-btn {
+            /* Fixed to viewport; positionCameraUI() overrides top/left during zoom */
+            position: fixed;
+            bottom: 52px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            border: 4px solid #fff;
+            background: rgba(255,255,255,0.25);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.1s, background 0.1s;
+        }
+        .shutter-btn:active { transform: translateX(-50%) scale(0.88); background: rgba(255,255,255,0.6); }
+        .shutter-inner { width: 52px; height: 52px; border-radius: 50%; background: #fff; pointer-events: none; }
+        #cameraToast {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.72);
+            color: #fff;
+            padding: 12px 24px;
+            border-radius: 24px;
+            font-size: 15px;
+            font-weight: 600;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        #cameraToast.show { opacity: 1; }
+        /* Photo preview card — shown after shutter tap */
+        .photo-preview-card {
+            position: fixed;
+            bottom: 148px; /* 52px shutter padding + 72px btn + 24px gap */
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 8100;
+            background: rgba(0,0,0,0.72);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-radius: 14px;
+            padding: 10px 10px 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+        }
+        .photo-preview-card img {
+            width: 120px;
+            height: 90px;
+            object-fit: cover;
+            border-radius: 8px;
+            display: block;
+            /* Must be default (not none) for the iOS long-press context menu
+               to offer "Save to Photo Library" */
+            -webkit-touch-callout: default;
+        }
+        .photo-preview-label {
+            color: rgba(255,255,255,0.85);
+            font-size: 11px;
+            font-weight: 600;
+            text-align: center;
+            white-space: nowrap;
+        }
+        .photo-preview-dismiss {
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            background: rgba(30,30,30,0.9);
+            border: 1.5px solid rgba(255,255,255,0.3);
+            color: #fff;
+            font-size: 13px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: inherit;
+        }
+        #cameraDenied {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: #fff;
+            font-size: 15px;
+            line-height: 1.6;
+            padding: 24px;
+            max-width: 300px;
+        }
     </style>
 </head>
 <body>
@@ -236,7 +629,9 @@
         <div class="status-row anim-2">
             <div class="status-dot" id="statusDot"></div>
             <span class="status-text" id="statusText">Not connected</span>
+            <span class="battery-indicator" id="batteryIndicator" style="display:none;"></span>
         </div>
+        <div class="battery-warning" id="batteryWarning" style="display:none;">⚠️ Low battery — consider plugging in</div>
 
         <!-- Waveform — CSS-animated, appears when audio is received -->
         <div class="waveform" id="waveform">
@@ -272,10 +667,67 @@
             <div class="volume-value" id="volumeValue">80%</div>
         </div>
 
-        <footer class="ios-note anim-5">
+        <!-- Show Subtitles button — inline, below volume %. Visible only when CC is active but hidden by user -->
+        <button id="captionMutedBadge" onclick="toggleCaptionMute()" title="Subtitles hidden — tap to show">Show Subtitles</button>
+
+        <footer id="iosNote" class="ios-note anim-5">
             <hr>
             <p>iPhone users: check that your silent switch is <strong>OFF</strong>, or use headphones.</p>
         </footer>
+    </div>
+
+    <!-- ── Floating reaction animation layer ─────────────────────────── -->
+    <div id="reactionAnimLayer"></div>
+
+    <!-- ── Reaction bar — fixed bottom, shown while listening ─────────── -->
+    <div id="reactionBar">
+        <button class="reaction-btn" onclick="sendReaction('thumbs-up')" aria-label="Thumbs up">
+            <!-- Material Design thumbs-up (24×24) scaled to 64×64 -->
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="white">
+                <g transform="scale(2.667)">
+                    <path d="M1 21h4V9H1v12zm22-11c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L14.17 1 7.59 7.59C7.22 7.95 7 8.45 7 9v10c0 1.1.9 2 2 2h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-2l-.01-.01L23 10z"/>
+                </g>
+            </svg>
+            <span class="reaction-label">Thumbs Up</span>
+        </button>
+        <button class="reaction-btn" onclick="sendReaction('thumbs-down')" aria-label="Thumbs down">
+            <!-- Material Design thumbs-down (24×24) scaled to 64×64 -->
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="white">
+                <g transform="scale(2.667)">
+                    <path d="M15 3H6c-.83 0-1.54.5-1.84 1.22l-3.02 7.05c-.09.23-.14.47-.14.73v2l.01.01L1 14c0 1.1.9 2 2 2h6.31l-.95 4.57-.03.32c0 .41.17.79.44 1.06L9.83 23l6.59-6.59c.36-.36.58-.86.58-1.41V5c0-1.1-.9-2-2-2zm4 0v12h4V3h-4z"/>
+                </g>
+            </svg>
+            <span class="reaction-label">Thumbs Down</span>
+        </button>
+        <button class="reaction-btn" onclick="sendReaction('heart')" aria-label="Heart">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="white">
+                <path d="M32 54 C32 54 8 38 8 22 C8 14 14 8 22 8 C26 8 30 10 32 14 C34 10 38 8 42 8 C50 8 56 14 56 22 C56 38 32 54 32 54 Z"/>
+            </svg>
+            <span class="reaction-label">Heart</span>
+        </button>
+        <button class="reaction-btn" onclick="sendReaction('laugh')" aria-label="Laugh">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+                <circle cx="32" cy="32" r="26" stroke="white" stroke-width="3.5"/>
+                <path d="M19 25 Q23 20 27 25" stroke="white" stroke-width="3" stroke-linecap="round"/>
+                <path d="M37 25 Q41 20 45 25" stroke="white" stroke-width="3" stroke-linecap="round"/>
+                <path d="M16 36 Q32 56 48 36 Z" fill="white"/>
+            </svg>
+            <span class="reaction-label">Laugh</span>
+        </button>
+        <button class="reaction-btn" onclick="sendReaction('mind-blown')" aria-label="Mind blown">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+                <circle cx="32" cy="36" r="22" stroke="white" stroke-width="3.5"/>
+                <circle cx="23" cy="32" r="4.5" fill="white"/>
+                <circle cx="41" cy="32" r="4.5" fill="white"/>
+                <ellipse cx="32" cy="45" rx="6" ry="5" fill="white"/>
+                <line x1="32" y1="14" x2="32" y2="6" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+                <line x1="21" y1="18" x2="15" y2="11" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+                <line x1="43" y1="18" x2="49" y2="11" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+                <line x1="13" y1="29" x2="5" y2="26" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+                <line x1="51" y1="29" x2="59" y2="26" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+            </svg>
+            <span class="reaction-label">Mind Blown</span>
+        </button>
     </div>
 
     <!-- ── Lock Screen Overlay ─────────────────────────────────────── -->
@@ -304,13 +756,82 @@
         <div class="lock-hint" id="lockHint"></div>
     </div>
 
+    <!-- ── Caption Bar — hidden until subtitle messages arrive ──────────── -->
+    <!-- Fixed at bottom, z-index 10000 keeps it above the lock overlay (9999) -->
+    <div id="captionBar">
+        <div class="caption-controls">
+            <div class="caption-live-badge">
+                <div class="caption-live-dot"></div>
+                CC Live
+            </div>
+            <div class="caption-btns">
+                <button class="caption-ctrl-btn" id="captionSizeBtn"
+                        onclick="toggleCaptionSize()" aria-label="Toggle large text">Aa</button>
+                <button class="caption-ctrl-btn" id="captionMuteBtn"
+                        onclick="toggleCaptionMute()" aria-label="Hide subtitles">Hide</button>
+            </div>
+        </div>
+        <div id="captionText"></div>
+    </div>
+
+    <!-- ── Camera Button (hidden until getUserMedia confirmed available) ── -->
+    <button id="cameraBtn" style="display:none;" onclick="openCamera()" aria-label="Take a photo">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/>
+            <circle cx="12" cy="13" r="3"/>
+        </svg>
+    </button>
+
+    <!-- ── Camera Overlay ─────────────────────────────────────────────── -->
+    <div id="cameraOverlay" style="display:none;" class="camera-overlay">
+        <video id="cameraVideo" autoplay playsinline muted></video>
+        <div class="camera-overlay-ui">
+            <button class="camera-close" onclick="closeCamera()" aria-label="Close camera">✕</button>
+            <div id="cameraDenied" style="display:none;">
+                Camera access denied.<br>Please allow camera access in your browser settings.
+            </div>
+            <button class="shutter-btn" id="shutterBtn" onclick="takePhoto()" aria-label="Take photo">
+                <div class="shutter-inner"></div>
+            </button>
+        </div>
+        <!-- Photo preview card — shown after shutter tap.
+             Long-pressing the thumbnail shows iOS's native "Save to Photo Library"
+             context menu — a short, focused list with no app-exiting options. -->
+        <div id="photoPreviewCard" style="display:none;" class="photo-preview-card">
+            <button class="photo-preview-dismiss" onclick="dismissPhotoPreview()" aria-label="Dismiss">✕</button>
+            <img id="photoPreviewImg" alt="Captured photo">
+            <p class="photo-preview-label">Hold photo to save</p>
+        </div>
+        <div id="cameraToast"></div>
+    </div>
+
+    <!-- Hidden canvas used to capture a frame from the camera video -->
+    <canvas id="cameraCanvas" style="display:none;"></canvas>
+
     <script>
         let ws = null;
         let isListening = false;
         let audioContext = null;
         let gainNode = null;
-        let nextPlayTime = 0;
         let wakeLock = null;
+
+        // ── Adaptive jitter buffer state ─────────────────────────────────────────
+        let jitterQueue = [];           // {buffer: AudioBuffer, arrivedAt: number}[]
+        let bufferMs = 500;             // current playback hold duration in ms
+        let nextPlayTime = 0;           // AudioContext clock for next scheduled chunk
+        let arrivalHistory = [];        // rolling window of arrival deltas (ms)
+        let expectedArrivalTime = 0;    // wall-clock when next chunk is due (ms)
+        const CHUNK_DURATION_MS = (1024 / 16000) * 1000;  // ~64 ms per 1024-sample chunk
+        let lateArrivalRate = 0;        // 0.0 – 1.0 fraction of late arrivals
+
+        let drainIntervalId   = null;   // handle for 20 ms drain loop
+        let metricsIntervalId = null;   // handle for 5 s metrics / recalc loop
+
+        // Per-session counters (reset each time startListening() is called)
+        let reconnectCount = 0;
+        let flushCount = 0;
+        let receivedPacketCount = 0;
+        let hasConnectedOnce = false;   // distinguishes first connect from reconnects
 
         // Lock screen state
         let isLocked = false;
@@ -318,21 +839,65 @@
         let lockTapTimer = null;
         let lockTapFlashTimer = null;
 
+        // Battery save mode
+        let isBatterySave = false;
+        let batterySaveTimer = null;
+
+        // Battery monitor
+        let batteryManager = null;
+
+        // Caption bar state
+        let captionFinalLines = [];     // up to 2 final lines kept on screen
+        let subtitleClearTimer = null;  // 5 s silence auto-clear
+        let captionsMuted = true;       // subtitles off by default; user taps "Show Subtitles" to enable
+        let captionLarge  = false;      // user enabled large-text mode
+        let captionsActive = false;     // true while guide is sending subtitles
+
         function updateStatus(state, text) {
             document.getElementById('statusDot').className = 'status-dot ' + state;
             document.getElementById('statusText').textContent = text;
         }
 
+        /**
+         * Measures both fixed bottom bars and sets body.paddingBottom so that
+         * scrollable page content (volume slider, Show Subtitles button, etc.)
+         * is never hidden underneath them.  Call after any bar show/hide.
+         */
+        function syncBodyPadding() {
+            requestAnimationFrame(() => {
+                const reactionBar = document.getElementById('reactionBar');
+                const captionBar  = document.getElementById('captionBar');
+                const reactionH = (reactionBar && reactionBar.style.display !== 'none')
+                    ? (reactionBar.getBoundingClientRect().height || 80) : 0;
+                const captionH  = (captionBar  && captionBar.style.display  !== 'none')
+                    ? (captionBar.getBoundingClientRect().height  || 0)  : 0;
+                // Caption bar sits on top of the reaction bar, so total obscured = sum of both
+                document.body.style.paddingBottom = (reactionH + captionH) + 'px';
+                // Keep caption bar docked above the reaction bar
+                if (captionBar) captionBar.style.bottom = reactionH + 'px';
+            });
+        }
+
         function updateButton() {
             const btn = document.getElementById('toggleBtn');
             const lockBtn = document.getElementById('lockBtn');
+            const reactionBar = document.getElementById('reactionBar');
+            const iosNote     = document.getElementById('iosNote');
             btn.className = 'btn-primary';
             if (isListening) {
                 btn.textContent = 'Stop Listening';
-                if (lockBtn) lockBtn.style.display = '';
+                if (lockBtn)  lockBtn.style.display = '';
+                if (iosNote)  iosNote.style.display = 'none';
+                if (reactionBar) reactionBar.style.display = 'flex';
+                syncBodyPadding();
             } else {
                 btn.textContent = 'Start Listening';
-                if (lockBtn) lockBtn.style.display = 'none';
+                if (lockBtn)  lockBtn.style.display = 'none';
+                if (iosNote)  iosNote.style.display = '';
+                if (reactionBar) reactionBar.style.display = 'none';
+                document.body.style.paddingBottom = '';
+                const captionBar = document.getElementById('captionBar');
+                if (captionBar) captionBar.style.bottom = '0';
             }
         }
 
@@ -349,9 +914,12 @@
             }
         }
 
-        // Initialize slider fill on page load
+        // Initialize slider fill on page load; reveal camera button if supported
         window.addEventListener('DOMContentLoaded', () => {
-            setVolume(80); // Set initial volume
+            setVolume(80);
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                document.getElementById('cameraBtn').style.display = 'flex';
+            }
         });
 
         // Request wake lock to prevent screen from sleeping
@@ -386,37 +954,48 @@
             }
         }
 
-        // Waveform is CSS-animated; no JS driving needed
-        function updateMiniVisualizer(audioData) { /* no-op */ }
-
         async function startListening() {
             try {
                 updateStatus('connecting', 'Connecting...');
 
-                // Create AudioContext in response to user interaction (required for iOS)
+                // Reset per-session counters and jitter state
+                reconnectCount = 0;
+                flushCount = 0;
+                receivedPacketCount = 0;
+                hasConnectedOnce = false;
+                jitterQueue = [];
+                arrivalHistory = [];
+                bufferMs = 500;
+                lateArrivalRate = 0;
+                expectedArrivalTime = 0;
+
+                // Create AudioContext (must be inside a user gesture for iOS)
                 audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
                 console.log('AudioContext created, state:', audioContext.state);
 
-                // CRITICAL for iOS: Resume AudioContext immediately after user interaction
                 if (audioContext.state === 'suspended') {
-                    console.log('Attempting to resume AudioContext for iOS...');
+                    console.log('Resuming AudioContext for iOS…');
                     await audioContext.resume();
-                    console.log('AudioContext resumed, new state:', audioContext.state);
+                    console.log('AudioContext resumed, state:', audioContext.state);
                 }
 
-                // Play a silent sound to "unlock" audio on iOS
-                const silentBuffer = audioContext.createBuffer(1, 1, audioContext.sampleRate);
+                // Unlock iOS audio with a one-sample silent buffer
+                const silentBuffer = audioContext.createBuffer(1, 1, 16000);
                 const silentSource = audioContext.createBufferSource();
                 silentSource.buffer = silentBuffer;
                 silentSource.connect(audioContext.destination);
                 silentSource.start(0);
-                console.log('Silent sound played to unlock iOS audio');
 
-                // Detect if device might be in silent mode (iOS-specific check)
+                // Detect silent-mode ringer switch (iOS)
                 checkSilentMode();
 
-                // Request wake lock to keep screen on during audio playback
+                // Keep screen awake while streaming
                 await requestWakeLock();
+
+                // Log battery level at session start
+                if (batteryManager) console.log('[Battery] Session start —',
+                    Math.round(batteryManager.level * 100) + '%',
+                    '| charging:', batteryManager.charging);
 
                 gainNode = audioContext.createGain();
                 gainNode.connect(audioContext.destination);
@@ -424,113 +1003,14 @@
 
                 nextPlayTime = audioContext.currentTime;
 
-                const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-                ws = new WebSocket(protocol + '//' + location.host);
-                ws.binaryType = 'arraybuffer';
+                // Mark as listening so reconnect guards work from first connect
+                isListening = true;
+                updateButton();
 
-                console.log('WebSocket connecting to:', protocol + '//' + location.host);
+                // Start drain + metrics timers, then open the WebSocket
+                startJitterTimers();
+                connectWebSocket();
 
-                let receivedPacketCount = 0;
-
-                ws.onopen = () => {
-                    isListening = true;
-                    updateStatus('connected', 'Connected - Listening');
-                    updateButton();
-                    updateLockWave();
-                    console.log('WebSocket connected, waiting for audio...');
-                };
-
-                ws.onmessage = (event) => {
-                    try {
-                        // Check if it's a text message (client count update or client ID)
-                        if (typeof event.data === 'string') {
-                            const message = JSON.parse(event.data);
-                            if (message.type === 'client-count') {
-                                // Listener page doesn't display count, just ignore
-                                return;
-                            }
-                            if (message.type === 'client-id') {
-                                document.getElementById('travelerNumber').textContent = message.id;
-                                document.getElementById('travelerId').style.display = 'inline-block';
-                                return;
-                            }
-                        }
-
-                        // It's binary audio data (PCM)
-                        receivedPacketCount++;
-
-                        // Show waveform on first packet
-                        if (receivedPacketCount === 1) {
-                            document.getElementById('waveform').style.display = 'flex';
-                            console.log('First audio packet received - showing waveform');
-                        }
-
-                        // Log every 50th packet
-                        if (receivedPacketCount % 50 === 0) {
-                            console.log('Received packet #' + receivedPacketCount);
-                        }
-
-                        // Convert Int16Array back to Float32Array
-                        const pcmData = new Int16Array(event.data);
-                        const floatData = new Float32Array(pcmData.length);
-                        for (let i = 0; i < pcmData.length; i++) {
-                            floatData[i] = pcmData[i] / 32768;
-                        }
-
-                        // Update mini visualizer with audio data
-                        updateMiniVisualizer(floatData);
-
-                        // Create audio buffer
-                        const audioBuffer = audioContext.createBuffer(1, floatData.length, audioContext.sampleRate);
-                        audioBuffer.getChannelData(0).set(floatData);
-
-                        // Create and schedule source
-                        const source = audioContext.createBufferSource();
-                        source.buffer = audioBuffer;
-                        source.connect(gainNode);
-
-                        // Schedule for seamless playback with small buffer
-                        if (receivedPacketCount === 1) {
-                            // First packet: add 100ms buffer to prevent underruns
-                            nextPlayTime = audioContext.currentTime + 0.1;
-                            console.log('First audio packet - starting with 100ms buffer');
-                        }
-
-                        // Always schedule at nextPlayTime (don't skip ahead)
-                        source.start(nextPlayTime);
-                        nextPlayTime = nextPlayTime + audioBuffer.duration;
-
-                        // Check for drift: if we're falling too far behind, reset
-                        const drift = nextPlayTime - audioContext.currentTime;
-                        if (drift > 1.0) {  // If more than 1 second ahead, reset
-                            console.log('Buffer overflow detected (' + Math.round(drift * 1000) + 'ms ahead), resetting');
-                            nextPlayTime = audioContext.currentTime + 0.1;
-                        } else if (drift < 0) {  // If we're behind current time, catch up
-                            console.log('Buffer underrun detected, resetting');
-                            nextPlayTime = audioContext.currentTime + 0.05;  // Small buffer
-                        }
-
-                    } catch (e) {
-                        console.error('Audio playback error:', e);
-                    }
-                };
-                
-                ws.onclose = () => {
-                    if (isListening) {
-                        updateStatus('error', 'Disconnected - Tap to reconnect');
-                        isListening = false;
-                        updateButton();
-                        updateLockWave();
-                    }
-                };
-
-                ws.onerror = () => {
-                    updateStatus('error', 'Connection error');
-                    isListening = false;
-                    updateButton();
-                    updateLockWave();
-                };
-                
             } catch (err) {
                 updateStatus('error', 'Error: ' + err.message);
                 console.error(err);
@@ -541,6 +1021,12 @@
             // Exit lock mode first if active so the UI restores correctly
             if (isLocked) exitLockMode();
 
+            // Set isListening=false BEFORE closing ws so onclose won't schedule a reconnect
+            isListening = false;
+
+            stopJitterTimers();
+            jitterQueue = [];    // discard buffered audio (not counted as a flush event)
+
             if (ws) {
                 ws.close();
                 ws = null;
@@ -550,17 +1036,182 @@
                 audioContext = null;
             }
 
-            // Release wake lock when stopping
             releaseWakeLock();
-
-            // Hide waveform
             document.getElementById('waveform').style.display = 'none';
 
+            // Log battery level at session end
+            if (batteryManager) console.log('[Battery] Session end —',
+                Math.round(batteryManager.level * 100) + '%',
+                '| charging:', batteryManager.charging);
+
             gainNode = null;
-            isListening = false;
             updateStatus('', 'Not connected');
             updateButton();
         }
+
+        // ═══════════════════════════════════════════════════════════════════════════
+        // ADAPTIVE JITTER BUFFER — helper functions
+        // ═══════════════════════════════════════════════════════════════════════════
+
+        /** Open (or re-open) the WebSocket and wire up all handlers. */
+        function connectWebSocket() {
+            if (!isListening) return;   // user stopped during a reconnect delay
+
+            const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(protocol + '//' + location.host);
+            ws.binaryType = 'arraybuffer';
+            console.log('[WS] Connecting to', protocol + '//' + location.host);
+
+            ws.onopen = () => {
+                if (hasConnectedOnce) {
+                    // Reconnect: flush stale audio so there is no echo/double-play
+                    flushQueue();
+                    reconnectCount++;
+                    console.log('[Jitter] Reconnected. reconnects:', reconnectCount);
+                } else {
+                    hasConnectedOnce = true;
+                    console.log('[WS] Connected — waiting for audio…');
+                }
+                updateStatus('connected', 'Connected - Listening');
+                updateButton();
+                updateLockWave();
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    if (typeof event.data === 'string') {
+                        const msg = JSON.parse(event.data);
+                        if (msg.type === 'client-id') {
+                            document.getElementById('travelerNumber').textContent = msg.id;
+                            document.getElementById('travelerId').style.display = 'inline-block';
+                        } else if (msg.type === 'subtitle') {
+                            showSubtitle(msg.text, msg.isFinal, msg.enabled);
+                        } else if (msg.type === 'reaction') {
+                            playReactionAnimation(msg.reaction);
+                        }
+                        return;
+                    }
+                    onChunkArrived(event.data);
+                } catch (e) {
+                    console.error('[WS] Message error:', e);
+                }
+            };
+
+            ws.onclose = () => {
+                ws = null;
+                if (!isListening) return;   // user pressed Stop — do not reconnect
+                updateStatus('connecting', 'Reconnecting…');
+                console.log('[WS] Closed — reconnecting in 1 s…');
+                setTimeout(connectWebSocket, 1000);
+            };
+
+            ws.onerror = (e) => {
+                console.error('[WS] Error:', e);
+                // onclose fires next and handles the reconnect
+            };
+        }
+
+        /** Called for every binary audio chunk from the server. */
+        function onChunkArrived(arrayBuffer) {
+            const now = Date.now();
+            receivedPacketCount++;
+
+            if (receivedPacketCount === 1) {
+                document.getElementById('waveform').style.display = 'flex';
+                expectedArrivalTime = now;
+                console.log('[Jitter] First chunk received | bufferMs:', bufferMs);
+            }
+
+            // Track whether this chunk arrived later than expected
+            const delta = now - expectedArrivalTime;
+            arrivalHistory.push(delta);
+            if (arrivalHistory.length > 10) arrivalHistory.shift();
+            lateArrivalRate = arrivalHistory.filter(d => d > 100).length / arrivalHistory.length;
+
+            // Advance expected time by one chunk period
+            expectedArrivalTime = now + CHUNK_DURATION_MS;
+
+            // Decode and enqueue
+            const floatData = pcm16ToFloat32(arrayBuffer);
+            const audioBuffer = audioContext.createBuffer(1, floatData.length, audioContext.sampleRate);
+            audioBuffer.getChannelData(0).set(floatData);
+            jitterQueue.push({ buffer: audioBuffer, arrivedAt: now });
+        }
+
+        /** Scheduled every 20 ms — releases chunks that have aged past bufferMs. */
+        function drainQueue() {
+            if (!audioContext || jitterQueue.length === 0) return;
+            const now = Date.now();
+
+            while (jitterQueue.length > 0) {
+                if ((now - jitterQueue[0].arrivedAt) < bufferMs) break;
+
+                const item = jitterQueue.shift();
+
+                // Keep the scheduler slightly ahead of the playhead
+                if (nextPlayTime < audioContext.currentTime) {
+                    nextPlayTime = audioContext.currentTime + 0.01;
+                }
+
+                const source = audioContext.createBufferSource();
+                source.buffer = item.buffer;
+                source.connect(gainNode);
+                source.start(nextPlayTime);
+                nextPlayTime += item.buffer.duration;
+            }
+        }
+
+        /** Discard all queued audio (called on reconnect to prevent echo). */
+        function flushQueue() {
+            const count = jitterQueue.length;
+            jitterQueue = [];
+            nextPlayTime = audioContext ? audioContext.currentTime : 0;
+            flushCount++;
+            console.log('[Jitter] Flushed', count, 'chunks | total flushes:', flushCount);
+        }
+
+        /** Adjust bufferMs based on the rolling lateArrivalRate. */
+        function recalcBufferMs() {
+            const newMs = lateArrivalRate < 0.05 ? 500 :
+                          lateArrivalRate <= 0.20 ? 1500 : 3000;
+            if (newMs !== bufferMs) {
+                console.log('[Jitter] bufferMs', bufferMs, '→', newMs,
+                            '| lateArrivalRate', (lateArrivalRate * 100).toFixed(1) + '%');
+                bufferMs = newMs;
+            }
+        }
+
+        /** Convert Int16 PCM ArrayBuffer to Float32Array. */
+        function pcm16ToFloat32(arrayBuffer) {
+            const pcm = new Int16Array(arrayBuffer);
+            const f32 = new Float32Array(pcm.length);
+            for (let i = 0; i < pcm.length; i++) f32[i] = pcm[i] / 32768;
+            return f32;
+        }
+
+        /** Start the drain loop and the 5-second metrics/recalc interval. */
+        function startJitterTimers() {
+            drainIntervalId   = setInterval(drainQueue, 20);
+            metricsIntervalId = setInterval(() => {
+                recalcBufferMs();
+                if (isListening) {
+                    console.log('[Jitter] bufferMs:', bufferMs,
+                                '| lateArrivalRate:', (lateArrivalRate * 100).toFixed(1) + '%',
+                                '| reconnects:', reconnectCount,
+                                '| flushes:', flushCount,
+                                '| queueDepth:', jitterQueue.length);
+                }
+            }, 5000);
+        }
+
+        /** Stop the drain and metrics timers. */
+        function stopJitterTimers() {
+            clearInterval(drainIntervalId);
+            clearInterval(metricsIntervalId);
+            drainIntervalId = metricsIntervalId = null;
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════════
 
         function toggleListening() {
             if (isListening) {
@@ -662,6 +1313,148 @@
         // iOS note is always visible in the footer — nothing to do
         function checkSilentMode() { /* note is always shown */ }
 
+        // ── Camera ────────────────────────────────────────────────────────────
+        var cameraStream = null;
+        var _cameraZoom  = 1;   // current digital-zoom multiplier (1–5×)
+        var _pinchDist0  = 0;   // finger separation when pinch began
+        var _pinchZoom0  = 1;   // zoom level when pinch began
+
+        function _getPinchDist(touches) {
+            var dx = touches[0].clientX - touches[1].clientX;
+            var dy = touches[0].clientY - touches[1].clientY;
+            return Math.sqrt(dx * dx + dy * dy);
+        }
+
+        // Intercept multi-touch moves on the overlay so the browser never
+        // gets a chance to zoom the page. Single-finger touches pass through
+        // normally so the shutter/close buttons still respond to taps.
+        function _onOverlayTouchMove(e) {
+            if (e.touches.length > 1) e.preventDefault();
+        }
+
+        function _onPinchStart(e) {
+            if (e.touches.length !== 2) return;
+            e.preventDefault();
+            _pinchDist0 = _getPinchDist(e.touches);
+            _pinchZoom0 = _cameraZoom;
+        }
+
+        function _onPinchMove(e) {
+            if (e.touches.length !== 2) return;
+            e.preventDefault();
+            var dist = _getPinchDist(e.touches);
+            _cameraZoom = Math.min(5, Math.max(1, _pinchZoom0 * dist / _pinchDist0));
+            document.getElementById('cameraVideo').style.transform =
+                'scale(' + _cameraZoom + ')';
+        }
+
+        async function openCamera() {
+            var overlay = document.getElementById('cameraOverlay');
+            var video   = document.getElementById('cameraVideo');
+            var denied  = document.getElementById('cameraDenied');
+            var shutter = document.getElementById('shutterBtn');
+
+            // Reset to a clean state each open
+            denied.style.display  = 'none';
+            shutter.style.display = 'flex';
+            video.style.display   = 'block';
+            video.style.transform = '';
+            _cameraZoom = 1;
+            overlay.style.display = 'block';
+
+            // Lock browser page-zoom while the camera overlay is open.
+            // This keeps the buttons fixed in place and prevents the app
+            // from being left zoomed-in after the camera is closed.
+            // Pinch gestures are re-routed to scale the <video> instead.
+            var vpMeta = document.querySelector('meta[name=viewport]');
+            if (vpMeta) {
+                vpMeta._savedContent = vpMeta.content;
+                vpMeta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+            }
+
+            overlay.addEventListener('touchmove', _onOverlayTouchMove, { passive: false });
+            video.addEventListener('touchstart',  _onPinchStart, { passive: false });
+            video.addEventListener('touchmove',   _onPinchMove,  { passive: false });
+
+            try {
+                cameraStream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment' },
+                    audio: false
+                });
+                video.srcObject = cameraStream;
+            } catch (err) {
+                video.style.display   = 'none';
+                shutter.style.display = 'none';
+                denied.style.display  = 'block';
+                cameraStream = null;
+                console.warn('Camera access error:', err.name, err.message);
+            }
+        }
+
+        function closeCamera() {
+            var overlay = document.getElementById('cameraOverlay');
+            var video   = document.getElementById('cameraVideo');
+
+            // Remove pinch-zoom handlers
+            overlay.removeEventListener('touchmove', _onOverlayTouchMove);
+            video.removeEventListener('touchstart',  _onPinchStart);
+            video.removeEventListener('touchmove',   _onPinchMove);
+
+            // Restore viewport meta so normal page zoom is allowed again
+            var vpMeta = document.querySelector('meta[name=viewport]');
+            if (vpMeta && vpMeta._savedContent) {
+                vpMeta.content      = vpMeta._savedContent;
+                vpMeta._savedContent = null;
+            }
+
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(function (t) { t.stop(); });
+                cameraStream = null;
+            }
+            video.srcObject       = null;
+            video.style.display   = 'block';
+            video.style.transform = '';
+            dismissPhotoPreview();
+            document.getElementById('cameraOverlay').style.display = 'none';
+            document.getElementById('cameraDenied').style.display  = 'none';
+            document.getElementById('shutterBtn').style.display    = 'flex';
+            // ws and audioContext are completely untouched — audio keeps playing
+        }
+
+        function takePhoto() {
+            var video  = document.getElementById('cameraVideo');
+            var canvas = document.getElementById('cameraCanvas');
+            if (!cameraStream || !video.videoWidth) return;
+
+            canvas.width  = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+
+            // Use a blob URL as the image src so iOS offers full-resolution
+            // "Save to Photo Library" on long-press (the native context menu —
+            // smaller and more focused than the full share sheet).
+            canvas.toBlob(function (blob) {
+                var url = URL.createObjectURL(blob);
+                document.getElementById('photoPreviewImg').src = url;
+                document.getElementById('photoPreviewCard').style.display = 'flex';
+            }, 'image/jpeg', 0.92);
+        }
+
+        function dismissPhotoPreview() {
+            var img = document.getElementById('photoPreviewImg');
+            // Revoke the blob URL to free memory
+            if (img.src && img.src.startsWith('blob:')) URL.revokeObjectURL(img.src);
+            img.src = '';
+            document.getElementById('photoPreviewCard').style.display = 'none';
+        }
+
+        function showCameraToast(msg) {
+            var toast = document.getElementById('cameraToast');
+            toast.textContent = msg;
+            toast.classList.add('show');
+            setTimeout(function () { toast.classList.remove('show'); }, 2200);
+        }
+
         // ── Lock Screen ───────────────────────────────────────────────────────
 
         function enterLockMode() {
@@ -681,6 +1474,9 @@
 
             // Trap the back button so it can't navigate away while locked
             history.pushState({ locked: true }, '');
+
+            // Schedule battery save mode after 5 seconds of inactivity
+            batterySaveTimer = setTimeout(activateBatterySave, 5000);
         }
 
         function exitLockMode() {
@@ -689,6 +1485,9 @@
             resetLockDots();
             clearTimeout(lockTapTimer);
             clearTimeout(lockTapFlashTimer);
+            clearTimeout(batterySaveTimer);
+            batterySaveTimer = null;
+            deactivateBatterySave();
             document.getElementById('lockOverlay').style.display = 'none';
             document.getElementById('lockHint').textContent = '';
 
@@ -701,6 +1500,15 @@
 
         function handleLockTap() {
             if (!isLocked) return;
+
+            // Any tap wakes battery save mode; the tap still counts toward unlock
+            if (isBatterySave) {
+                deactivateBatterySave();
+                clearTimeout(batterySaveTimer);
+                // Restart the inactivity timer from this tap
+                batterySaveTimer = setTimeout(activateBatterySave, 5000);
+            }
+
             clearTimeout(lockTapTimer);
 
             lockTapCount++;
@@ -764,6 +1572,244 @@
 
         // Initialize volume
         setVolume(80);
+
+        // ── Reactions ─────────────────────────────────────────────────────────
+
+        // Inline SVG map — same paths as the reaction bar buttons (reused for animations)
+        const REACTION_SVGS = {
+            'thumbs-up':   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="white"><g transform="scale(2.667)"><path d="M1 21h4V9H1v12zm22-11c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L14.17 1 7.59 7.59C7.22 7.95 7 8.45 7 9v10c0 1.1.9 2 2 2h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-2l-.01-.01L23 10z"/></g></svg>',
+            'thumbs-down': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="white"><g transform="scale(2.667)"><path d="M15 3H6c-.83 0-1.54.5-1.84 1.22l-3.02 7.05c-.09.23-.14.47-.14.73v2l.01.01L1 14c0 1.1.9 2 2 2h6.31l-.95 4.57-.03.32c0 .41.17.79.44 1.06L9.83 23l6.59-6.59c.36-.36.58-.86.58-1.41V5c0-1.1-.9-2-2-2zm4 0v12h4V3h-4z"/></g></svg>',
+            'heart':       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="white"><path d="M32 54 C32 54 8 38 8 22 C8 14 14 8 22 8 C26 8 30 10 32 14 C34 10 38 8 42 8 C50 8 56 14 56 22 C56 38 32 54 32 54 Z"/></svg>',
+            'laugh':       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none"><circle cx="32" cy="32" r="26" stroke="white" stroke-width="3.5"/><path d="M19 25 Q23 20 27 25" stroke="white" stroke-width="3" stroke-linecap="round"/><path d="M37 25 Q41 20 45 25" stroke="white" stroke-width="3" stroke-linecap="round"/><path d="M16 36 Q32 56 48 36 Z" fill="white"/></svg>',
+            'mind-blown':  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none"><circle cx="32" cy="36" r="22" stroke="white" stroke-width="3.5"/><circle cx="23" cy="32" r="4.5" fill="white"/><circle cx="41" cy="32" r="4.5" fill="white"/><ellipse cx="32" cy="45" rx="6" ry="5" fill="white"/><line x1="32" y1="14" x2="32" y2="6" stroke="white" stroke-width="2.5" stroke-linecap="round"/><line x1="21" y1="18" x2="15" y2="11" stroke="white" stroke-width="2.5" stroke-linecap="round"/><line x1="43" y1="18" x2="49" y2="11" stroke="white" stroke-width="2.5" stroke-linecap="round"/><line x1="13" y1="29" x2="5" y2="26" stroke="white" stroke-width="2.5" stroke-linecap="round"/><line x1="51" y1="29" x2="59" y2="26" stroke="white" stroke-width="2.5" stroke-linecap="round"/></svg>'
+        };
+
+        let activeFloatingCount = 0;
+        const MAX_FLOATING = 8;
+
+        // Independent 5-second cooldown per reaction type — mirrors REACTION_COOLDOWN_MS on server
+        const REACTION_COOLDOWN_MS = 5000;
+        const reactionCooldowns = {};   // { reactionType: timeoutId | null }
+
+        /** Participant taps a reaction button — send to server and animate locally. */
+        function sendReaction(reaction) {
+            if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+            // Client-side cooldown guard — button is already grayed out but defense-in-depth
+            if (reactionCooldowns[reaction]) return;
+
+            ws.send(JSON.stringify({ type: 'reaction', reaction }));
+
+            // Find the tapped button and apply tap pulse → cooldown gray-out
+            const btn = document.querySelector(`.reaction-btn[onclick*="'${reaction}'"]`);
+            if (btn) {
+                // Short tap-scale animation first
+                btn.classList.add('tapped');
+                btn.addEventListener('animationend', () => btn.classList.remove('tapped'), { once: true });
+
+                // Gray out for the cooldown duration
+                btn.classList.add('cooldown');
+                reactionCooldowns[reaction] = setTimeout(() => {
+                    btn.classList.remove('cooldown');
+                    reactionCooldowns[reaction] = null;
+                }, REACTION_COOLDOWN_MS);
+            }
+
+            // Play animation locally (guide also sees it since server broadcasts back to all participants)
+            playReactionAnimation(reaction);
+        }
+
+        /** Spawn a floating icon that drifts upward and fades out. */
+        function playReactionAnimation(reaction) {
+            if (activeFloatingCount >= MAX_FLOATING) return;   // silently drop
+            const svg = REACTION_SVGS[reaction];
+            if (!svg) return;
+            const layer = document.getElementById('reactionAnimLayer');
+            if (!layer) return;
+
+            const el = document.createElement('div');
+            el.className = 'floating-reaction';
+
+            // Random horizontal spread (15%–85% of viewport width), bottom above reaction bar
+            const reactionBar = document.getElementById('reactionBar');
+            const barH = (reactionBar && reactionBar.style.display !== 'none')
+                ? (reactionBar.getBoundingClientRect().height || 80) : 0;
+            el.style.left   = (15 + Math.random() * 70) + '%';
+            el.style.bottom = (barH + 8) + 'px';
+            el.innerHTML    = svg;
+
+            layer.appendChild(el);
+            activeFloatingCount++;
+
+            el.addEventListener('animationend', () => {
+                el.remove();
+                activeFloatingCount--;
+            }, { once: true });
+        }
+
+        // ── Caption Bar ───────────────────────────────────────────────────────
+
+        /**
+         * Render a subtitle message into the caption bar.
+         * @param {string}  text    - transcript text
+         * @param {boolean} isFinal - whether the recognition result is final
+         * @param {boolean} enabled - false signals guide turned subtitles off
+         */
+        function showSubtitle(text, isFinal, enabled) {
+            const bar      = document.getElementById('captionBar');
+            const textEl   = document.getElementById('captionText');
+            const badge    = document.getElementById('captionMutedBadge');
+            if (!bar || !textEl) return;
+
+            // Guide explicitly disabled subtitles — hide bar entirely and reset to default (muted)
+            if (enabled === false) {
+                clearTimeout(subtitleClearTimer);
+                bar.style.display = 'none';
+                textEl.innerHTML  = '';
+                captionFinalLines = [];
+                captionsActive    = false;
+                captionsMuted     = true;   // reset to default so next session also starts hidden
+                const btn = document.getElementById('captionMuteBtn');
+                if (btn)   btn.textContent = 'Hide';
+                if (badge) badge.style.display = 'none';
+                syncBodyPadding();
+                return;
+            }
+
+            // First subtitle of this session — show bar or badge depending on mute state
+            captionsActive = true;
+            if (!captionsMuted) {
+                bar.style.display = 'flex';
+                syncBodyPadding();
+            } else {
+                // Subtitles are muted (default) — show the "Show Subtitles" inline button
+                if (badge) badge.style.display = 'block';
+            }
+
+            // Restart the 10-second silence auto-clear timer
+            // On timeout: clear text but keep the bar + controls visible
+            clearTimeout(subtitleClearTimer);
+            subtitleClearTimer = setTimeout(() => {
+                textEl.innerHTML  = '';
+                captionFinalLines = [];
+            }, 10000);
+
+            // Accumulate final lines — keep last 8 for scroll-back history
+            if (isFinal && text && text.trim()) {
+                captionFinalLines.push(text.trim());
+                if (captionFinalLines.length > 8) captionFinalLines.shift();
+            }
+
+            // Build HTML: final lines (normal) + interim line (italic)
+            let html = captionFinalLines
+                .map(l => `<div class="caption-line">${escapeHtml(l)}</div>`)
+                .join('');
+            if (!isFinal && text && text.trim()) {
+                html += `<div class="caption-line interim">${escapeHtml(text.trim())}</div>`;
+            }
+
+            if (html) {
+                if (!captionsMuted) {
+                    textEl.innerHTML = html;
+                    // Auto-scroll to bottom so latest line is always visible
+                    textEl.scrollTop = textEl.scrollHeight;
+                    if (badge) badge.style.display = 'none';
+                } else {
+                    // Muted — keep text hidden, show badge
+                    if (badge) badge.style.display = 'block';
+                }
+            }
+        }
+
+        function toggleCaptionMute() {
+            const bar    = document.getElementById('captionBar');
+            const badge  = document.getElementById('captionMutedBadge');
+            const textEl = document.getElementById('captionText');
+            const btn    = document.getElementById('captionMuteBtn');
+            captionsMuted = !captionsMuted;
+
+            if (captionsMuted) {
+                bar.style.display = 'none';   // hide entire bar including controls
+                textEl.innerHTML  = '';
+                if (badge) badge.style.display = captionsActive ? 'block' : 'none';
+                syncBodyPadding();
+            } else {
+                // Re-render buffered final lines and restore bar
+                const html = captionFinalLines
+                    .map(l => `<div class="caption-line">${escapeHtml(l)}</div>`)
+                    .join('');
+                textEl.innerHTML = html;
+                textEl.scrollTop = textEl.scrollHeight;
+                if (captionsActive) bar.style.display = 'flex';
+                if (badge) badge.style.display = 'none';
+                syncBodyPadding();
+            }
+        }
+
+        function toggleCaptionSize() {
+            const bar = document.getElementById('captionBar');
+            const btn = document.getElementById('captionSizeBtn');
+            captionLarge = !captionLarge;
+            if (bar) bar.classList.toggle('large', captionLarge);
+            if (btn) btn.classList.toggle('active', captionLarge);
+        }
+
+        function escapeHtml(str) {
+            return str.replace(/&/g, '&amp;')
+                      .replace(/</g, '&lt;')
+                      .replace(/>/g, '&gt;');
+        }
+
+        // ── Battery Monitor ───────────────────────────────────────────────────
+
+        async function initBattery() {
+            if (!('getBattery' in navigator)) {
+                console.log('[Battery] API not supported on this device');
+                return;
+            }
+            try {
+                batteryManager = await navigator.getBattery();
+                updateBatteryUI();
+                batteryManager.addEventListener('levelchange',   updateBatteryUI);
+                batteryManager.addEventListener('chargingchange', updateBatteryUI);
+                console.log('[Battery] Level:', Math.round(batteryManager.level * 100) + '%',
+                            '| Charging:', batteryManager.charging);
+            } catch (e) {
+                console.warn('[Battery] Error initialising:', e);
+            }
+        }
+
+        function updateBatteryUI() {
+            if (!batteryManager) return;
+            const pct      = Math.round(batteryManager.level * 100);
+            const charging = batteryManager.charging;
+
+            const indicator = document.getElementById('batteryIndicator');
+            if (indicator) {
+                indicator.textContent = (charging ? '⚡ ' : '') + pct + '%';
+                indicator.style.display = '';
+            }
+
+            const warning = document.getElementById('batteryWarning');
+            if (warning) {
+                warning.style.display = (pct < 20 && !charging) ? '' : 'none';
+            }
+        }
+
+        // ── Battery Save Mode ─────────────────────────────────────────────────
+
+        function activateBatterySave() {
+            isBatterySave = true;
+            document.getElementById('lockOverlay').classList.add('battery-save');
+        }
+
+        function deactivateBatterySave() {
+            isBatterySave = false;
+            document.getElementById('lockOverlay').classList.remove('battery-save');
+        }
+
+        // Run on page load
+        initBattery();
     </script>
 </body>
 </html>

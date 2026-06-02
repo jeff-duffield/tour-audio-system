@@ -4,7 +4,7 @@ Real-time audio streaming from tour guide to tourists' smartphones via local WiF
 
 ## Quick Reference
 
-**Router Password:** EFTours2026!
+**Router Password:** See `secrets.txt` (same folder as this README)
 
 **EF-TOUR-001 Network Password:** EFLearnFun
 
@@ -44,7 +44,7 @@ ssh root@192.168.8.1
 /etc/init.d/tour-audio restart
 ```
 
-**Password:** `EFTours2026!`
+**Password:** See `secrets.txt` (same folder as this README)
 
 ### Run Load Test
 
@@ -79,7 +79,7 @@ node load-test.js --clients 80 --duration 120
 
 - **Listener Page:** `https://audio.eftours.travel/` or `https://audio.eftours.travel/index.html`
 - **Guide Page:** `https://audio.eftours.travel/guide.html`
-- **Audio System Admin:** `https://audio.eftours.travel/admin?token=<token>` (see below)
+- **Audio System Admin:** `https://audio.eftours.travel/admin?token=EFAdminAudio02141`
 - **Health Check:** `https://audio.eftours.travel/health`
 
 ---
@@ -90,37 +90,12 @@ The Audio System Admin portal lets a Tour Director connect the router to hotel W
 
 ### How Access Works
 
-Access is granted via a **bearer token** baked into the URL. The token is generated once and saved permanently to `/etc/ef-admin-token` on the router, so the same link works across reboots until you deliberately rotate it. Sessions last 8 hours after opening the link.
+Access is granted via a **fixed token** baked into the URL. The token never changes and never needs to be regenerated. Sessions last 8 hours after opening the link.
 
-### Generating the Access Link and QR Code
-
-Run this on the router (or on your computer after copying `admin-qr.js` there):
-
-```bash
-ssh root@192.168.8.1
-node /root/tour-audio-server/admin-qr.js
+**Admin URL (bookmark this):**
 ```
-
-The script prints:
-
+https://audio.eftours.travel/admin?token=EFAdminAudio02141
 ```
-════════════════════════════════════════════════════════════════════════
- AUDIO SYSTEM ADMIN ACCESS URL
-════════════════════════════════════════════════════════════════════════
-
- https://audio.eftours.travel/admin?token=<48-char-hex-token>
-
-════════════════════════════════════════════════════════════════════════
- QUICKEST WAY TO GET THE QR CODE
-════════════════════════════════════════════════════════════════════════
- Open this link in any browser — it loads the QR image directly:
-
- https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=...
-```
-
-**On a phone:** open the QR image link in your browser, right-click → Save → print onto the TD onboarding card.
-
-**On a computer:** copy the admin URL and paste it directly into any browser on the tour Wi-Fi network.
 
 ### On-Screen QR Code + URL Page
 
@@ -131,16 +106,6 @@ Once logged into the admin portal, tap **"📱 Show QR code for this device"** a
 - A **"📋 Copy URL"** button — tap to copy to clipboard
 
 This page works for both scenarios: a TD on their phone scans the QR, a TD on a laptop copies the URL.
-
-### Rotating the Token (e.g. if a card is lost)
-
-```bash
-ssh root@192.168.8.1
-node /root/tour-audio-server/admin-qr.js --rotate
-/etc/init.d/tour-audio restart
-```
-
-This invalidates all existing QR codes and printed cards. Print new cards from the new output.
 
 ---
 
@@ -196,7 +161,7 @@ That's it. One router, one battery pack.
 
 1. Power on the GL-MT2500 and connect to its WiFi (default SSID on the label)
 2. Open a browser and go to `http://192.168.8.1`
-3. Set an admin password when prompted.  Use:  EFTours2026!
+3. Set an admin password when prompted. Use the router admin password from `secrets.txt`.
 4. Connect the router to another Wifi signal as a repeater (or connect to the internet via ethernet)
 4. Go to **Wireless** settings and change the SSID to your tour name (e.g., `EFTourAudio-1`)
 5. Set a WiFi password
@@ -313,7 +278,24 @@ uci commit dhcp
 nslookup audio.eftours.travel 127.0.0.1
 ```
 
-**Important:** Do NOT add wildcard DNS entries (`address=/#/`) or captive portal check domains (`connectivitycheck.gstatic.com`, etc.). These cause Chrome and Android to block all internet traffic on the router's WiFi.
+**Also add captive portal probe domains** so that iOS, Android, and Windows devices trigger the captive portal UI when joining the network and iCloud Private Relay stays suspended for the session:
+
+```bash
+cat >> /etc/dnsmasq.conf << 'EOF'
+
+# Captive portal host intercept — OS connectivity probes
+address=/captive.apple.com/192.168.8.1
+address=/www.appleiphonecell.com/192.168.8.1
+address=/www.apple.com/192.168.8.1
+address=/connectivitycheck.gstatic.com/192.168.8.1
+address=/clients3.google.com/192.168.8.1
+address=/www.msftconnecttest.com/192.168.8.1
+EOF
+
+/etc/init.d/dnsmasq restart
+```
+
+The HTTP server responds to requests on these domains with a `302` redirect to `/connected.html` (never `204`), which keeps iOS in captive-portal mode and suspends Private Relay for the entire session. Do NOT add wildcard DNS entries (`address=/#/`) — those intercept all traffic and break general internet access.
 
 ### Step 7: Set Up Port Forwarding
 
@@ -415,7 +397,11 @@ chmod +x /root/optimize-wifi.sh
 - Optimizes 5GHz: Auto channel, HE80 mode (WiFi 6)
 - Enables client isolation for security (can be disabled if needed)
 
-**Important:** Encourage users to connect to **5GHz (EF-TOUR-001)** for best performance with 40+ people.
+**WiFi bands are split into two SSIDs:**
+- **Tourists → `EF-TOUR-001` (2.4GHz)** — better range and wall/crowd penetration; more than enough bandwidth for audio
+- **Guides → `EF-TOUR-GUIDE` (5GHz)** — less congestion from tourist devices; guide is usually close to the router
+
+Both use the same password (`EFLearnFun`) and the same app. Tourists join `EF-TOUR-001`, guides join `EF-TOUR-GUIDE`.
 
 **Manual WiFi optimization (if script doesn't match your router):**
 
@@ -712,20 +698,24 @@ free -m | grep Mem'
 ### For the Tour Guide:
 1. Power on the router (connect USB battery pack)
 2. Wait ~30 seconds for it to boot
-3. Connect your phone to the tour WiFi network
-4. Open browser and go to `https://audio.eftours.travel/guide.html`
+3. Connect your phone to **`EF-TOUR-GUIDE`** (5GHz — guide network)
+4. Open Safari and go to `https://audio.eftours.travel/guide.html`
+   - Or tap the EF logo **5 times** on the captive portal welcome screen to jump there directly
 5. Tap **Start Broadcasting**
 6. Speak — your voice streams to all connected tourists
+7. Only one guide can broadcast at a time; a second guide sees listener count and metrics in watch mode
+
+> ⚠️ **Must use full Safari/Chrome** — the captive portal mini-browser blocks microphone access.
 
 ### For Tourists:
-1. Connect to the tour WiFi network (e.g., `EF-TOUR-001`)
-2. Open any browser
-3. Navigate to `audio.eftours.travel` — the browser will automatically use HTTPS
+1. Connect to **`EF-TOUR-001`** (2.4GHz — tourist network)
+2. The captive portal pops up automatically — tap **Open Tour Audio** on the connected screen
+3. If the popup doesn't appear, open any browser and go to `audio.eftours.travel`
 4. Tap **Start Listening**
-5. Use headphones for best experience
-6. Adjust volume as needed
+5. Use headphones for best experience; adjust the on-screen volume slider as needed
+6. Tap the **lock icon** to lock the screen and prevent accidental taps while the phone is in your pocket — tap the screen 3 times to unlock
 
-**Note:** No security warnings or click-throughs needed — the site uses a trusted CA-signed certificate. The screen will stay on while listening to prevent audio interruption on iPhone.
+**Note:** No security warnings — the site uses a trusted CA-signed certificate. The screen stays on while listening (Wake Lock).
 
 ---
 
@@ -846,7 +836,6 @@ Visit `https://audio.eftours.travel/health` to see:
 ```
 tour-audio-server/
 ├── server.js                          # Main server (dual HTTP/HTTPS)
-├── admin-qr.js                        # Generate/rotate admin token; print QR + URL
 ├── ef-update.sh                       # Certificate update script (run by admin portal)
 ├── setup-router.sh                    # Complete router setup automation
 ├── package.json                       # Node.js dependencies
@@ -858,9 +847,10 @@ tour-audio-server/
 │   ├── server.key                     # EC private key (installed via Update Device)
 │   └── backup/                        # Timestamped backups of previous certs
 └── public/
-    ├── welcome.html                   # Welcome/landing page (HTTP)
-    ├── index.html                     # Listener interface (HTTPS)
-    ├── guide.html                     # Tour guide broadcast interface (HTTPS)
+    ├── welcome.html                   # Captive portal splash page (HTTP) — 5-tap logo → guide app
+    ├── connected.html                 # Captive portal "you're connected" page (shown by OS probe intercept)
+    ├── index.html                     # Listener interface (HTTPS) — dark blue, lock screen, wake lock
+    ├── guide.html                     # Tour guide broadcast interface (HTTPS) — pink, broadcaster lock, watch mode
     ├── admin.html                     # Audio System Admin portal (Wi-Fi connect, cert update)
     ├── waiting-room.html              # Waiting room for staggered connections
     └── EF-Logos_EF Logo Pink.png      # EF Tours logo
@@ -908,8 +898,23 @@ tour-audio-server/
 - ✅ **Broadcast indicators** with pulsing dots showing active transmission
 - ✅ **Microphone test** feature for guide
 - ✅ **Audio test** feature for listeners
-- ✅ **EF brand styling** with color-coded pages (blue for listeners, pink for guide)
+- ✅ **EF brand styling** with color-coded pages (dark blue for listeners, pink for guide)
+- ✅ **Listener lock screen** — 3-tap unlock, animated equalizer, back-button trap, pocket protection
+- ✅ **Broadcaster locking** — only one guide can broadcast at a time; second guide enters watch mode
+- ✅ **Watch mode** — second guide sees live listener count and server metrics without interrupting broadcast
+- ✅ **Guide easter egg** — tap the EF logo 5× on the welcome/captive portal page to navigate to the guide app
+- ✅ **Captive portal mini-browser detection** — guide app detects restricted browser and shows "Open in Safari" instructions
 - ✅ **Waiting room page** for staggered connections
+
+**Captive Portal:**
+- ✅ **Host-based OS probe intercept** — `captive.apple.com`, `www.apple.com`, `connectivitycheck.gstatic.com`, `clients3.google.com`, `www.msftconnecttest.com` all return `302` (never `204`)
+- ✅ **iCloud Private Relay suppression** — always-on `302` keeps iOS in captive-portal mode and suspends Private Relay in full Safari
+- ✅ **Connected page** (`/connected.html`) — dark branded page with "Open Tour Audio" button; no auto-redirect
+- ✅ **Split SSID** — tourists on `EF-TOUR-001` (2.4GHz), guides on `EF-TOUR-GUIDE` (5GHz)
+
+**Admin:**
+- ✅ **Fixed admin token** — URL never changes: `https://audio.eftours.travel/admin?token=EFAdminAudio02141`
+- ✅ **8-hour session cookie** — log in once, stay logged in for the day
 
 ### Performance Specifications
 

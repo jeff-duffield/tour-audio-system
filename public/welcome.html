@@ -61,6 +61,37 @@
             box-shadow: 0 8px 24px rgba(255,50,155,0.35);
         }
         .continue-btn:active { transform: translateY(0); box-shadow: none; }
+        /* Easter egg tap dots */
+        .tap-dots {
+            display: flex;
+            gap: 6px;
+            position: absolute;
+            top: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+        .tap-dots.visible { opacity: 1; }
+        .tap-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.25);
+            transition: background 0.15s ease;
+        }
+        .tap-dot.lit { background: #FF329B; }
+        .logo-wrap {
+            position: relative;
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 32px;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+        .logo-wrap .logo { margin-bottom: 0; }
         /* Entrance animations */
         @keyframes fadeUp {
             from { opacity: 0; transform: translateY(16px); }
@@ -73,13 +104,56 @@
 </head>
 <body>
     <div class="page">
-        <img src="EF-Logos_EF Logo Pink.png" alt="EF Tours" class="logo anim-0">
+        <div class="logo-wrap anim-0" id="logoWrap" aria-hidden="true">
+            <div class="tap-dots" id="tapDots">
+                <div class="tap-dot" id="d1"></div>
+                <div class="tap-dot" id="d2"></div>
+                <div class="tap-dot" id="d3"></div>
+                <div class="tap-dot" id="d4"></div>
+                <div class="tap-dot" id="d5"></div>
+            </div>
+            <img src="EF-Logos_EF Logo Pink.png" alt="EF Tours" class="logo">
+        </div>
         <h1 class="anim-1">Tour Audio</h1>
         <p class="subtitle anim-1">Listen to your guide in real-time</p>
         <a href="https://audio.eftours.travel/index.html" class="continue-btn anim-2">
             Start Listening
         </a>
     </div>
+    <script>
+        (function () {
+            var count = 0, timer = null;
+            var wrap = document.getElementById('logoWrap');
+            var dots = document.getElementById('tapDots');
+            var dotEls = [
+                document.getElementById('d1'), document.getElementById('d2'),
+                document.getElementById('d3'), document.getElementById('d4'),
+                document.getElementById('d5')
+            ];
+
+            function reset() {
+                count = 0;
+                dots.classList.remove('visible');
+                dotEls.forEach(function (d) { d.classList.remove('lit'); });
+                clearTimeout(timer);
+            }
+
+            wrap.addEventListener('click', function () {
+                count++;
+                clearTimeout(timer);
+                dots.classList.add('visible');
+                for (var i = 0; i < dotEls.length; i++) {
+                    dotEls[i].classList.toggle('lit', i < count);
+                }
+                if (count >= 5) {
+                    reset();
+                    window.location.href = 'https://audio.eftours.travel/guide.html';
+                    return;
+                }
+                timer = setTimeout(reset, 3000);
+            });
+        })();
+    </script>
 </body>
 </html>
 

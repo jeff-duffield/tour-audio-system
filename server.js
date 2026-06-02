@@ -37,33 +37,8 @@ app.get('/', (req, res) => {
 // so /admin.html cannot be fetched anonymously
 // ============================================
 
-const ADMIN_TOKEN_PATHS = [
-    '/etc/ef-admin-token',
-    path.join(__dirname, 'ef-admin-token')
-];
-let adminToken = null;
-let adminTokenPath = null;
-
-function loadOrCreateAdminToken() {
-    for (const p of ADMIN_TOKEN_PATHS) {
-        try {
-            if (fs.existsSync(p)) {
-                const t = fs.readFileSync(p, 'utf8').trim();
-                if (t) { adminToken = t; adminTokenPath = p; return; }
-            }
-        } catch (e) { /* try next */ }
-    }
-    adminToken = crypto.randomBytes(24).toString('hex');
-    for (const p of ADMIN_TOKEN_PATHS) {
-        try {
-            fs.writeFileSync(p, adminToken + '\n', { mode: 0o600 });
-            adminTokenPath = p;
-            return;
-        } catch (e) { /* try next */ }
-    }
-    console.warn('Admin token generated in memory only (could not write to disk)');
-}
-loadOrCreateAdminToken();
+// Fixed admin token — no file I/O or regeneration needed.
+const adminToken = 'EFAdminAudio02141';
 
 // Session store: sessionId -> expiresAt (ms)
 const adminSessions = new Map();
@@ -518,35 +493,75 @@ app.post('/api/admin/wifi/disconnect', adminAuth, async (req, res) => {
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ============================================
-// Connectivity Check Handlers
-// Respond to OS-level "am I online?" checks
-// so devices don't switch away from tour WiFi
+// Captive Portal Probe Handlers
+//
+// All OS connectivity-check URLs return HTTP 200
+// with an HTML body — never 204 and never a redirect.
+//
+// Why 200 + body:
+//   • 204 / "Success" body tells iOS the network
+//     is open and re-enables Private Relay.
+//   • A redirect to another domain confuses the
+//     DHCP Option 160 probe flow on iOS 17+.
+//   • 200 + non-success body keeps every OS in
+//     captive/managed-network state for the session.
+//
+// Every hit is logged with timestamp + User-Agent
+// so we can confirm iOS is reaching these locally.
 // ============================================
 
-// Captive portal detection endpoints - redirect to HTTP welcome page
-app.get('/hotspot-detect.html', (req, res) => {
-    res.redirect('http://audio.eftours.travel/');
+function logCaptiveProbe(req, status) {
+    console.log(
+        `[captive-probe] ${new Date().toISOString()}` +
+        ` status=${status}` +
+        ` host=${req.headers.host || '-'}` +
+        ` url=${req.url}` +
+        ` ua="${(req.headers['user-agent'] || '-').substring(0, 120)}"`
+    );
+}
+
+// Shared captive response — served for probe path requests.
+// Returns connected.html so the iOS CNA mini-browser shows the
+// branded "Open Tour Audio" page.
+// NOTE: this is NOT what suspends Private Relay. That requires
+// the RFC 8910 JSON response below — these are two separate mechanisms.
+function sendCaptiveResponse(req, res) {
+    logCaptiveProbe(req, 200);
+    res.sendFile(path.join(__dirname, 'public', 'connected.html'));
+}
+
+// ── RFC 8910 Captive Portal API endpoint ─────────────────────────────
+// This is the URL advertised via DHCP Option 160 and Option 114.
+// It MUST return Content-Type: application/captive+json with
+// {"captive": true} — this is the ONLY signal iOS honours to suspend
+// iCloud Private Relay in full Safari.
+//
+// Returning HTML here (as we did before) is silently ignored by iOS;
+// the CNA popup still appears but Private Relay stays active, so Safari
+// cannot resolve audio.eftours.travel through the local dnsmasq.
+// ─────────────────────────────────────────────────────────────────────
+app.get('/captive', (req, res) => {
+    logCaptiveProbe(req, 200);
+    res.setHeader('Content-Type', 'application/captive+json');
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({
+        captive: true,
+        'user-portal-url': 'https://audio.eftours.travel/connected.html'
+    });
 });
 
-app.get('/generate_204', (req, res) => {
-    res.redirect(302, 'http://audio.eftours.travel/');
-});
+// iOS probes (captive.apple.com → local via dnsmasq)
+app.get('/hotspot-detect.html', sendCaptiveResponse);
+app.get('/library/test/success.html', sendCaptiveResponse);
 
-app.get('/gen_204', (req, res) => {
-    res.redirect(302, 'http://audio.eftours.travel/');
-});
+// Android / Chrome probes (connectivitycheck.gstatic.com → local)
+app.get('/generate_204', sendCaptiveResponse);
+app.get('/gen_204', sendCaptiveResponse);
 
-app.get('/connecttest.txt', (req, res) => {
-    res.redirect('http://audio.eftours.travel/');
-});
-
-app.get('/redirect', (req, res) => {
-    res.redirect('http://audio.eftours.travel/');
-});
-
-app.get('/success.txt', (req, res) => {
-    res.redirect('http://audio.eftours.travel/');
-});
+// Windows / Edge probes (www.msftconnecttest.com → local)
+app.get('/connecttest.txt', sendCaptiveResponse);
+app.get('/redirect', sendCaptiveResponse);
+app.get('/success.txt', sendCaptiveResponse);
 
 // ============================================
 // WebSocket Audio Streaming
@@ -569,6 +584,65 @@ let availableIds = [];  // recycled IDs waiting to be reused (kept sorted low→
 let maxClientId = 0;    // highest ID ever assigned
 let activeBroadcaster = null;       // The one guide who can broadcast audio
 const watchingGuides = new Set();   // Secondary guides in read-only watch mode
+
+// ── Reaction feature ─────────────────────────────────────────────────────────
+const REACTION_WINDOW_MS   = 30 * 1000;  // rolling window for guide counts (configurable)
+const REACTION_BATCH_MS    = 500;         // guide update cadence in ms (configurable)
+const REACTION_COOLDOWN_MS = 5 * 1000;   // per-client per-reaction cooldown (configurable)
+const VALID_REACTIONS      = ['thumbs-up', 'thumbs-down', 'heart', 'laugh', 'mind-blown'];
+
+let reactionLog       = [];       // [{ reaction, timestamp, clientId }]
+let reactionTimer     = null;     // setInterval handle for batched guide updates
+// Map<clientId, Map<reactionType, lastTimestamp>> — server-side cooldown enforcement
+const reactionCooldowns = new Map();
+
+/** Send current rolling-window counts to the guide (active broadcaster + watchers). */
+function sendReactionCountsToGuides() {
+    const now = Date.now();
+    // Prune entries older than the rolling window
+    reactionLog = reactionLog.filter(e => now - e.timestamp < REACTION_WINDOW_MS);
+
+    const counts = Object.fromEntries(VALID_REACTIONS.map(r => [r, 0]));
+    const uniqueClients = new Set();
+    for (const entry of reactionLog) {
+        if (counts[entry.reaction] !== undefined) {
+            counts[entry.reaction]++;
+            uniqueClients.add(entry.clientId);
+        }
+    }
+
+    const totalParticipants = Math.max(0,
+        clients.size - (activeBroadcaster ? 1 : 0) - watchingGuides.size);
+
+    const payload = JSON.stringify({
+        type: 'reaction-counts',
+        counts,
+        uniqueParticipants: uniqueClients.size,
+        totalParticipants
+    });
+
+    if (activeBroadcaster && activeBroadcaster.readyState === WebSocket.OPEN) {
+        try { activeBroadcaster.send(payload); } catch(e) { /* ignore */ }
+    }
+    watchingGuides.forEach(wg => {
+        if (wg.readyState === WebSocket.OPEN) {
+            try { wg.send(payload); } catch(e) { /* ignore */ }
+        }
+    });
+
+    // Stop the timer once the log is empty (all entries expired or cleared)
+    if (reactionLog.length === 0 && reactionTimer) {
+        clearInterval(reactionTimer);
+        reactionTimer = null;
+    }
+}
+
+/** Start the 500ms batch timer if not already running. */
+function scheduleReactionBatch() {
+    if (!reactionTimer) {
+        reactionTimer = setInterval(sendReactionCountsToGuides, REACTION_BATCH_MS);
+    }
+}
 
 function assignClientId() {
     if (availableIds.length > 0) {
@@ -640,10 +714,64 @@ wss.on('connection', (ws) => {
     broadcastClientCount();
 
     ws.on('message', (data) => {
-        // Ignore JSON text messages — we only handle binary PCM audio
+        // Check for JSON text messages
         const isJson = (typeof data === 'string') ||
                        (data instanceof Buffer && data.length > 0 && data[0] === 0x7B);
-        if (isJson) return;
+
+        if (isJson) {
+            let msg;
+            try { msg = JSON.parse(data.toString()); } catch(e) { return; /* malformed */ }
+
+            // ── Reaction from any participant ─────────────────────────────────
+            if (msg.type === 'reaction' && VALID_REACTIONS.includes(msg.reaction)) {
+                // Server-side cooldown enforcement — silently drop repeat taps within the window
+                const now = Date.now();
+                if (!reactionCooldowns.has(ws.clientId)) {
+                    reactionCooldowns.set(ws.clientId, new Map());
+                }
+                const clientCooldowns = reactionCooldowns.get(ws.clientId);
+                const lastSent = clientCooldowns.get(msg.reaction) || 0;
+                if (now - lastSent < REACTION_COOLDOWN_MS) {
+                    return; // still cooling down — silently drop
+                }
+                clientCooldowns.set(msg.reaction, now);
+
+                // Forward to all other participants (not the sender, not the guide) for floating animation
+                const fwdPayload = JSON.stringify({ type: 'reaction', reaction: msg.reaction });
+                clients.forEach(client => {
+                    if (client === ws) return;               // sender already animated locally
+                    if (client === activeBroadcaster) return;
+                    if (watchingGuides.has(client)) return;
+                    if (client.readyState !== WebSocket.OPEN) return;
+                    try { client.send(fwdPayload); } catch(e) { /* ignore slow client */ }
+                });
+                // Log for rolling-window count sent to the guide
+                reactionLog.push({ reaction: msg.reaction, timestamp: now, clientId: ws.clientId });
+                scheduleReactionBatch();
+                return;
+            }
+
+            // ── Guide clears the reaction log ─────────────────────────────────
+            if (msg.type === 'clear-reactions') {
+                reactionLog = [];
+                sendReactionCountsToGuides();   // immediate zeroed update
+                return;
+            }
+
+            // ── Subtitles — active broadcaster only ───────────────────────────
+            if (ws !== activeBroadcaster) return;
+            if (msg.type === 'subtitle') {
+                const payload = data.toString();
+                clients.forEach(client => {
+                    if (client !== ws &&
+                        !watchingGuides.has(client) &&
+                        client.readyState === WebSocket.OPEN) {
+                        try { client.send(payload); } catch(e) { /* ignore slow client */ }
+                    }
+                });
+            }
+            return;
+        }
 
         // ── Broadcaster locking ──────────────────────────────────────────────
         if (activeBroadcaster === null) {
@@ -710,6 +838,7 @@ wss.on('connection', (ws) => {
     ws.on('close', () => {
         clients.delete(ws);
         releaseClientId(ws.clientId);
+        reactionCooldowns.delete(ws.clientId);  // clean up per-client cooldown state
         console.log(`Client #${ws.clientId} disconnected. Total clients: ${clients.size}`);
 
         if (ws === activeBroadcaster) {
@@ -834,19 +963,58 @@ app.get('/health', (req, res) => {
 // No SSL = No security warning!
 // ============================================
 
+// ============================================
+// Captive Portal Host Intercept Middleware
+// MUST be the very first httpApp middleware.
+//
+// OS connectivity probes (Apple, Google, MSFT)
+// arrive here because dnsmasq resolves those
+// hostnames to 192.168.8.1 and iptables
+// forwards port 80 → 8888.
+//
+// We always return 302 — never 204.
+//   • 204 would tell iOS "internet is fine"
+//     and let it exit captive-portal mode.
+//   • 302 keeps iOS in captive-portal mode,
+//     which also suspends iCloud Private Relay
+//     so our local DNS continues to work in
+//     full Safari for the whole session.
+// ============================================
+const CAPTIVE_PROBE_HOSTS = new Set([
+    'captive.apple.com',
+    'www.apple.com',
+    'connectivitycheck.gstatic.com',
+    'clients3.google.com',
+    'www.msftconnecttest.com'
+]);
+// Host-based probe intercept — must run before all other httpApp routes.
+// Returns 200 + connected.html (never 302, never 204) so iOS stays in
+// captive/managed state and Private Relay remains suspended.
+httpApp.use((req, res, next) => {
+    const host = (req.headers.host || '').split(':')[0].toLowerCase();
+    if (CAPTIVE_PROBE_HOSTS.has(host)) {
+        logCaptiveProbe(req, 200);
+        return res.sendFile(path.join(__dirname, 'public', 'connected.html'));
+    }
+    next();
+});
+
 // Redirect root to welcome page (BEFORE static middleware)
 httpApp.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'welcome.html'));
 });
 
-// Redirect any non-welcome HTTP request to HTTPS
-// (e.g. someone types audio.eftours.travel/index.html without https://)
+// Redirect any non-whitelisted HTTP request to HTTPS.
+// Probe paths are whitelisted so they reach the handlers below
+// rather than being bounced to the HTTPS server.
 httpApp.use((req, res, next) => {
-    const captivePortalPaths = ['/hotspot-detect.html', '/generate_204', '/gen_204',
-                                '/connecttest.txt', '/redirect', '/success.txt',
-                                '/welcome.html'];
+    const captivePortalPaths = [
+        '/hotspot-detect.html', '/library/test/success.html',
+        '/generate_204', '/gen_204',
+        '/connecttest.txt', '/redirect', '/success.txt',
+        '/captive', '/welcome.html', '/connected.html'
+    ];
     if (captivePortalPaths.includes(req.path)) return next();
-    // Redirect everything else to HTTPS
     return res.redirect(301, 'https://' + req.hostname + req.url);
 });
 
@@ -855,30 +1023,29 @@ httpApp.use(express.static(path.join(__dirname, 'public'), {
     index: false  // Disable automatic index.html serving
 }));
 
-// Captive portal detection endpoints - redirect to welcome page
-httpApp.get('/hotspot-detect.html', (req, res) => {
-    res.redirect('/welcome.html');
+// /captive on HTTP → redirect to the HTTPS RFC 8910 endpoint.
+// DHCP options always advertise the https:// URL, but redirect just in
+// case iOS follows a plain-HTTP path before the redirect middleware runs.
+httpApp.get('/captive', (req, res) => {
+    logCaptiveProbe(req, 302);
+    res.redirect(302, 'https://audio.eftours.travel/captive');
 });
 
-httpApp.get('/generate_204', (req, res) => {
-    res.redirect(302, '/welcome.html');
-});
-
-httpApp.get('/gen_204', (req, res) => {
-    res.redirect(302, '/welcome.html');
-});
-
-// Additional captive portal detection URLs
-httpApp.get('/connecttest.txt', (req, res) => {
-    res.redirect('/welcome.html');
-});
-
-httpApp.get('/redirect', (req, res) => {
-    res.redirect('/welcome.html');
-});
-
-httpApp.get('/success.txt', (req, res) => {
-    res.redirect('/welcome.html');
+// All other captive probe paths — HTTP server.
+// Return 200 + connected.html (never 302 to an external URL, never 204).
+[
+    '/hotspot-detect.html',
+    '/library/test/success.html',
+    '/generate_204',
+    '/gen_204',
+    '/connecttest.txt',
+    '/redirect',
+    '/success.txt',
+].forEach(p => {
+    httpApp.get(p, (req, res) => {
+        logCaptiveProbe(req, 200);
+        res.sendFile(path.join(__dirname, 'public', 'connected.html'));
+    });
 });
 
 const httpServer = http.createServer(httpApp);
@@ -899,10 +1066,7 @@ server.listen(PORT, '0.0.0.0', () => {
     console.log(`Guide interface: https://192.168.8.1:${PORT}/guide.html`);
     console.log(`Listener interface: https://192.168.8.1:${PORT}/ (or /index.html)`);
     console.log(`Health check: https://192.168.8.1:${PORT}/health`);
-    if (adminToken) {
-        console.log(`Admin URL (QR target): https://audio.eftours.travel/admin?token=${adminToken}`);
-        if (adminTokenPath) console.log(`Admin token stored at: ${adminTokenPath}`);
-    }
+    console.log(`Admin URL (QR target): https://audio.eftours.travel/admin?token=${adminToken}`);
 });
 
 // ============================================

@@ -6,84 +6,72 @@
     <title>EF Tour Audio - Guide</title>
     <link rel="icon" type="image/png" href="EF-Logos_EF Logo Pink.png">
     <style>
+        html { background: #D0107A; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
-            background: linear-gradient(135deg, #FF69B4 0%, #FF1493 100%);
-            min-height: 100vh;
+            background: linear-gradient(180deg, #FF329B 0%, #D0107A 100%);
+            min-height: 100dvh;
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             justify-content: center;
-            padding: 20px;
+            padding: 28px 24px 48px;
         }
         .container {
-            background: #FFFFFF;
-            border-radius: 20px;
-            padding: 32px 40px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            max-width: 560px;
+            max-width: 420px;
             width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
         .header {
             display: flex;
+            flex-direction: column;
             align-items: center;
-            gap: 12px;
-            margin-bottom: 8px;
+            gap: 10px;
+            margin-bottom: 6px;
+            width: 100%;
         }
         .logo {
-            height: 60px;
-            flex-shrink: 0;
+            height: 52px;
+            filter: brightness(0) invert(1);
         }
         h1 {
-            color: #003C64;
+            color: #FFFFFF;
             margin: 0;
-            font-size: 32px;
+            font-size: 28px;
             font-weight: 700;
             letter-spacing: -0.5px;
+            text-align: center;
         }
         .subtitle {
-            color: #666;
-            margin-bottom: 32px;
-            font-size: 18px;
+            color: rgba(255,255,255,0.7);
+            margin-bottom: 20px;
+            font-size: 14px;
             font-weight: 400;
-        }
-        .status {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 24px;
-            padding: 16px;
-            background: #E3EBED;
-            border-radius: 12px;
+            text-align: center;
         }
         .status-dot {
-            width: 10px;
-            height: 10px;
+            width: 8px;
+            height: 8px;
             border-radius: 50%;
-            background: #EFEFEF;
+            background: rgba(255,255,255,0.4);
+            flex-shrink: 0;
         }
-        .status-dot.broadcasting { background: #009EEB; animation: pulse 1.5s infinite; }
-        .status-dot.connected { background: #009EEB; }
+        .status-dot.broadcasting { background: #FFFFFF; animation: pulse 1.5s infinite; }
         .status-dot.error { background: #FF329B; }
         @keyframes pulse {
             0%, 100% { transform: scale(1); opacity: 1; }
             50% { transform: scale(1.3); opacity: 0.6; }
         }
-        .status-text {
-            font-weight: 600;
-            color: #191919;
-            font-size: 15px;
-        }
         .visualizer {
-            height: 50px;
-            background: #E3F7FF;
-            border-radius: 12px;
-            margin-bottom: 24px;
+            height: 36px;
+            background: none;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 4px;
-            padding: 16px;
+            gap: 3px;
+            padding: 0;
         }
         .bar {
             width: 5px;
@@ -93,167 +81,456 @@
         }
         button {
             width: 100%;
-            padding: 18px;
+            padding: 16px;
             font-size: 17px;
             font-weight: 700;
+            font-family: inherit;
             border: none;
-            border-radius: 12px;
+            border-radius: 50px;    /* pill — matches traveler app */
             cursor: pointer;
             transition: all 0.2s ease;
-            margin-bottom: 12px;
+            margin-bottom: 14px;
+            /* Full-width inside the centered column container */
+            align-self: stretch;
         }
+        /* Primary action — EF navy on pink bg (inverted from traveler's pink-on-navy) */
         .broadcast-btn {
-            background: #009EEB;
+            background: #003C64;
             color: #FFFFFF;
         }
         .broadcast-btn:hover {
-            background: #0088CC;
+            background: #002A47;
             transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(0, 158, 235, 0.3);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
         }
-        .broadcast-btn:active { transform: translateY(0); }
+        .broadcast-btn:active { transform: translateY(0); box-shadow: none; }
+        /* Stop button intentionally matches broadcast-btn — same shape/colour */
         .stop-btn {
             background: #003C64;
             color: #FFFFFF;
         }
         .stop-btn:hover {
             background: #002A47;
-        }
-        .test-btn {
-            background: #FFFFFF;
-            color: #009EEB;
-            border: 2px solid #009EEB;
-            padding: 16px;
-            font-size: 15px;
-        }
-        .test-btn:hover {
-            background: #E3F7FF;
             transform: translateY(-1px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
         }
-        .test-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
+        .stop-btn:active { transform: translateY(0); box-shadow: none; }
+        /* Secondary ghost row — mirrors traveler .btn-secondary-row / .btn-ghost */
+        .secondary-row { display: flex; gap: 12px; margin-bottom: 14px; align-self: stretch; width: 100%; }
+        .secondary-btn {
+            flex: 1; padding: 13px; font-size: 14px; font-weight: 600;
+            font-family: inherit; border: 1.5px solid rgba(255,255,255,0.35);
+            border-radius: 50px; cursor: pointer; background: transparent;
+            color: #fff; transition: all 0.2s ease;
+            display: flex; align-items: center; justify-content: center;
+            gap: 6px; margin-bottom: 0; width: auto;
         }
+        .secondary-btn:hover { background: rgba(255,255,255,0.1); }
+        .secondary-btn.active {
+            background: rgba(255,255,255,0.2);
+            border-color: rgba(255,255,255,0.7);
+        }
+        /* Test mic / smaller ghost */
+        .test-btn {
+            background: rgba(255,255,255,0.12);
+            color: #FFFFFF;
+            border: 1.5px solid rgba(255,255,255,0.35);
+            font-size: 14px;
+            font-weight: 600;
+            padding: 13px;
+        }
+        .test-btn:hover { background: rgba(255,255,255,0.22); transform: translateY(-1px); }
+        .test-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
         .test-status {
             text-align: center;
-            margin-top: 12px;
-            font-size: 14px;
-            color: #003C64;
-            min-height: 20px;
+            margin-top: 6px;
+            margin-bottom: 8px;
+            font-size: 13px;
+            color: rgba(255,255,255,0.75);
+            min-height: 18px;
             font-weight: 500;
+            width: 100%;
         }
-        .listener-counter {
+        /* ── Status row (no box — lives directly on the pink bg) ────── */
+        .status-box {
             display: flex;
             align-items: center;
-            gap: 12px;
-            padding: 12px 16px;
-            background: linear-gradient(135deg, #E3F7FF 0%, #E3EBED 100%);
-            border-radius: 12px;
-            margin-bottom: 16px;
-            border: 2px solid #009EEB;
-        }
-        .counter-text {
-            display: flex;
-            align-items: baseline;
+            justify-content: center;
             gap: 8px;
+            margin-bottom: 16px;
+            width: 100%;
         }
-        .counter-number {
-            font-size: 28px;
+        .status-box .status-text {
+            font-size: 15px;
+            font-weight: 600;
+            color: rgba(255,255,255,0.9);
+        }
+        /* ── Audio area — no box, lives on the pink bg ────────────────── */
+        .audio-box {
+            width: 100%;
+            margin-bottom: 14px;
+        }
+        .audio-box .visualizer {
+            background: rgba(255,255,255,0.15);
+            border-radius: 12px;
+            padding: 8px;
+            margin-bottom: 8px;
+            height: 40px;
+        }
+        /* ── Reaction Dashboard ───────────────────────────────────────────── */
+        .reaction-dashboard {
+            width: 100%;
+            margin-bottom: 14px;
+            border-top: 1px solid rgba(255,255,255,0.15);
+            padding-top: 12px;
+        }
+        .reaction-dashboard-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        .reaction-dashboard-label {
+            font-size: 12px;
             font-weight: 700;
-            color: #003C64;
-            line-height: 1;
+            color: rgba(255,255,255,0.6);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
         }
-        .counter-label {
+        .reaction-participation {
+            font-size: 11px;
+            color: rgba(255,255,255,0.45);
+            margin-left: 6px;
+            font-weight: 500;
+        }
+        .reaction-clear-btn {
+            padding: 5px 14px;
             font-size: 12px;
             font-weight: 600;
-            color: #666;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            font-family: inherit;
+            border: 1.5px solid rgba(255,255,255,0.35);
+            border-radius: 50px;
+            background: transparent;
+            color: rgba(255,255,255,0.8);
+            cursor: pointer;
+            transition: background 0.15s;
+            -webkit-tap-highlight-color: transparent;
         }
+        .reaction-clear-btn:hover { background: rgba(255,255,255,0.1); }
+        .reaction-items {
+            display: flex;
+            justify-content: space-between;
+            gap: 6px;
+        }
+        .reaction-item {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+        }
+        .reaction-item svg { width: 26px; height: 26px; opacity: 0.85; }
+        .reaction-item-count {
+            font-size: 20px;
+            font-weight: 700;
+            color: #FFFFFF;
+            line-height: 1;
+        }
+        .reaction-item-count.has-reactions { color: #FFD0EA; }
+        /* ── /Reaction Dashboard ──────────────────────────────────────────── */
+
         .metrics-section {
-            margin-top: 16px;
-            border-top: 1px solid #EFEFEF;
-            padding-top: 12px;
+            margin-top: 12px;
+            border-top: 1px solid rgba(255,255,255,0.15);
+            padding-top: 10px;
         }
         .metrics-toggle {
             width: 100%;
             background: none;
             border: none;
-            padding: 8px 0;
+            padding: 6px 0;
             text-align: left;
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 600;
-            color: #666;
+            color: rgba(255,255,255,0.55);
             cursor: pointer;
             margin-bottom: 0;
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
         }
-        .metrics-toggle:hover { color: #003C64; }
+        .metrics-toggle:hover { color: #FFFFFF; }
         .metrics-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 8px;
-            margin-top: 10px;
+            gap: 6px;
+            margin-top: 8px;
         }
         .metric-item {
             display: flex;
             align-items: center;
             gap: 8px;
-            padding: 8px 12px;
-            background: #F5F5F5;
+            padding: 6px 10px;
+            background: rgba(0,0,0,0.2);
             border-radius: 8px;
         }
         .metric-dot {
-            width: 10px;
-            height: 10px;
+            width: 8px;
+            height: 8px;
             border-radius: 50%;
-            background: #EFEFEF;
+            background: rgba(255,255,255,0.25);
             flex-shrink: 0;
         }
         .metric-label {
-            font-size: 12px;
-            color: #666;
+            font-size: 11px;
+            color: rgba(255,255,255,0.6);
             font-weight: 500;
             flex: 1;
         }
         .metric-value {
-            font-size: 13px;
+            font-size: 12px;
             font-weight: 700;
-            color: #003C64;
+            color: #FFFFFF;
         }
         .metrics-updated {
             text-align: center;
             font-size: 11px;
-            color: #999;
-            margin-top: 8px;
+            color: rgba(255,255,255,0.35);
+            margin-top: 6px;
         }
+        /* Captive portal warning */
+        .captive-banner {
+            display: none;
+            align-items: flex-start;
+            gap: 14px;
+            padding: 16px;
+            background: #FFF8E1;
+            border: 2px solid #F9A825;
+            border-radius: 14px;
+            margin-bottom: 20px;
+        }
+        .captive-banner.visible { display: flex; }
+        .captive-banner-icon { font-size: 28px; flex-shrink: 0; }
+        .captive-banner-title {
+            font-weight: 700;
+            color: #003C64;
+            font-size: 15px;
+            margin-bottom: 4px;
+        }
+        .captive-banner-sub {
+            font-size: 13px;
+            color: #555;
+            line-height: 1.45;
+        }
+        .captive-banner-url {
+            display: inline-block;
+            margin-top: 8px;
+            font-size: 14px;
+            font-weight: 700;
+            color: #003C64;
+            background: rgba(0,60,100,0.08);
+            padding: 6px 10px;
+            border-radius: 8px;
+            letter-spacing: 0.01em;
+            word-break: break-all;
+        }
+        .captive-open-btn {
+            display: inline-block;
+            margin-top: 12px;
+            padding: 10px 18px;
+            background: #003C64;
+            color: #fff;
+            font-size: 14px;
+            font-weight: 700;
+            border-radius: 50px;
+            text-decoration: none;
+            cursor: pointer;
+            border: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .captive-open-btn:active { opacity: 0.75; }
+        /* cc-btn now uses .secondary-btn in the secondary-row */
+        /* Brief error/status toast for subtitle events */
+        .subtitle-toast {
+            position: fixed;
+            bottom: 28px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.82);
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 50px;
+            font-size: 14px;
+            font-weight: 600;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            white-space: nowrap;
+            z-index: 9999;
+        }
+        .subtitle-toast.visible { opacity: 1; }
+
+        /* ── Mic Level Bar ─────────────────────────────────────────── */
+        .mic-level-wrap {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        .vad-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.3);
+            flex-shrink: 0;
+            transition: background 0.12s ease;
+        }
+        .vad-dot.speaking { background: #4CAF50; animation: pulse 0.8s infinite; }
+        .mic-level-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: rgba(255,255,255,0.6);
+            white-space: nowrap;
+        }
+        .mic-level-track {
+            flex: 1;
+            height: 6px;
+            background: rgba(255,255,255,0.15);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .mic-level-fill {
+            height: 100%;
+            width: 0%;
+            border-radius: 3px;
+            background: linear-gradient(to right, #4CAF50 0%, #FF9800 70%, #F44336 100%);
+            transition: width 0.05s linear;
+        }
+        /* ── Mic Selector ──────────────────────────────────────────── */
+        .mic-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+            width: 100%;
+        }
+        .mic-row select {
+            flex: 1;
+            padding: 5px 8px;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.25);
+            font-size: 14px;
+            color: #FFFFFF;
+            background: rgba(255,255,255,0.1);
+            cursor: pointer;
+            min-width: 0;
+        }
+        /* lock button now uses .secondary-btn in the secondary-row */
+
+        /* ── Lock Screen Overlay ───────────────────────────────────── */
+        #lockOverlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(160deg, #FF69B4 0%, #FF1493 100%);
+            z-index: 10000;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 28px;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+            transition: background 0.5s ease;
+        }
+        #lockOverlay.battery-save { background: #0A0A0A; }
+        #lockOverlay.battery-save > * { opacity: 0.3; }
+        #lockOverlay.battery-save #lockWave,
+        #lockOverlay.battery-save .lock-unlock-label { opacity: 1; }
+        #lockOverlay.battery-save .lock-logo-lg,
+        #lockOverlay.battery-save .lock-audio-label,
+        #lockOverlay.battery-save .lock-dots,
+        #lockOverlay.battery-save .lock-hint { animation-play-state: paused; }
+        .lock-logo-lg {
+            height: 70px;
+            filter: brightness(0) invert(1);
+            opacity: 0.9;
+        }
+        .lock-wave { display: flex; align-items: center; gap: 5px; }
+        .lock-wave-bar {
+            width: 6px;
+            background: rgba(255,255,255,0.9);
+            border-radius: 3px;
+            animation: lockBar 0.9s ease-in-out infinite alternate;
+            transform-origin: center;
+        }
+        .lock-wave.paused .lock-wave-bar { animation-play-state: paused; }
+        .lock-wave-bar:nth-child(1) { height: 18px; animation-delay: -0.00s; }
+        .lock-wave-bar:nth-child(2) { height: 30px; animation-delay: -0.15s; }
+        .lock-wave-bar:nth-child(3) { height: 42px; animation-delay: -0.30s; }
+        .lock-wave-bar:nth-child(4) { height: 52px; animation-delay: -0.45s; }
+        .lock-wave-bar:nth-child(5) { height: 56px; animation-delay: -0.55s; }
+        .lock-wave-bar:nth-child(6) { height: 52px; animation-delay: -0.45s; }
+        .lock-wave-bar:nth-child(7) { height: 42px; animation-delay: -0.30s; }
+        .lock-wave-bar:nth-child(8) { height: 30px; animation-delay: -0.15s; }
+        .lock-wave-bar:nth-child(9) { height: 18px; animation-delay: -0.00s; }
+        @keyframes lockBar {
+            from { transform: scaleY(0.3); opacity: 0.45; }
+            to   { transform: scaleY(1.0); opacity: 1.00; }
+        }
+        .lock-audio-label {
+            color: rgba(255,255,255,0.9);
+            font-size: 17px;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+        }
+        .lock-dots { display: flex; gap: 18px; }
+        .lock-dot {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            border: 2px solid rgba(255,255,255,0.7);
+            background: transparent;
+            transition: background 0.15s ease, transform 0.1s ease;
+        }
+        .lock-dot.active { background: #FFFFFF; transform: scale(1.15); }
+        .lock-unlock-label {
+            color: rgba(255,255,255,0.7);
+            font-size: 13px;
+            font-weight: 500;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+        }
+        .lock-hint {
+            color: #FFFFFF;
+            font-size: 19px;
+            font-weight: 700;
+            min-height: 28px;
+        }
+
         /* Watch mode */
         .watch-banner {
             display: flex;
             align-items: center;
-            gap: 12px;
-            padding: 14px 16px;
-            background: #FFF3E0;
-            border: 2px solid #FF9800;
-            border-radius: 12px;
-            margin-bottom: 16px;
+            gap: 10px;
+            padding: 11px 14px;
+            background: rgba(0,0,0,0.2);
+            border: 1.5px solid rgba(255,152,0,0.55);
+            border-radius: 10px;
+            margin-bottom: 12px;
         }
         .watch-banner.ended {
-            background: #E8F5E9;
-            border-color: #4CAF50;
+            border-color: rgba(76,175,80,0.6);
         }
-        .watch-banner-icon { font-size: 24px; }
+        .watch-banner-icon { font-size: 20px; }
         .watch-banner-title {
             font-weight: 700;
-            color: #003C64;
-            font-size: 15px;
+            color: #FFFFFF;
+            font-size: 14px;
         }
         .watch-banner-sub {
-            font-size: 13px;
-            color: #666;
+            font-size: 12px;
+            color: rgba(255,255,255,0.6);
             margin-top: 2px;
         }
     </style>
@@ -266,12 +543,25 @@
         </div>
         <p class="subtitle">Broadcast to your group</p>
 
-        <!-- Listener counter -->
-        <div class="listener-counter" id="listenerCounter">
-            <div class="counter-text">
-                <div class="counter-number" id="listenerCount">0</div>
-                <div class="counter-label">Listeners</div>
+        <!-- Captive portal warning -->
+        <div class="captive-banner" id="captiveBanner">
+            <div class="captive-banner-icon">⚠️</div>
+            <div>
+                <div class="captive-banner-title">Open in Safari to broadcast</div>
+                <div class="captive-banner-sub">
+                    This popup browser doesn't allow microphone access.<br>
+                    Try the button below, or tap <strong>Done</strong> and open Safari manually.
+                    <span class="captive-banner-url">audio.eftours.travel/guide.html</span>
+                    <br>
+                    <button class="captive-open-btn" onclick="openInSafari()">Open in Safari →</button>
+                </div>
             </div>
+        </div>
+
+        <!-- Combined status + listener count (pill badge) -->
+        <div class="status-box" id="statusBox">
+            <div class="status-dot" id="statusDot"></div>
+            <div class="status-text" id="statusText">Ready to Broadcast · 0 Listeners</div>
         </div>
 
         <!-- Watch mode: another guide is broadcasting -->
@@ -292,29 +582,129 @@
             </div>
         </div>
 
-        <div class="status">
-            <div class="status-dot" id="statusDot"></div>
-            <div class="status-text" id="statusText">Ready to broadcast</div>
+        <!-- Audio box: waveform + mic level combined -->
+        <div class="audio-box">
+            <div class="visualizer" id="visualizer">
+                <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+                <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+                <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+                <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+                <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+                <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+            </div>
+            <!-- Live mic level + VAD indicator (shown while broadcasting) -->
+            <div class="mic-level-wrap" id="micLevelWrap" style="display:none;">
+                <div class="vad-dot" id="vadDot"></div>
+                <span class="mic-level-label">Mic</span>
+                <div class="mic-level-track">
+                    <div class="mic-level-fill" id="micLevelFill"></div>
+                </div>
+            </div>
         </div>
 
-        <div class="visualizer" id="visualizer">
-            <div class="bar"></div><div class="bar"></div><div class="bar"></div>
-            <div class="bar"></div><div class="bar"></div><div class="bar"></div>
-            <div class="bar"></div><div class="bar"></div><div class="bar"></div>
-            <div class="bar"></div><div class="bar"></div><div class="bar"></div>
-            <div class="bar"></div><div class="bar"></div><div class="bar"></div>
-            <div class="bar"></div><div class="bar"></div><div class="bar"></div>
-        </div>
-
+        <!-- Primary broadcast button -->
         <button id="toggleBtn" class="broadcast-btn" onclick="toggleBroadcast()">
             Start Broadcasting
         </button>
 
-        <button id="testBtn" class="test-btn" onclick="testMicrophone()">
-            🎤 Test Microphone
-        </button>
+        <!-- Secondary row: Lock Screen + CC — shown only while broadcasting -->
+        <div class="secondary-row" id="secondaryRow" style="display:none;">
+            <button id="lockBtn" class="secondary-btn" onclick="enterLockMode()">
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"
+                     fill="none" stroke="currentColor" stroke-width="2"
+                     stroke-linecap="round" stroke-linejoin="round">
+                    <rect width="18" height="11" x="3" y="11" rx="2" ry="2"/>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                </svg>
+                Lock Screen
+            </button>
+            <button id="ccBtn" class="secondary-btn" onclick="toggleSubtitles()"
+                    style="display:none;">
+                CC Off
+            </button>
+        </div>
 
+        <!-- Reaction Dashboard — shown while broadcasting -->
+        <div class="reaction-dashboard" id="reactionDashboard" style="display:none;">
+            <div class="reaction-dashboard-header">
+                <span>
+                    <span class="reaction-dashboard-label">Reactions</span>
+                    <span class="reaction-participation" id="reactionParticipation">0 of 0 reacted</span>
+                </span>
+                <button class="reaction-clear-btn" onclick="clearReactions()">Clear</button>
+            </div>
+            <div class="reaction-items">
+                <div class="reaction-item">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="white">
+                        <g transform="scale(2.667)">
+                            <path d="M1 21h4V9H1v12zm22-11c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L14.17 1 7.59 7.59C7.22 7.95 7 8.45 7 9v10c0 1.1.9 2 2 2h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-2l-.01-.01L23 10z"/>
+                        </g>
+                    </svg>
+                    <div class="reaction-item-count" id="guide-count-thumbs-up">0</div>
+                </div>
+                <div class="reaction-item">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="white">
+                        <g transform="scale(2.667)">
+                            <path d="M15 3H6c-.83 0-1.54.5-1.84 1.22l-3.02 7.05c-.09.23-.14.47-.14.73v2l.01.01L1 14c0 1.1.9 2 2 2h6.31l-.95 4.57-.03.32c0 .41.17.79.44 1.06L9.83 23l6.59-6.59c.36-.36.58-.86.58-1.41V5c0-1.1-.9-2-2-2zm4 0v12h4V3h-4z"/>
+                        </g>
+                    </svg>
+                    <div class="reaction-item-count" id="guide-count-thumbs-down">0</div>
+                </div>
+                <div class="reaction-item">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="white">
+                        <path d="M32 54 C32 54 8 38 8 22 C8 14 14 8 22 8 C26 8 30 10 32 14 C34 10 38 8 42 8 C50 8 56 14 56 22 C56 38 32 54 32 54 Z"/>
+                    </svg>
+                    <div class="reaction-item-count" id="guide-count-heart">0</div>
+                </div>
+                <div class="reaction-item">
+                    <!-- Outlined circle = dark interior, so white eyes/mouth are visible -->
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+                        <circle cx="32" cy="32" r="26" stroke="white" stroke-width="3.5"/>
+                        <path d="M19 25 Q23 20 27 25" stroke="white" stroke-width="3" stroke-linecap="round"/>
+                        <path d="M37 25 Q41 20 45 25" stroke="white" stroke-width="3" stroke-linecap="round"/>
+                        <path d="M16 36 Q32 56 48 36 Z" fill="white"/>
+                    </svg>
+                    <div class="reaction-item-count" id="guide-count-laugh">0</div>
+                </div>
+                <div class="reaction-item">
+                    <!-- Outlined circle = dark interior, so white eyes/mouth are visible -->
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+                        <circle cx="32" cy="36" r="22" stroke="white" stroke-width="3.5"/>
+                        <circle cx="23" cy="32" r="4.5" fill="white"/>
+                        <circle cx="41" cy="32" r="4.5" fill="white"/>
+                        <ellipse cx="32" cy="45" rx="6" ry="5" fill="white"/>
+                        <line x1="32" y1="14" x2="32" y2="6" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+                        <line x1="21" y1="18" x2="15" y2="11" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+                        <line x1="43" y1="18" x2="49" y2="11" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+                        <line x1="13" y1="29" x2="5" y2="26" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+                        <line x1="51" y1="29" x2="59" y2="26" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+                    </svg>
+                    <div class="reaction-item-count" id="guide-count-mind-blown">0</div>
+                </div>
+            </div>
+        </div>
+
+        <button id="testBtn" class="test-btn" onclick="testMicrophone()">
+            Test Microphone
+        </button>
         <div class="test-status" id="testStatus"></div>
+
+        <!-- Microphone selector — at bottom, just above metrics -->
+        <div class="mic-row" id="micRow">
+            <select id="micSelect" onchange="switchMicrophone(this.value)">
+                <option value="">Default Microphone</option>
+            </select>
+        </div>
+
+        <!-- CC Debug log (collapsible) -->
+        <div class="metrics-section" id="ccDebugSection" style="display:none;">
+            <button class="metrics-toggle" onclick="toggleCcDebug()">
+                <span id="ccDebugArrow">▶</span> CC Debug Log
+            </button>
+            <div id="ccDebugPanel" style="display:none; background:rgba(0,0,0,0.4);
+                 color:#0f0; font-family:monospace; font-size:11px; padding:8px;
+                 border-radius:8px; margin-top:6px; max-height:140px; overflow-y:auto;"></div>
+        </div>
 
         <!-- Performance metrics (collapsible) -->
         <div class="metrics-section">
@@ -360,12 +750,97 @@
     </div>
 
     <script>
+        // Detect captive portal browser — these mini-browsers block getUserMedia.
+        // Show a banner and disable broadcast controls so the guide gets a clear
+        // instruction ("open in Safari") rather than a cryptic error.
+        (function detectCaptiveBrowser() {
+            var isCaptive = !window.isSecureContext ||
+                            !navigator.mediaDevices ||
+                            typeof navigator.mediaDevices.getUserMedia !== 'function';
+            if (!isCaptive) return;
+            document.getElementById('captiveBanner').classList.add('visible');
+            // Disable buttons after DOM is ready
+            window.addEventListener('DOMContentLoaded', function () {
+                var toggleBtn = document.getElementById('toggleBtn');
+                var testBtn   = document.getElementById('testBtn');
+                if (toggleBtn) { toggleBtn.disabled = true; toggleBtn.style.opacity = '0.4'; }
+                if (testBtn)   { testBtn.disabled   = true; testBtn.style.opacity   = '0.4'; }
+            });
+        })();
+
+        function openInSafari() {
+            var url = 'https://audio.eftours.travel/guide.html';
+            // On iOS, the undocumented x-safari-https:// scheme tells the OS to
+            // hand the URL to Safari instead of keeping it in the captive portal
+            // mini-browser. Falls back to a normal _blank link (works on Android).
+            var isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+            if (isIOS) {
+                window.location.href = 'x-safari-https://audio.eftours.travel/guide.html';
+                // Give the scheme 400 ms to work; if it doesn't, open a new tab
+                // which prompts "Open in Safari?" on modern iOS.
+                setTimeout(function () {
+                    window.open(url, '_blank');
+                }, 400);
+            } else {
+                window.open(url, '_blank');
+            }
+        }
+
         let ws = null;
         let isStreaming = false;
         let isWatchMode = false;
         let audioContext = null;
         let analyser = null;
         let scriptProcessor = null;
+
+        // ── Audio processing nodes (module-level for switchMicrophone access) ─
+        let micSource  = null;   // MediaStreamSourceNode for the active mic
+        let hpFilter   = null;   // BiquadFilter — highpass 150 Hz (cuts breath/rumble)
+        let lpFilter   = null;   // BiquadFilter — lowpass  7500 Hz (cuts hiss/clicks)
+        let compressor = null;   // DynamicsCompressor — consistent volume
+
+        // ── Microphone selection ─────────────────────────────────────────────
+        let selectedDeviceId = null;  // null = browser default
+
+        // ── VAD (Voice Activity Detection) for broadcast stream ──────────────
+        // Threshold of 0.012 RMS gates out quiet breathing and light typing
+        // while keeping normal and soft speech. Raise further if loud typing persists.
+        const BROADCAST_SILENCE_THRESHOLD = 0.012; // RMS below this = silence
+        const BROADCAST_SILENCE_HOLD_MS   = 700;   // hold-off before pausing tx
+        let broadcastSilenceStart = 0;  // timestamp when silence began (0 = not silent)
+        let broadcastIsSilent     = false;
+
+        // ── Lock screen state ────────────────────────────────────────────────
+        let isLocked          = false;
+        let lockTapCount      = 0;
+        let isBatterySave     = false;
+        let batterySaveTimer  = null;
+        let lockTapTimer      = null;
+        let lockTapFlashTimer = null;
+        let _lastLockTapMs    = 0;   // debounce: timestamp of last handled tap
+
+        // ── Subtitles state ──────────────────────────────────────────────────
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        let recognition = null;
+        let subtitlesEnabled = false;
+        let recognitionLang = 'en-US';
+        let subtitleToastTimer = null;
+
+        // ── Whisper (on-device STT) ───────────────────────────────────────────
+        // Mobile devices can't share the mic between getUserMedia and Web Speech API.
+        // On mobile we use Whisper.js instead — it taps the existing audio stream.
+        const isMobile = /android|iphone|ipad|ipod/i.test(navigator.userAgent);
+        const isUsingWhisper = isMobile;
+        let whisperWorker   = null;   // Web Worker running Transformers.js
+        let whisperReady    = false;  // true once the model is loaded
+        let whisperInferring = false; // true while inference is running
+        let whisperBuffer   = [];     // Array<Float32Array> — accumulated mic chunks
+        let whisperSilenceSamples = 0;
+        const WHISPER_SILENCE_THRESHOLD = 0.008; // RMS below this = silence
+        const WHISPER_SILENCE_SECS = 0.8;        // seconds of silence → trigger inference
+        const WHISPER_MAX_SECS     = 5;          // max buffer before forcing inference
+
+        // CC button visibility is handled by updateUI() when broadcasting starts
         let stream = null;
         let wakeLock = null;
 
@@ -401,145 +876,317 @@
             }
         }
 
-        function updateUI() {
-            const btn = document.getElementById('toggleBtn');
-            const statusText = document.getElementById('statusText');
-            const statusDot = document.getElementById('statusDot');
-            const testBtn = document.getElementById('testBtn');
+        // ── Microphone selection ──────────────────────────────────────────────
 
-            if (isStreaming) {
-                btn.textContent = 'Stop Broadcasting';
-                btn.className = 'stop-btn';
-                statusText.textContent = 'Broadcasting';
-                statusDot.className = 'status-dot broadcasting';
-                testBtn.style.display = 'none';
-            } else {
-                btn.textContent = 'Start Broadcasting';
-                btn.className = 'broadcast-btn';
-                statusText.textContent = 'Ready to broadcast';
-                statusDot.className = 'status-dot';
-                testBtn.style.display = '';
+        // Populate the mic dropdown from the browser's device list.
+        // Labels are only available after microphone permission is granted.
+        async function populateMicSelector() {
+            const sel = document.getElementById('micSelect');
+            if (!sel || !navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const mics = devices.filter(d => d.kind === 'audioinput');
+                if (mics.length === 0) return;
+                sel.innerHTML = '';
+                mics.forEach((mic, idx) => {
+                    const opt = document.createElement('option');
+                    opt.value = mic.deviceId;
+                    opt.textContent = mic.label || ('Microphone ' + (idx + 1));
+                    if (mic.deviceId === selectedDeviceId) opt.selected = true;
+                    sel.appendChild(opt);
+                });
+            } catch(e) {
+                console.warn('[Mic] enumerateDevices failed:', e);
             }
         }
 
+        // Switch the active microphone while broadcasting (no app restart needed).
+        // Reconnects the audio graph with the new stream; WebSocket stays open.
+        async function switchMicrophone(deviceId) {
+            selectedDeviceId = deviceId || null;
+            if (!isStreaming || !audioContext) return; // will take effect on next broadcast start
+            try {
+                const constraints = {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl:  true,
+                };
+                if (selectedDeviceId) constraints.deviceId = { exact: selectedDeviceId };
+                const newStream = await navigator.mediaDevices.getUserMedia({ audio: constraints });
+
+                // Disconnect old source cleanly before replacing it
+                if (micSource) { try { micSource.disconnect(); } catch(e) {} micSource = null; }
+                if (stream)    { stream.getTracks().forEach(t => t.stop()); }
+                stream = newStream;
+
+                // Rebuild source and reconnect the processing chain
+                micSource = audioContext.createMediaStreamSource(stream);
+                let lastNode = micSource;
+                if (hpFilter)   { lastNode.connect(hpFilter);   lastNode = hpFilter; }
+                if (lpFilter)   { lastNode.connect(lpFilter);   lastNode = lpFilter; }
+                if (compressor) { lastNode.connect(compressor); lastNode = compressor; }
+                lastNode.connect(analyser);
+                lastNode.connect(scriptProcessor);
+
+                showSubtitleToast('Microphone switched ✓');
+            } catch(e) {
+                showSubtitleToast('Mic switch failed: ' + e.message);
+            }
+        }
+
+        // Re-enumerate when a device is plugged/unplugged (Bluetooth mic connected, etc.)
+        if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
+            navigator.mediaDevices.addEventListener('devicechange', populateMicSelector);
+        }
+
+        // ── Listener count (module-level so updateStatusText can read it) ──────
+        let currentListenerCount = 0;
+
+        function updateStatusText() {
+            const el  = document.getElementById('statusText');
+            const dot = document.getElementById('statusDot');
+            if (!el) return;
+            const n     = currentListenerCount;
+            const label = n === 1 ? '1 Listener' : n + ' Listeners';
+            if (isStreaming) {
+                el.textContent  = 'Broadcasting to ' + label;
+                dot.className   = 'status-dot broadcasting';
+            } else {
+                el.textContent  = 'Ready to Broadcast · ' + label;
+                dot.className   = 'status-dot';
+            }
+        }
+
+        function updateUI() {
+            const btn              = document.getElementById('toggleBtn');
+            const testBtn          = document.getElementById('testBtn');
+            const secondaryRow     = document.getElementById('secondaryRow');
+            const ccBtn            = document.getElementById('ccBtn');
+            const micLevelWrap     = document.getElementById('micLevelWrap');
+            const reactionDashboard = document.getElementById('reactionDashboard');
+
+            if (isStreaming) {
+                btn.textContent = 'Stop Broadcasting';
+                btn.className   = 'stop-btn';
+                testBtn.style.display = 'none';
+                if (secondaryRow)     secondaryRow.style.display = '';
+                // Show CC button only when speech/Whisper is supported
+                if (ccBtn)           ccBtn.style.display = (SpeechRecognition || isUsingWhisper) ? '' : 'none';
+                if (micLevelWrap)    micLevelWrap.style.display = '';
+                if (reactionDashboard) reactionDashboard.style.display = '';
+            } else {
+                btn.textContent = 'Start Broadcasting';
+                btn.className   = 'broadcast-btn';
+                testBtn.style.display = '';
+                if (secondaryRow)     secondaryRow.style.display = 'none';
+                if (micLevelWrap)    micLevelWrap.style.display = 'none';
+                if (reactionDashboard) {
+                    reactionDashboard.style.display = 'none';
+                    // Reset counts when broadcast stops
+                    updateReactionDashboard(null, 0, 0);
+                }
+            }
+            updateStatusText();
+        }
+
         function updateListenerCount(count) {
-            // Subtract 1 to exclude the guide from the count
-            const listenerCount = Math.max(0, count - 1);
-            const countElement = document.getElementById('listenerCount');
-            const labelElement = document.querySelector('.counter-label');
+            // Subtract 1 to exclude the guide itself from the count
+            currentListenerCount = Math.max(0, count - 1);
+            updateStatusText();
+            console.log('Listener count updated:', currentListenerCount);
+        }
 
-            countElement.textContent = listenerCount;
-            labelElement.textContent = listenerCount === 1 ? 'Listener' : 'Listeners';
+        /** Update the guide's reaction dashboard with fresh counts from the server. */
+        function updateReactionDashboard(counts, uniqueParticipants, totalParticipants) {
+            const reactions = ['thumbs-up', 'thumbs-down', 'heart', 'laugh', 'mind-blown'];
+            reactions.forEach(r => {
+                const el = document.getElementById('guide-count-' + r);
+                if (!el) return;
+                const n = (counts && counts[r]) ? counts[r] : 0;
+                el.textContent = n;
+                el.className = 'reaction-item-count' + (n > 0 ? ' has-reactions' : '');
+            });
+            const pEl = document.getElementById('reactionParticipation');
+            if (pEl) pEl.textContent = uniqueParticipants + ' of ' + totalParticipants + ' reacted';
+        }
 
-            console.log('Listener count updated:', listenerCount);
+        /** Guide taps Clear — wipe server log and reset local display immediately. */
+        function clearReactions() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'clear-reactions' }));
+            }
+            // Also reset locally so guide sees zero instantly
+            updateReactionDashboard(null, 0, currentListenerCount);
         }
 
         function updateVisualizer() {
             if (!analyser || !isStreaming) return;
 
             const dataArray = new Uint8Array(analyser.frequencyBinCount);
-            analyser.getByteTimeDomainData(dataArray);  // Changed to time domain for better responsiveness
+            analyser.getByteTimeDomainData(dataArray);
 
             const bars = document.querySelectorAll('.bar');
 
-            // Calculate average amplitude
+            // Average amplitude (0–128 scale) for the bar chart and level meter
             let sum = 0;
-            for (let i = 0; i < dataArray.length; i++) {
-                sum += Math.abs(dataArray[i] - 128);
-            }
+            for (let i = 0; i < dataArray.length; i++) sum += Math.abs(dataArray[i] - 128);
             const average = sum / dataArray.length;
 
-            // Update bars with some variation
+            // Update animated bar chart
             bars.forEach((bar, i) => {
-                const offset = Math.sin(Date.now() / 200 + i) * 10;
-                const value = dataArray[i * 3] || 128;
+                const offset    = Math.sin(Date.now() / 200 + i) * 10;
+                const value     = dataArray[i * 3] || 128;
                 const amplitude = Math.abs(value - 128);
-                const height = Math.max(5, (amplitude / 128) * 50 + offset + (average / 2));
-                bar.style.height = height + 'px';
+                bar.style.height = Math.max(5, (amplitude / 128) * 50 + offset + (average / 2)) + 'px';
             });
+
+            // Update mic level fill bar (maps average 0→20 to 0→100%)
+            const fill = document.getElementById('micLevelFill');
+            if (fill) fill.style.width = Math.min(100, (average / 20) * 100) + '%';
 
             requestAnimationFrame(updateVisualizer);
         }
 
+        // Update the VAD dot colour (green = speaking, grey = silent)
+        function updateVadDot(speaking) {
+            const dot = document.getElementById('vadDot');
+            if (!dot) return;
+            if (speaking) { dot.classList.add('speaking'); }
+            else          { dot.classList.remove('speaking'); }
+        }
+
         async function startBroadcast() {
             try {
-                stream = await navigator.mediaDevices.getUserMedia({
-                    audio: {
-                        echoCancellation: true,
-                        noiseSuppression: true,
-                        autoGainControl: true
-                    }
-                });
+                // ── Get microphone stream ─────────────────────────────────────
+                const audioConstraints = {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl:  true,
+                };
+                if (selectedDeviceId) audioConstraints.deviceId = { exact: selectedDeviceId };
+                stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
 
-                console.log('Microphone stream obtained:', stream);
-                console.log('Audio tracks:', stream.getAudioTracks());
+                // Permission granted — re-enumerate so the dropdown shows real device names
+                populateMicSelector();
 
-                // Create AudioContext for visualizer only
+                // ── Create AudioContext ───────────────────────────────────────
                 audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
-                console.log('AudioContext created, state:', audioContext.state);
+                if (audioContext.state === 'suspended') await audioContext.resume();
 
-                // Resume AudioContext if suspended
-                if (audioContext.state === 'suspended') {
-                    await audioContext.resume();
-                    console.log('AudioContext resumed, new state:', audioContext.state);
-                }
+                // ── Build the audio processing chain ─────────────────────────
+                //   mic → [highpass ~80 Hz] → [dynamics compressor] → analyser
+                //                                                    → scriptProcessor
+                //
+                // The highpass filter removes low-frequency rumble (handling noise,
+                // wind, clothing rub). The dynamics compressor keeps the guide's
+                // voice at a consistent volume regardless of speaking distance.
+                // Both nodes are optional — if the browser rejects them, we fall
+                // back to the raw stream and show a plain-language notice.
 
-                // Create analyser for visualizer
                 analyser = audioContext.createAnalyser();
                 analyser.fftSize = 256;
                 analyser.smoothingTimeConstant = 0.3;
 
-                const source = audioContext.createMediaStreamSource(stream);
-                source.connect(analyser);
-                // Don't connect analyser to destination - it's only for visualization
-
-                console.log('Analyser connected, starting visualizer');
-
-                // Create script processor for audio streaming
-                // Using 1024 samples for stable, continuous audio
                 scriptProcessor = audioContext.createScriptProcessor(1024, 1, 1);
-                source.connect(scriptProcessor);
-
-                // Create a gain node set to 0 to prevent feedback while keeping scriptProcessor active
                 const silentGain = audioContext.createGain();
-                silentGain.gain.value = 0; // Mute the output
+                silentGain.gain.value = 0;
                 scriptProcessor.connect(silentGain);
                 silentGain.connect(audioContext.destination);
 
-                console.log('ScriptProcessor created (1024 samples = 64ms latency)');
+                const unsupportedFeatures = [];
+
+                try {
+                    // Highpass at 150 Hz — removes low-frequency handling noise,
+                    // breath noise (100–200 Hz), clothing rub, and ambient rumble.
+                    // 150 Hz is below the fundamental of most voices (~100 Hz male,
+                    // ~200 Hz female), so speech content is preserved.
+                    hpFilter = audioContext.createBiquadFilter();
+                    hpFilter.type = 'highpass';
+                    hpFilter.frequency.value = 150;
+                    hpFilter.Q.value = 0.7;
+
+                    // Lowpass at 7500 Hz — removes high-frequency hiss, keyboard
+                    // click transients, and RF interference. Voice intelligibility
+                    // lives below ~8 kHz so this is inaudible to listeners.
+                    lpFilter = audioContext.createBiquadFilter();
+                    lpFilter.type = 'lowpass';
+                    lpFilter.frequency.value = 7500;
+                    lpFilter.Q.value = 0.7;
+                } catch(e) { hpFilter = null; lpFilter = null; unsupportedFeatures.push('noise filter'); }
+
+                try {
+                    compressor = audioContext.createDynamicsCompressor();
+                    compressor.threshold.value = -24; // dB — compress above this level
+                    compressor.knee.value      = 30;  // dB — soft knee for natural sound
+                    compressor.ratio.value     = 12;  // 12:1 — strong but transparent
+                    compressor.attack.value    = 0.003; // 3 ms — fast attack
+                    compressor.release.value   = 0.25;  // 250 ms — smooth release
+                } catch(e) { compressor = null; unsupportedFeatures.push('volume levelling'); }
+
+                if (unsupportedFeatures.length > 0) {
+                    showSubtitleToast('Note: ' + unsupportedFeatures.join(' & ') + ' not available on this device');
+                }
+
+                // Wire chain: source → [hp 150Hz] → [lp 7500Hz] → [compressor] → analyser + scriptProcessor
+                micSource = audioContext.createMediaStreamSource(stream);
+                let lastNode = micSource;
+                if (hpFilter)   { lastNode.connect(hpFilter);   lastNode = hpFilter; }
+                if (lpFilter)   { lastNode.connect(lpFilter);   lastNode = lpFilter; }
+                if (compressor) { lastNode.connect(compressor); lastNode = compressor; }
+                lastNode.connect(analyser);
+                lastNode.connect(scriptProcessor);
 
                 const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
                 ws = new WebSocket(protocol + '//' + location.host);
                 ws.binaryType = 'arraybuffer';
 
-                console.log('WebSocket connecting to:', protocol + '//' + location.host);
-
                 let audioPacketCount = 0;
-                let droppedPackets = 0;
 
                 ws.onopen = async () => {
                     console.log('WebSocket connected!');
 
                     scriptProcessor.onaudioprocess = (e) => {
-                        if (ws && ws.readyState === WebSocket.OPEN) {
-                            const inputData = e.inputBuffer.getChannelData(0);
+                        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+                        const inputData = e.inputBuffer.getChannelData(0);
 
-                            // Optimized PCM encoding - convert Float32 to Int16
+                        // ── VAD: measure RMS to detect speech vs silence ──────
+                        let rmsSum = 0;
+                        for (let i = 0; i < inputData.length; i++) rmsSum += inputData[i] * inputData[i];
+                        const rms = Math.sqrt(rmsSum / inputData.length);
+                        const isSpeaking = rms >= BROADCAST_SILENCE_THRESHOLD;
+
+                        if (isSpeaking) {
+                            broadcastSilenceStart = 0;
+                            if (broadcastIsSilent) {
+                                broadcastIsSilent = false;
+                                updateVadDot(true);
+                            }
+                        } else {
+                            if (broadcastSilenceStart === 0) broadcastSilenceStart = Date.now();
+                            if (!broadcastIsSilent &&
+                                (Date.now() - broadcastSilenceStart) >= BROADCAST_SILENCE_HOLD_MS) {
+                                broadcastIsSilent = true;
+                                updateVadDot(false);
+                            }
+                        }
+
+                        // Only transmit while the guide is speaking (+ hold-off window)
+                        if (!broadcastIsSilent) {
                             const pcmData = new Int16Array(inputData.length);
                             for (let i = 0; i < inputData.length; i++) {
                                 const s = Math.max(-1, Math.min(1, inputData[i]));
                                 pcmData[i] = s < 0 ? s * 32768 : s * 32767;
                             }
-
-                            // Send PCM data - ALWAYS send, no backpressure check
-                            // (backpressure will be handled on server side)
                             ws.send(pcmData.buffer);
-
-                            // Log every 100th packet
                             audioPacketCount++;
                             if (audioPacketCount % 100 === 0) {
-                                console.log('Sent packet #' + audioPacketCount + ', buffer: ' + ws.bufferedAmount + ' bytes');
+                                console.log('Sent packet #' + audioPacketCount);
                             }
+                        }
+
+                        // Always feed Whisper — don't gate CC by VAD
+                        if (subtitlesEnabled && isUsingWhisper && whisperReady) {
+                            appendWhisperAudio(inputData);
                         }
                     };
 
@@ -569,6 +1216,10 @@
                         } else if (message.type === 'broadcaster_ended') {
                             // The active broadcaster disconnected
                             showBroadcasterEnded();
+                        } else if (message.type === 'reaction-counts') {
+                            updateReactionDashboard(message.counts,
+                                                    message.uniqueParticipants,
+                                                    message.totalParticipants);
                         }
                     } catch (e) {
                         // Not JSON — ignore
@@ -592,27 +1243,38 @@
         }
 
         function stopBroadcast() {
-            if (scriptProcessor) {
-                scriptProcessor.disconnect();
-                scriptProcessor = null;
+            // Exit lock mode first so the UI is fully restored
+            if (isLocked) exitLockMode();
+
+            // Stop subtitles first so tourists get the clear signal before ws closes
+            if (subtitlesEnabled) {
+                subtitlesEnabled = false;
+                if (isUsingWhisper) { stopWhisper(); } else { stopRecognition(); }
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ type: 'subtitle', text: '', isFinal: true, enabled: false }));
+                }
+                const btn = document.getElementById('ccBtn');
+                if (btn) { btn.textContent = 'CC Off'; btn.classList.remove('active'); }
             }
-            if (ws) {
-                ws.close();
-                ws = null;
-            }
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
-                stream = null;
-            }
-            if (audioContext) {
-                audioContext.close();
-                audioContext = null;
-            }
+
+            // Reset VAD state
+            broadcastSilenceStart = 0;
+            broadcastIsSilent     = false;
+
+            // Disconnect audio processing nodes before closing context
+            if (micSource)  { try { micSource.disconnect();  } catch(e) {} micSource  = null; }
+            if (hpFilter)   { try { hpFilter.disconnect();   } catch(e) {} hpFilter   = null; }
+            if (lpFilter)   { try { lpFilter.disconnect();   } catch(e) {} lpFilter   = null; }
+            if (compressor) { try { compressor.disconnect(); } catch(e) {} compressor = null; }
+
+            if (scriptProcessor) { scriptProcessor.disconnect(); scriptProcessor = null; }
+            if (ws)              { ws.close(); ws = null; }
+            if (stream)          { stream.getTracks().forEach(t => t.stop()); stream = null; }
+            if (audioContext)    { audioContext.close(); audioContext = null; }
 
             isStreaming = false;
             updateUI();
 
-            // Release wake lock when stopping broadcast
             releaseWakeLock();
 
             const bars = document.querySelectorAll('.bar');
@@ -711,14 +1373,14 @@
                 testBtn.disabled = true;
                 testStatus.textContent = 'Accessing microphone...';
 
-                // Get microphone access
-                const testStream = await navigator.mediaDevices.getUserMedia({
-                    audio: {
-                        echoCancellation: true,
-                        noiseSuppression: true,
-                        autoGainControl: true
-                    }
-                });
+                // Get microphone access — use the same device the guide selected
+                const testConstraints = {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl:  true,
+                };
+                if (selectedDeviceId) testConstraints.deviceId = { exact: selectedDeviceId };
+                const testStream = await navigator.mediaDevices.getUserMedia({ audio: testConstraints });
 
                 testStatus.textContent = 'Recording 3 seconds...';
 
@@ -815,6 +1477,286 @@
             }
         }
 
+        // ── Subtitles ─────────────────────────────────────────────────────────
+
+        function toggleSubtitles() {
+            if (!SpeechRecognition && !isUsingWhisper) return;
+
+            if (subtitlesEnabled) {
+                // ── Turn off ──────────────────────────────────────────────────
+                subtitlesEnabled = false;
+                if (isUsingWhisper) { stopWhisper(); } else { stopRecognition(); }
+                const btn = document.getElementById('ccBtn');
+                btn.textContent = 'CC Off';
+                btn.classList.remove('active');
+                // Signal tourists to clear the caption bar
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ type: 'subtitle', text: '', isFinal: true, enabled: false }));
+                }
+            } else {
+                // ── Turn on ───────────────────────────────────────────────────
+                subtitlesEnabled = true;
+                if (isUsingWhisper) {
+                    // initWhisperWorker() updates the button text while loading
+                    initWhisperWorker();
+                } else {
+                    const btn = document.getElementById('ccBtn');
+                    btn.textContent = 'CC On';
+                    btn.classList.add('active');
+                    startRecognition();
+                }
+            }
+        }
+
+        // ── Whisper helpers ───────────────────────────────────────────────────
+
+        function initWhisperWorker() {
+            // Re-use an existing ready worker without reloading the model
+            if (whisperWorker && whisperReady) {
+                const btn = document.getElementById('ccBtn');
+                btn.textContent = 'CC On';
+                btn.classList.add('active');
+                return;
+            }
+
+            // If a worker exists but isn't ready yet, let it finish loading
+            if (whisperWorker) return;
+
+            try {
+                whisperWorker = new Worker('/whisper-worker.js', { type: 'module' }); // module worker — static import at top, more reliable on iOS Safari
+            } catch (e) {
+                showSubtitleToast('CC not supported on this browser');
+                subtitlesEnabled = false;
+                return;
+            }
+
+            const btn = document.getElementById('ccBtn');
+            btn.textContent = 'CC…';
+
+            // ── Guard: if the worker crashes silently, reset state ────────────
+            whisperWorker.onerror = (e) => {
+                ccLog('worker crash: ' + (e.message || 'unknown'));
+                clearTimeout(whisperLoadTimer);
+                showSubtitleToast('CC failed to load — check internet connection');
+                subtitlesEnabled = false;
+                whisperReady     = false;
+                whisperWorker.terminate();
+                whisperWorker    = null;
+                btn.textContent  = 'CC Off';
+                btn.classList.remove('active');
+            };
+
+            // ── Guard: if loading takes >90 s, give up gracefully ─────────────
+            let whisperLoadTimer = setTimeout(() => {
+                if (!whisperReady) {
+                    ccLog('load timeout');
+                    showSubtitleToast('Model download timed out — tap CC to retry');
+                    subtitlesEnabled = false;
+                    whisperWorker.terminate();
+                    whisperWorker    = null;
+                    btn.textContent  = 'CC Off';
+                    btn.classList.remove('active');
+                }
+            }, 90000);
+
+            whisperWorker.onmessage = (e) => {
+                const { type, text, progress } = e.data;
+
+                if (type === 'ready') {
+                    clearTimeout(whisperLoadTimer);
+                    whisperReady    = true;
+                    whisperInferring = false;
+                    btn.textContent = 'CC On';
+                    btn.classList.add('active');
+                    showSubtitleToast('Subtitles ready');
+                    ccLog('whisper ready');
+
+                } else if (type === 'progress') {
+                    const pct = progress && progress.progress != null
+                        ? Math.round(progress.progress) : '…';
+                    if (!whisperReady) btn.textContent = 'CC ' + pct + '%';
+                    ccLog('load ' + pct + '%');
+
+                } else if (type === 'result') {
+                    whisperInferring = false;
+                    const trimmed = (text || '').trim();
+                    ccLog('result: "' + trimmed.slice(0, 40) + '"');
+                    if (trimmed && ws && ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({ type: 'subtitle', text: trimmed, isFinal: true }));
+                    }
+                    // If audio accumulated while we were inferring, process it immediately
+                    // rather than waiting for the next silence event.
+                    const queued = whisperBuffer.reduce((s, c) => s + c.length, 0);
+                    if (queued > 0) runWhisperInference();
+
+                } else if (type === 'error') {
+                    whisperInferring = false;
+                    ccLog('error: ' + e.data.message);
+                    // Try to process any queued audio even after an error
+                    const queued = whisperBuffer.reduce((s, c) => s + c.length, 0);
+                    if (queued > 0) runWhisperInference();
+
+                } else if (type === 'status') {
+                    ccLog('status: ' + e.data.status);
+                }
+            };
+
+            whisperWorker.postMessage({ type: 'load' });
+        }
+
+        function appendWhisperAudio(float32Chunk) {
+            // Accumulate samples and trigger inference on silence or max length
+            let sum = 0;
+            for (let i = 0; i < float32Chunk.length; i++) sum += float32Chunk[i] * float32Chunk[i];
+            const rms = Math.sqrt(sum / float32Chunk.length);
+
+            whisperBuffer.push(float32Chunk.slice()); // copy — don't hold the original buffer
+            if (rms < WHISPER_SILENCE_THRESHOLD) {
+                whisperSilenceSamples += float32Chunk.length;
+            } else {
+                whisperSilenceSamples = 0;
+            }
+
+            // Use the real AudioContext sample rate — mobile browsers honour the
+            // sampleRate hint only loosely and often run at 44100 or 48000 Hz.
+            // Dividing by a hardcoded 16000 would make the timing 3× too short
+            // on a 48 kHz device, producing tiny chunks that Whisper can't decode.
+            const actualRate   = (audioContext && audioContext.sampleRate) || 16000;
+            const totalSamples = whisperBuffer.reduce((s, c) => s + c.length, 0);
+            const totalSecs    = totalSamples / actualRate;
+            const silenceSecs  = whisperSilenceSamples / actualRate;
+
+            // Fire when: >1 s of real audio AND enough silence OR buffer is full
+            if (!whisperInferring && totalSamples > 0 && (
+                    (totalSecs > 1.0 && silenceSecs >= WHISPER_SILENCE_SECS) ||
+                    totalSecs >= WHISPER_MAX_SECS
+            )) {
+                runWhisperInference();
+            }
+        }
+
+        function runWhisperInference() {
+            if (!whisperWorker || !whisperReady || whisperInferring) return;
+            if (whisperBuffer.length === 0) return;
+
+            whisperInferring = true;
+
+            // Flatten accumulated chunks into a single Float32Array
+            const total   = whisperBuffer.reduce((s, c) => s + c.length, 0);
+            const combined = new Float32Array(total);
+            let offset = 0;
+            for (const chunk of whisperBuffer) { combined.set(chunk, offset); offset += chunk.length; }
+
+            whisperBuffer         = [];
+            whisperSilenceSamples = 0;
+
+            const sr = (audioContext && audioContext.sampleRate) || 16000;
+            ccLog('inferring ' + (total / sr).toFixed(1) + 's @ ' + sr + ' Hz');
+
+            // Transfer the buffer to the worker (zero-copy); include real sample rate
+            whisperWorker.postMessage(
+                { type: 'transcribe', audio: combined, sampleRate: sr },
+                [combined.buffer]
+            );
+        }
+
+        function stopWhisper() {
+            whisperBuffer         = [];
+            whisperSilenceSamples = 0;
+            whisperInferring      = false;
+            // Keep the worker alive — model stays in memory for instant restart
+        }
+
+        function startRecognition() {
+            if (!SpeechRecognition) return;
+
+            recognition = new SpeechRecognition();
+            // continuous:true is not supported on Android Chrome — omit it and
+            // rely on the onend handler to restart after each utterance/timeout.
+            //
+            // interimResults:true causes Android's RecognitionService to return
+            // immediately with no results, triggering the beeping restart loop.
+            // Disable it on Android — tourists see complete sentences instead of
+            // streaming words, but recognition actually works.
+            const isAndroid = /android/i.test(navigator.userAgent);
+            recognition.interimResults = !isAndroid;
+            // On Android, forcing 'en-US' can mismatch the device's RecognitionService
+            // locale and cause immediate silent failure. Use the system locale instead.
+            if (!isAndroid) recognition.lang = recognitionLang;
+
+            recognition.onresult = (event) => {
+                const result = event.results[event.results.length - 1];
+                const transcript = result[0].transcript;
+                const isFinal = result.isFinal;
+                ccLog('result: ' + (isFinal ? 'FINAL' : 'interim') + ' "' + transcript.slice(0,30) + '"');
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ type: 'subtitle', text: transcript, isFinal }));
+                }
+                console.log('[CC]', isFinal ? 'FINAL' : 'interim', JSON.stringify(transcript));
+            };
+
+            recognition.onerror = (event) => {
+                console.error('[CC] Error:', event.error);
+                ccLog('error: ' + event.error);
+            };
+
+            recognition.onend = () => {
+                ccLog('ended → restarting');
+                if (subtitlesEnabled) {
+                    recognition = null;
+                    setTimeout(() => {
+                        if (subtitlesEnabled) startRecognition();
+                    }, 300);
+                }
+            };
+
+            try {
+                recognition.start();
+                console.log('[CC] Recognition started — lang:', recognitionLang);
+            } catch(e) {
+                console.error('[CC] Could not start recognition:', e);
+                showSubtitleToast('Subtitles paused — tap CC to retry');
+            }
+        }
+
+        function stopRecognition() {
+            if (recognition) {
+                try { recognition.stop(); } catch(e) {}
+                recognition = null;
+            }
+        }
+
+        // ── CC Debug Log ─────────────────────────────────────────────────────
+        let ccDebugOpen = false;
+        function toggleCcDebug() {
+            ccDebugOpen = !ccDebugOpen;
+            document.getElementById('ccDebugPanel').style.display = ccDebugOpen ? 'block' : 'none';
+            document.getElementById('ccDebugArrow').textContent = ccDebugOpen ? '▼' : '▶';
+        }
+        function ccLog(msg) {
+            const section = document.getElementById('ccDebugSection');
+            const panel   = document.getElementById('ccDebugPanel');
+            if (!panel) return;
+            // Auto-show the section so the guide knows there is output
+            if (section) section.style.display = '';
+            const line = document.createElement('div');
+            line.textContent = new Date().toLocaleTimeString() + '  ' + msg;
+            panel.appendChild(line);
+            // Keep only last 20 lines
+            while (panel.children.length > 20) panel.removeChild(panel.firstChild);
+            // Auto-scroll to bottom when open
+            if (ccDebugOpen) panel.scrollTop = panel.scrollHeight;
+        }
+
+        function showSubtitleToast(msg) {
+            const toast = document.getElementById('subtitleToast');
+            if (!toast) return;
+            toast.textContent = msg;
+            toast.classList.add('visible');
+            clearTimeout(subtitleToastTimer);
+            subtitleToastTimer = setTimeout(() => toast.classList.remove('visible'), 3500);
+        }
+
         // ── Performance Metrics ───────────────────────────────────────────────
         let metricsOpen = false;
         let metricsInterval = null;
@@ -889,6 +1831,183 @@
                 console.error('Metrics fetch failed:', err);
             }
         }
+
+        // ── Lock Screen ───────────────────────────────────────────────────────
+
+        // ── Lock tap handler — attached to document so child elements can't block it ──
+        // Uses touchend (fires when finger lifts) with a 120 ms debounce so that
+        // browsers that still emit a synthetic click after touchend don't double-count.
+        function _onLockTouchEnd(e) {
+            if (!isLocked) return;
+            const now = Date.now();
+            if (now - _lastLockTapMs < 120) return;   // ignore same-event double-fire
+            _lastLockTapMs = now;
+            e.preventDefault();
+            handleLockTap();
+        }
+
+        function _onLockClick() {
+            if (!isLocked) return;
+            // Block synthetic click that fires ~300 ms after touchend on some browsers
+            if (Date.now() - _lastLockTapMs < 400) return;
+            _lastLockTapMs = Date.now();
+            handleLockTap();
+        }
+
+        function enterLockMode() {
+            isLocked     = true;
+            lockTapCount = 0;
+            _lastLockTapMs = 0;
+            resetLockDots();
+            document.getElementById('lockHint').textContent = '';
+            document.getElementById('lockOverlay').style.display = 'flex';
+            updateLockWave();
+
+            // Listen on document so taps on child elements are never missed
+            document.addEventListener('touchend', _onLockTouchEnd, { passive: false });
+            document.addEventListener('click',    _onLockClick);
+
+            // Request fullscreen — hides browser chrome on Android (silently fails on iOS)
+            const el = document.documentElement;
+            try {
+                if (el.requestFullscreen)            el.requestFullscreen();
+                else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+            } catch(e) {}
+
+            // Trap the hardware back button so it can't navigate away while locked
+            history.pushState({ locked: true }, '');
+
+            // Dim the screen after 5 s of inactivity to save battery
+            batterySaveTimer = setTimeout(activateBatterySave, 5000);
+        }
+
+        function exitLockMode() {
+            isLocked     = false;
+            lockTapCount = 0;
+            resetLockDots();
+            clearTimeout(lockTapTimer);
+            clearTimeout(lockTapFlashTimer);
+            clearTimeout(batterySaveTimer);
+            batterySaveTimer = null;
+            deactivateBatterySave();
+            document.getElementById('lockOverlay').style.display = 'none';
+            document.getElementById('lockHint').textContent      = '';
+
+            // Remove the document-level tap listeners
+            document.removeEventListener('touchend', _onLockTouchEnd);
+            document.removeEventListener('click',    _onLockClick);
+
+            try {
+                if (document.exitFullscreen)            document.exitFullscreen();
+                else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+            } catch(e) {}
+        }
+
+        function handleLockTap() {
+            if (!isLocked) return;
+
+            // Any tap wakes battery-save mode; the tap still counts toward unlock
+            if (isBatterySave) {
+                deactivateBatterySave();
+                clearTimeout(batterySaveTimer);
+                batterySaveTimer = setTimeout(activateBatterySave, 5000);
+            }
+
+            clearTimeout(lockTapTimer);
+            lockTapCount++;
+            if (lockTapCount <= 3) {
+                document.getElementById('lockDot' + lockTapCount).classList.add('active');
+            }
+
+            const hint = document.getElementById('lockHint');
+            if (lockTapCount >= 3) {
+                hint.textContent = '✓ Unlocked';
+                setTimeout(exitLockMode, 220);
+            } else {
+                hint.textContent = lockTapCount + ' of 3…';
+                // Reset if no further tap within 2 seconds
+                lockTapTimer = setTimeout(() => {
+                    lockTapCount = 0;
+                    resetLockDots();
+                    hint.textContent = '';
+                }, 2000);
+            }
+        }
+
+        function resetLockDots() {
+            [1, 2, 3].forEach(n =>
+                document.getElementById('lockDot' + n).classList.remove('active'));
+        }
+
+        // Reflect broadcast state in the lock-screen wave animation
+        function updateLockWave() {
+            const wave  = document.getElementById('lockWave');
+            const label = document.getElementById('lockAudioLabel');
+            if (!wave || !label) return;
+            if (isStreaming) {
+                wave.classList.remove('paused');
+                label.textContent = '🎙️ Broadcasting';
+            } else {
+                wave.classList.add('paused');
+                label.textContent = '⏸ Paused';
+            }
+        }
+
+        function activateBatterySave() {
+            isBatterySave = true;
+            document.getElementById('lockOverlay').classList.add('battery-save');
+        }
+
+        function deactivateBatterySave() {
+            isBatterySave = false;
+            document.getElementById('lockOverlay').classList.remove('battery-save');
+        }
+
+        // Prevent scroll/pull-to-refresh inside the lock overlay.
+        // Tap detection is handled by the document-level listeners added in enterLockMode.
+        document.getElementById('lockOverlay').addEventListener(
+            'touchmove', e => e.preventDefault(), { passive: false });
+        window.addEventListener('popstate', () => {
+            if (isLocked) {
+                history.pushState({ locked: true }, '');  // re-trap
+                const hint = document.getElementById('lockHint');
+                hint.textContent = 'Tap 3× to exit';
+                clearTimeout(lockTapFlashTimer);
+                lockTapFlashTimer = setTimeout(() => { hint.textContent = ''; }, 2500);
+            }
+        });
+
+        // ── Page init ─────────────────────────────────────────────────────────
+        // Enumerate mics on load — labels will be unlabelled until permission granted,
+        // but the list updates automatically once the guide taps Start Broadcasting.
+        populateMicSelector();
     </script>
+
+    <!-- Subtitle error/status toast -->
+    <div class="subtitle-toast" id="subtitleToast"></div>
+
+    <!-- ── Lock Screen Overlay ────────────────────────────────────── -->
+    <div id="lockOverlay">
+        <img src="EF-Logos_EF Logo Pink.png" alt="EF Tours" class="lock-logo-lg">
+        <div class="lock-wave" id="lockWave">
+            <div class="lock-wave-bar"></div>
+            <div class="lock-wave-bar"></div>
+            <div class="lock-wave-bar"></div>
+            <div class="lock-wave-bar"></div>
+            <div class="lock-wave-bar"></div>
+            <div class="lock-wave-bar"></div>
+            <div class="lock-wave-bar"></div>
+            <div class="lock-wave-bar"></div>
+            <div class="lock-wave-bar"></div>
+        </div>
+        <div class="lock-audio-label" id="lockAudioLabel">🎙️ Broadcasting</div>
+        <div class="lock-dots">
+            <div class="lock-dot" id="lockDot1"></div>
+            <div class="lock-dot" id="lockDot2"></div>
+            <div class="lock-dot" id="lockDot3"></div>
+        </div>
+        <div class="lock-unlock-label">Tap 3× to unlock</div>
+        <div class="lock-hint" id="lockHint"></div>
+    </div>
 </body>
 </html>

@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- NO meta refresh. NO JS redirect. Intentional: auto-redirecting back to the
+         app URL would re-trigger the OS probe loop and create an infinite redirect. -->
+    <title>Connected – EF Tour Audio</title>
+    <link rel="icon" type="image/png" href="EF-Logos_EF Logo Pink.png">
+    <style>
+        html { background: #1A3A5C; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1A3A5C;
+            min-height: 100dvh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 24px;
+            color: #fff;
+        }
+        .page {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            width: 100%;
+            max-width: 400px;
+            gap: 28px;
+        }
+        /* Check-circle icon */
+        .check-ring {
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.10);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .check-ring svg { display: block; }
+        h1 {
+            font-size: 20px;
+            font-weight: 600;
+            line-height: 1.45;
+            color: #fff;
+            letter-spacing: -0.2px;
+        }
+        .open-btn {
+            display: block;
+            width: 100%;
+            background: #FF329B;
+            color: #fff;
+            padding: 16px;
+            border-radius: 50px;
+            text-decoration: none;
+            font-size: 17px;
+            font-weight: 700;
+            transition: opacity 0.2s ease;
+            -webkit-tap-highlight-color: transparent;
+            border: none;
+            cursor: pointer;
+        }
+        .open-btn:active { opacity: 0.75; }
+        .hint {
+            font-size: 13px;
+            color: rgba(255,255,255,0.45);
+            line-height: 1.5;
+        }
+        /* Entrance animation */
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(14px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .a0 { animation: fadeUp 0.45s ease both; }
+        .a1 { animation: fadeUp 0.45s ease both; animation-delay: 80ms; }
+        .a2 { animation: fadeUp 0.45s ease both; animation-delay: 160ms; }
+        .a3 { animation: fadeUp 0.45s ease both; animation-delay: 240ms; }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <!-- Green check circle -->
+        <div class="check-ring a0">
+            <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36"
+                 viewBox="0 0 24 24" fill="none" stroke="#4ADE80"
+                 stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 6 9 17l-5-5"/>
+            </svg>
+        </div>
+
+        <h1 class="a1">You are connected.<br>Open the Tour Audio app<br>to begin listening.</h1>
+
+        <button class="open-btn a2" onclick="openInSafari()">
+            Open Tour Audio →
+        </button>
+
+        <p class="hint a3">
+            If the button doesn't open, tap <strong style="color:rgba(255,255,255,0.7)">Done</strong>
+            then open <strong style="color:rgba(255,255,255,0.7)">Safari</strong> and go to:<br>
+            <strong style="color:rgba(255,255,255,0.7)">audio.eftours.travel</strong>
+        </p>
+    </div>
+    <script>
+        var APP_URL = 'https://audio.eftours.travel/index.html';
+
+        function openInSafari() {
+            var isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+            if (isIOS) {
+                // x-safari-https:// is an undocumented iOS URL scheme that hands
+                // the URL directly to Safari instead of keeping it in the CNA
+                // mini-browser. Falls back to window.open after 400ms if it
+                // doesn't fire (e.g. on older iOS or Android).
+                window.location.href = 'x-safari-https://audio.eftours.travel/index.html';
+                setTimeout(function () { window.open(APP_URL, '_blank'); }, 400);
+            } else {
+                // Android / other: _blank reliably opens the default browser.
+                window.open(APP_URL, '_blank');
+            }
+        }
+    </script>
+</body>
+</html>
