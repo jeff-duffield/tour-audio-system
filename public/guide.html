@@ -406,25 +406,31 @@
             background: linear-gradient(to right, #4CAF50 0%, #FF9800 70%, #F44336 100%);
             transition: width 0.05s linear;
         }
-        /* ── Mic Selector ──────────────────────────────────────────── */
-        .mic-row {
+
+        /* ── Sensitivity Slider ────────────────────────────────────── */
+        .sensitivity-row {
             display: flex;
             align-items: center;
-            gap: 10px;
-            margin-bottom: 10px;
+            gap: 8px;
+            margin-bottom: 12px;
             width: 100%;
         }
-        .mic-row select {
-            flex: 1;
-            padding: 5px 8px;
-            border-radius: 8px;
-            border: 1px solid rgba(255,255,255,0.25);
-            font-size: 14px;
-            color: #FFFFFF;
-            background: rgba(255,255,255,0.1);
-            cursor: pointer;
-            min-width: 0;
+        .sensitivity-row label {
+            font-size: 12px;
+            color: rgba(255,255,255,0.6);
+            white-space: nowrap;
         }
+        .sensitivity-end {
+            font-size: 11px;
+            color: rgba(255,255,255,0.4);
+            white-space: nowrap;
+        }
+        .sensitivity-row input[type=range] {
+            flex: 1;
+            accent-color: #FF329B;
+            height: 4px;
+        }
+
         /* lock button now uses .secondary-btn in the secondary-row */
 
         /* ── Lock Screen Overlay ───────────────────────────────────── */
@@ -689,11 +695,13 @@
         </button>
         <div class="test-status" id="testStatus"></div>
 
-        <!-- Microphone selector — at bottom, just above metrics -->
-        <div class="mic-row" id="micRow">
-            <select id="micSelect" onchange="switchMicrophone(this.value)">
-                <option value="">Default Microphone</option>
-            </select>
+        <!-- Gate sensitivity slider -->
+        <div class="sensitivity-row">
+            <label for="gateSensitivity">🎚 Sensitivity</label>
+            <span class="sensitivity-end">Low</span>
+            <input type="range" id="gateSensitivity" min="1" max="10" value="8"
+                   oninput="updateGateSensitivity(this.value)">
+            <span class="sensitivity-end">High</span>
         </div>
 
         <!-- CC Debug log (collapsible) -->
@@ -789,18 +797,59 @@
         let ws = null;
         let isStreaming = false;
         let isWatchMode = false;
+
+        // ── Cross-tab echo prevention ─────────────────────────────────────────
+        // If the listener page (index.html) is open in another tab on this device
+        // it will receive and play the guide's own audio — causing echo.
+        // BroadcastChannel signals listener tabs on the same device to mute
+        // themselves whenever this guide page is actively broadcasting.
+        let guideChannel = null;
+        try { guideChannel = new BroadcastChannel('ef-tour-guide'); } catch(e) {}
+
+        function signalGuideActive(active) {
+            try { if (guideChannel) guideChannel.postMessage({ guideActive: active }); } catch(e) {}
+        }
         let audioContext = null;
         let analyser = null;
         let scriptProcessor = null;
 
-        // ── Audio processing nodes (module-level for switchMicrophone access) ─
+        // ── Audio processing nodes ────────────────────────────────────────────
         let micSource  = null;   // MediaStreamSourceNode for the active mic
-        let hpFilter   = null;   // BiquadFilter — highpass 150 Hz (cuts breath/rumble)
+        let preamp     = null;   // GainNode — software mic boost (sensitivity slider)
+        let hpFilter   = null;   // BiquadFilter — highpass 300 Hz (cuts wind/breath/rumble)
         let lpFilter   = null;   // BiquadFilter — lowpass  7500 Hz (cuts hiss/clicks)
         let compressor = null;   // DynamicsCompressor — consistent volume
 
-        // ── Microphone selection ─────────────────────────────────────────────
-        let selectedDeviceId = null;  // null = browser default
+        // ── Noise gate ───────────────────────────────────────────────────────
+        // Opens when the guide speaks (RMS > OPEN), fades out when silent (RMS < CLOSE),
+        // eliminating crowd noise, wind, and HVAC during pauses between sentences.
+        let noiseGate         = null;
+        let noiseGateTimer    = null;
+        let noiseGateOpen     = true;
+        let gateOpenDebounce  = null; // hold-before-open timer
+        let gateHoldTimer     = null; // hold-open timer (bridges inter-word gaps)
+        // Thresholds are mutable — updated live by the sensitivity slider.
+        // Slider default is 8/10, giving open=0.014, close=0.004.
+        let GATE_OPEN_THRESHOLD  = 0.014;
+        let GATE_CLOSE_THRESHOLD = 0.004;
+        const GATE_ATTACK_TC        = 0.003; // seconds — fast open
+        const GATE_RELEASE_TC       = 0.20;  // seconds — slow fade-out
+        const GATE_OPEN_DEBOUNCE_MS = 15;    // ms signal must exceed open threshold before gate opens
+        const GATE_HOLD_OPEN_MS     = 400;   // ms gate stays open after signal drops (bridges word gaps)
+
+        // Slider: 1 = least sensitive (loud voices only), 10 = most sensitive (whispers).
+        // Controls both the noise gate threshold AND the preamp boost simultaneously.
+        //   Gate open threshold: 0.045 (v=1) → 0.005 (v=10)
+        //   Preamp gain:         1.0×  (v=1) → 4.0×  (v=10)
+        function updateGateSensitivity(val) {
+            const v = parseInt(val, 10);
+            GATE_OPEN_THRESHOLD  = 0.045 - (v - 1) * (0.040 / 9);
+            GATE_CLOSE_THRESHOLD = GATE_OPEN_THRESHOLD * 0.32;
+            const gain = 1 + (v - 1) / 3;   // 1× at v=1, 4× at v=10
+            if (preamp && audioContext) {
+                preamp.gain.setTargetAtTime(gain, audioContext.currentTime, 0.05);
+            }
+        }
 
         // ── VAD (Voice Activity Detection) for broadcast stream ──────────────
         // Threshold of 0.012 RMS gates out quiet breathing and light typing
@@ -876,67 +925,18 @@
             }
         }
 
-        // ── Microphone selection ──────────────────────────────────────────────
+        const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
 
-        // Populate the mic dropdown from the browser's device list.
-        // Labels are only available after microphone permission is granted.
-        async function populateMicSelector() {
-            const sel = document.getElementById('micSelect');
-            if (!sel || !navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
-            try {
-                const devices = await navigator.mediaDevices.enumerateDevices();
-                const mics = devices.filter(d => d.kind === 'audioinput');
-                if (mics.length === 0) return;
-                sel.innerHTML = '';
-                mics.forEach((mic, idx) => {
-                    const opt = document.createElement('option');
-                    opt.value = mic.deviceId;
-                    opt.textContent = mic.label || ('Microphone ' + (idx + 1));
-                    if (mic.deviceId === selectedDeviceId) opt.selected = true;
-                    sel.appendChild(opt);
-                });
-            } catch(e) {
-                console.warn('[Mic] enumerateDevices failed:', e);
-            }
-        }
-
-        // Switch the active microphone while broadcasting (no app restart needed).
-        // Reconnects the audio graph with the new stream; WebSocket stays open.
-        async function switchMicrophone(deviceId) {
-            selectedDeviceId = deviceId || null;
-            if (!isStreaming || !audioContext) return; // will take effect on next broadcast start
-            try {
-                const constraints = {
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl:  true,
-                };
-                if (selectedDeviceId) constraints.deviceId = { exact: selectedDeviceId };
-                const newStream = await navigator.mediaDevices.getUserMedia({ audio: constraints });
-
-                // Disconnect old source cleanly before replacing it
-                if (micSource) { try { micSource.disconnect(); } catch(e) {} micSource = null; }
-                if (stream)    { stream.getTracks().forEach(t => t.stop()); }
-                stream = newStream;
-
-                // Rebuild source and reconnect the processing chain
-                micSource = audioContext.createMediaStreamSource(stream);
-                let lastNode = micSource;
-                if (hpFilter)   { lastNode.connect(hpFilter);   lastNode = hpFilter; }
-                if (lpFilter)   { lastNode.connect(lpFilter);   lastNode = lpFilter; }
-                if (compressor) { lastNode.connect(compressor); lastNode = compressor; }
-                lastNode.connect(analyser);
-                lastNode.connect(scriptProcessor);
-
-                showSubtitleToast('Microphone switched ✓');
-            } catch(e) {
-                showSubtitleToast('Mic switch failed: ' + e.message);
-            }
-        }
-
-        // Re-enumerate when a device is plugged/unplugged (Bluetooth mic connected, etc.)
-        if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
-            navigator.mediaDevices.addEventListener('devicechange', populateMicSelector);
+        /**
+         * Build getUserMedia audio constraints.
+         * iOS Safari: disable browser processing to avoid locking its internal pipeline.
+         * Non-iOS: enable echo cancellation and noise suppression.
+         */
+        function buildAudioConstraints() {
+            // autoGainControl re-enabled on all platforms — the browser's hardware-level
+            // AGC boosts quiet voices before any Web Audio processing. Combined with the
+            // software preamp GainNode it lets the guide speak from a comfortable distance.
+            return { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
         }
 
         // ── Listener count (module-level so updateStatusText can read it) ──────
@@ -1057,17 +1057,18 @@
 
         async function startBroadcast() {
             try {
-                // ── Get microphone stream ─────────────────────────────────────
-                const audioConstraints = {
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl:  true,
-                };
-                if (selectedDeviceId) audioConstraints.deviceId = { exact: selectedDeviceId };
-                stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
+                // ── audioSession ──────────────────────────────────────────────
+                // Set type to 'play-and-record' BEFORE getUserMedia per MDN spec.
+                // This signals to iOS AVAudioSession that both capture and playback
+                // are needed, which can influence hardware routing decisions.
+                if (navigator.audioSession) {
+                    navigator.audioSession.type = 'play-and-record';
+                }
 
-                // Permission granted — re-enumerate so the dropdown shows real device names
-                populateMicSelector();
+                // ── Get microphone stream ─────────────────────────────────────
+                stream = await navigator.mediaDevices.getUserMedia(
+                    { audio: buildAudioConstraints() }
+                );
 
                 // ── Create AudioContext ───────────────────────────────────────
                 audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
@@ -1087,6 +1088,11 @@
                 analyser.fftSize = 256;
                 analyser.smoothingTimeConstant = 0.3;
 
+                // Buffer size 1024 → ~21 ms per packet at 48 kHz, ~47 packets/second.
+                // An earlier attempt at 4096 reduced packet rate but added 64 ms of
+                // capture latency and interacted badly with the jitter-buffer timing;
+                // the skip-rate problem that motivated the change is now fixed by
+                // disconnecting the listener WebSocket when the guide is broadcasting.
                 scriptProcessor = audioContext.createScriptProcessor(1024, 1, 1);
                 const silentGain = audioContext.createGain();
                 silentGain.gain.value = 0;
@@ -1096,14 +1102,16 @@
                 const unsupportedFeatures = [];
 
                 try {
-                    // Highpass at 150 Hz — removes low-frequency handling noise,
-                    // breath noise (100–200 Hz), clothing rub, and ambient rumble.
-                    // 150 Hz is below the fundamental of most voices (~100 Hz male,
-                    // ~200 Hz female), so speech content is preserved.
+                    // Highpass at 300 Hz — removes wind, breath, and keyboard thump.
+                    // 300 Hz is the standard telephone lower cutoff and has been proven
+                    // to maintain full voice intelligibility. Wind and breath energy is
+                    // concentrated below 200 Hz; raising to 300 Hz cuts it almost
+                    // completely. Voice formants (F1 ~300–900 Hz, F2 ~700–2500 Hz)
+                    // are preserved so the guide sounds clear, just slightly less warm.
                     hpFilter = audioContext.createBiquadFilter();
                     hpFilter.type = 'highpass';
-                    hpFilter.frequency.value = 150;
-                    hpFilter.Q.value = 0.7;
+                    hpFilter.frequency.value = 300;
+                    hpFilter.Q.value = 1.0; // steeper rolloff for better wind rejection
 
                     // Lowpass at 7500 Hz — removes high-frequency hiss, keyboard
                     // click transients, and RF interference. Voice intelligibility
@@ -1127,14 +1135,93 @@
                     showSubtitleToast('Note: ' + unsupportedFeatures.join(' & ') + ' not available on this device');
                 }
 
-                // Wire chain: source → [hp 150Hz] → [lp 7500Hz] → [compressor] → analyser + scriptProcessor
+                // ── Noise gate ───────────────────────────────────────────────
+                // GainNode (open=1, closed→0) controlled by a 30 ms poll of the
+                // analyser. Fast attack keeps first syllables intact; slow release
+                // fades pauses out naturally rather than cutting hard.
+                try {
+                    noiseGate = audioContext.createGain();
+                    noiseGate.gain.value = 1;
+                    noiseGateOpen = true;
+                    noiseGateTimer = setInterval(() => {
+                        if (!analyser || !noiseGate || !audioContext) return;
+                        const buf = new Float32Array(analyser.fftSize);
+                        analyser.getFloatTimeDomainData(buf);
+                        let sum = 0;
+                        for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+                        const rms = Math.sqrt(sum / buf.length);
+
+                        if (rms >= GATE_OPEN_THRESHOLD) {
+                            // Active speech — cancel any pending close (extend hold-open)
+                            if (gateHoldTimer) { clearTimeout(gateHoldTimer); gateHoldTimer = null; }
+
+                            // Hold-before-open: require GATE_OPEN_DEBOUNCE_MS of sustained
+                            // signal before opening. Rejects very fast clicks (< 15 ms)
+                            // with minimal clipping of word starts.
+                            if (!noiseGateOpen && !gateOpenDebounce) {
+                                gateOpenDebounce = setTimeout(() => {
+                                    gateOpenDebounce = null;
+                                    if (!noiseGate || !audioContext) return;
+                                    noiseGateOpen = true;
+                                    noiseGate.gain.setTargetAtTime(1.0, audioContext.currentTime, GATE_ATTACK_TC);
+                                }, GATE_OPEN_DEBOUNCE_MS);
+                            }
+                        } else {
+                            // Below open threshold — cancel any pending open
+                            if (gateOpenDebounce) { clearTimeout(gateOpenDebounce); gateOpenDebounce = null; }
+
+                            // Below close threshold — start hold-open timer if not already running.
+                            // The gate stays open for GATE_HOLD_OPEN_MS to bridge natural
+                            // inter-word gaps (50–200 ms) without chopping up sentences.
+                            if (rms < GATE_CLOSE_THRESHOLD && noiseGateOpen && !gateHoldTimer) {
+                                gateHoldTimer = setTimeout(() => {
+                                    gateHoldTimer = null;
+                                    if (!noiseGate || !audioContext) return;
+                                    noiseGateOpen = false;
+                                    noiseGate.gain.setTargetAtTime(0.0, audioContext.currentTime, GATE_RELEASE_TC);
+                                    // Speech just ended — run Whisper immediately on whatever
+                                    // was buffered rather than waiting for silence to accumulate.
+                                    if (subtitlesEnabled && isUsingWhisper && whisperReady) {
+                                        runWhisperInference();
+                                    }
+                                }, GATE_HOLD_OPEN_MS);
+                            }
+                        }
+                    }, 30);
+                } catch(e) { noiseGate = null; unsupportedFeatures.push('noise gate'); }
+
+                // ── Preamp (software mic boost) ──────────────────────────────
+
+                // Boosts the raw mic signal before any filtering, so the guide
+                // can speak from a comfortable distance. Gain is set from the
+                // current slider value and updated live by updateGateSensitivity.
+                try {
+                    const sliderVal = parseInt(document.getElementById('gateSensitivity')?.value || '8', 10);
+                    preamp = audioContext.createGain();
+                    preamp.gain.value = 1 + (sliderVal - 1) / 3; // matches slider formula
+                } catch(e) { preamp = null; }
+
+                // Wire chain: source → [preamp] → [hp] → [lp] → [compressor] → analyser (VU meter)
+                //                                                              → scriptProcessor (broadcast)
+                //                                                              → [noiseGate] (state machine only)
+                //
+                // IMPORTANT: scriptProcessor taps the signal BEFORE the noiseGate GainNode.
+                // The gate's GainNode is intentionally not in the broadcast path — it would
+                // attenuate the first ~60 ms of each utterance (30 ms poll + 15 ms debounce +
+                // 15 ms TC) causing word-start clipping. Instead:
+                //   • Broadcast silence is suppressed by the broadcastIsSilent VAD flag.
+                //   • Whisper audio is gated by the noiseGateOpen boolean (set by the timer).
+                //   • The noiseGate GainNode stays connected so its setInterval guard
+                //     (!noiseGate check) doesn't throw, but it leads nowhere audible.
                 micSource = audioContext.createMediaStreamSource(stream);
                 let lastNode = micSource;
+                if (preamp)     { lastNode.connect(preamp);     lastNode = preamp; }
                 if (hpFilter)   { lastNode.connect(hpFilter);   lastNode = hpFilter; }
                 if (lpFilter)   { lastNode.connect(lpFilter);   lastNode = lpFilter; }
                 if (compressor) { lastNode.connect(compressor); lastNode = compressor; }
-                lastNode.connect(analyser);
-                lastNode.connect(scriptProcessor);
+                lastNode.connect(analyser);        // VU meter + gate state detection
+                lastNode.connect(scriptProcessor); // broadcast path — pre-gate, no word-start clip
+                if (noiseGate)  { lastNode.connect(noiseGate); } // alive for state machine only
 
                 const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
                 ws = new WebSocket(protocol + '//' + location.host);
@@ -1184,13 +1271,17 @@
                             }
                         }
 
-                        // Always feed Whisper — don't gate CC by VAD
-                        if (subtitlesEnabled && isUsingWhisper && whisperReady) {
+                        // Feed Whisper only while the noise gate is open (speech detected).
+                        // Feeding silence causes whisper-tiny to hallucinate words like
+                        // "you" or "thank you" on every 5-second silence timeout.
+                        // Inference is triggered explicitly when the gate closes (above).
+                        if (subtitlesEnabled && isUsingWhisper && whisperReady && noiseGateOpen) {
                             appendWhisperAudio(inputData);
                         }
                     };
 
                     isStreaming = true;
+                    signalGuideActive(true);   // mute listener tabs on this device
                     updateUI();
 
                     // Request wake lock to keep screen on during broadcast
@@ -1262,10 +1353,15 @@
             broadcastIsSilent     = false;
 
             // Disconnect audio processing nodes before closing context
+            if (noiseGateTimer)  { clearInterval(noiseGateTimer);  noiseGateTimer   = null; }
+            if (gateOpenDebounce){ clearTimeout(gateOpenDebounce); gateOpenDebounce  = null; }
+            if (gateHoldTimer)   { clearTimeout(gateHoldTimer);    gateHoldTimer     = null; }
             if (micSource)  { try { micSource.disconnect();  } catch(e) {} micSource  = null; }
+            if (preamp)     { try { preamp.disconnect();     } catch(e) {} preamp     = null; }
             if (hpFilter)   { try { hpFilter.disconnect();   } catch(e) {} hpFilter   = null; }
             if (lpFilter)   { try { lpFilter.disconnect();   } catch(e) {} lpFilter   = null; }
             if (compressor) { try { compressor.disconnect(); } catch(e) {} compressor = null; }
+            if (noiseGate)  { try { noiseGate.disconnect();  } catch(e) {} noiseGate  = null; }
 
             if (scriptProcessor) { scriptProcessor.disconnect(); scriptProcessor = null; }
             if (ws)              { ws.close(); ws = null; }
@@ -1273,6 +1369,7 @@
             if (audioContext)    { audioContext.close(); audioContext = null; }
 
             isStreaming = false;
+            signalGuideActive(false);  // un-mute listener tabs on this device
             updateUI();
 
             releaseWakeLock();
@@ -1296,10 +1393,16 @@
             isWatchMode = true;
 
             // Stop audio capture but keep the WebSocket open for status updates
+            if (noiseGateTimer)  { clearInterval(noiseGateTimer);  noiseGateTimer   = null; }
+            if (gateOpenDebounce){ clearTimeout(gateOpenDebounce); gateOpenDebounce  = null; }
+            if (gateHoldTimer)   { clearTimeout(gateHoldTimer);    gateHoldTimer     = null; }
+            if (preamp)     { try { preamp.disconnect();     } catch(e) {} preamp     = null; }
+            if (noiseGate)  { try { noiseGate.disconnect();  } catch(e) {} noiseGate  = null; }
             if (scriptProcessor) { scriptProcessor.disconnect(); scriptProcessor = null; }
             if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
             if (audioContext) { audioContext.close(); audioContext = null; }
             isStreaming = false;
+            signalGuideActive(false);  // un-mute listener tabs on this device
 
             // Update listener counter with the count from the server
             const lc = Math.max(0, listenerCount || 0);
@@ -1373,14 +1476,12 @@
                 testBtn.disabled = true;
                 testStatus.textContent = 'Accessing microphone...';
 
-                // Get microphone access — use the same device the guide selected
-                const testConstraints = {
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl:  true,
-                };
-                if (selectedDeviceId) testConstraints.deviceId = { exact: selectedDeviceId };
-                const testStream = await navigator.mediaDevices.getUserMedia({ audio: testConstraints });
+                // Try the selected device first; fall back to default if iOS refuses it.
+                // iOS can enumerate a USB/external mic but still reject it via WebRTC
+                // (error: "No AVAudioSessionCaptureDevice device").
+                const testStream = await navigator.mediaDevices.getUserMedia(
+                    { audio: buildAudioConstraints() }
+                );
 
                 testStatus.textContent = 'Recording 3 seconds...';
 
@@ -1626,12 +1727,17 @@
             const totalSecs    = totalSamples / actualRate;
             const silenceSecs  = whisperSilenceSamples / actualRate;
 
-            // Fire when: >1 s of real audio AND enough silence OR buffer is full
+            // Fire when: >1 s of real audio AND enough silence OR buffer is full.
+            // Use setTimeout to defer the inference call OUT of the onaudioprocess
+            // callback. runWhisperInference() allocates and copies a large Float32Array
+            // before posting it to the worker — doing that synchronously inside the audio
+            // callback can stall the thread long enough to drop the next audio chunk,
+            // causing the audible dropout that occurs ~every 5 s when CC is enabled.
             if (!whisperInferring && totalSamples > 0 && (
                     (totalSecs > 1.0 && silenceSecs >= WHISPER_SILENCE_SECS) ||
                     totalSecs >= WHISPER_MAX_SECS
             )) {
-                runWhisperInference();
+                setTimeout(() => runWhisperInference(), 0);
             }
         }
 
@@ -1977,10 +2083,7 @@
             }
         });
 
-        // ── Page init ─────────────────────────────────────────────────────────
-        // Enumerate mics on load — labels will be unlabelled until permission granted,
-        // but the list updates automatically once the guide taps Start Broadcasting.
-        populateMicSelector();
+
     </script>
 
     <!-- Subtitle error/status toast -->

@@ -817,15 +817,21 @@
 
         // ── Adaptive jitter buffer state ─────────────────────────────────────────
         let jitterQueue = [];           // {buffer: AudioBuffer, arrivedAt: number}[]
-        let bufferMs = 500;             // current playback hold duration in ms
+        let bufferMs = 100;             // current playback hold duration in ms (LAN-optimised)
         let nextPlayTime = 0;           // AudioContext clock for next scheduled chunk
         let arrivalHistory = [];        // rolling window of arrival deltas (ms)
         let expectedArrivalTime = 0;    // wall-clock when next chunk is due (ms)
-        const CHUNK_DURATION_MS = (1024 / 16000) * 1000;  // ~64 ms per 1024-sample chunk
+        // CHUNK_DURATION_MS is derived dynamically from the actual received buffer —
+        // see onChunkArrived(). This placeholder is kept so variable references are
+        // clear; it is overwritten on the first chunk arrival.
+        let chunkDurationMs = 21;  // ~21 ms for 1024 samples at 48 kHz; updated on first chunk
         let lateArrivalRate = 0;        // 0.0 – 1.0 fraction of late arrivals
+        let activeSourceNodes = [];     // AudioBufferSourceNodes scheduled but not yet finished
 
         let drainIntervalId   = null;   // handle for 20 ms drain loop
         let metricsIntervalId = null;   // handle for 5 s metrics / recalc loop
+        let pingIntervalId    = null;   // handle for 5 s heartbeat ping
+        let pongTimeoutId     = null;   // 4 s timeout — close socket if pong never arrives
 
         // Per-session counters (reset each time startListening() is called)
         let reconnectCount = 0;
@@ -903,7 +909,7 @@
 
         function setVolume(value) {
             if (gainNode) {
-                gainNode.gain.value = value / 100;
+                gainNode.gain.value = guideMuted ? 0 : value / 100;
             }
             document.getElementById('volumeValue').textContent = value + '%';
 
@@ -921,6 +927,37 @@
                 document.getElementById('cameraBtn').style.display = 'flex';
             }
         });
+
+        // ── Cross-tab echo prevention ─────────────────────────────────────────
+        // ── Cross-tab guide detection ─────────────────────────────────────────
+        // When guide.html is open in another tab on this device, this listener tab
+        // must DISCONNECT its WebSocket (not just mute audio). Keeping the WebSocket
+        // open while the guide is broadcasting forces the router to simultaneously
+        // stream audio back to the same device it's receiving audio from — competing
+        // for bandwidth on the same WiFi channel and causing packet drops (high skip
+        // rate) that affect ALL listeners, not just this tab.
+        let guideMuted = false;
+        try {
+            const guideChannel = new BroadcastChannel('ef-tour-guide');
+            guideChannel.onmessage = (e) => {
+                guideMuted = !!e.data.guideActive;
+                if (guideMuted) {
+                    // Guide is broadcasting on this device — disconnect to free bandwidth
+                    if (ws) {
+                        ws.close();   // onclose suppresses reconnect while guideMuted=true
+                        ws = null;
+                    }
+                    if (gainNode) gainNode.gain.value = 0;
+                    updateStatus('muted', 'Muted — guide active on this device');
+                } else {
+                    // Guide stopped — reconnect if the user had listening active
+                    if (isListening) {
+                        updateStatus('connecting', 'Reconnecting…');
+                        setTimeout(connectWebSocket, 500);
+                    }
+                }
+            };
+        } catch(e) { /* BroadcastChannel not supported — no-op */ }
 
         // Request wake lock to prevent screen from sleeping
         async function requestWakeLock() {
@@ -965,7 +1002,7 @@
                 hasConnectedOnce = false;
                 jitterQueue = [];
                 arrivalHistory = [];
-                bufferMs = 500;
+                bufferMs = 100;
                 lateArrivalRate = 0;
                 expectedArrivalTime = 0;
 
@@ -1025,7 +1062,11 @@
             isListening = false;
 
             stopJitterTimers();
-            jitterQueue = [];    // discard buffered audio (not counted as a flush event)
+            if (pingIntervalId) { clearInterval(pingIntervalId); pingIntervalId = null; }
+            if (pongTimeoutId)  { clearTimeout(pongTimeoutId);   pongTimeoutId  = null; }
+            jitterQueue = [];          // discard buffered audio (not counted as a flush event)
+            for (const src of activeSourceNodes) { try { src.stop(); } catch(e) {} }
+            activeSourceNodes = [];
 
             if (ws) {
                 ws.close();
@@ -1075,6 +1116,23 @@
                 updateStatus('connected', 'Connected - Listening');
                 updateButton();
                 updateLockWave();
+
+                // ── Heartbeat ping ─────────────────────────────────────────────
+                // Send a ping every 5 s. If no pong arrives within 4 s the TCP
+                // connection is stale (e.g. WiFi drop that hasn't closed the socket
+                // yet). Close it immediately so the 1-s reconnect fires, rather than
+                // waiting up to 90 s for the OS TCP timeout to kick in.
+                if (pingIntervalId) clearInterval(pingIntervalId);
+                pingIntervalId = setInterval(() => {
+                    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+                    if (pongTimeoutId) clearTimeout(pongTimeoutId);
+                    pongTimeoutId = setTimeout(() => {
+                        pongTimeoutId = null;
+                        console.log('[WS] Pong timeout — closing stale connection');
+                        if (ws) ws.close();
+                    }, 4000);
+                    try { ws.send(JSON.stringify({ type: 'ping' })); } catch(e) { /* ignore */ }
+                }, 5000);
             };
 
             ws.onmessage = (event) => {
@@ -1084,6 +1142,9 @@
                         if (msg.type === 'client-id') {
                             document.getElementById('travelerNumber').textContent = msg.id;
                             document.getElementById('travelerId').style.display = 'inline-block';
+                        } else if (msg.type === 'pong') {
+                            // Heartbeat alive — cancel the stale-connection timeout
+                            if (pongTimeoutId) { clearTimeout(pongTimeoutId); pongTimeoutId = null; }
                         } else if (msg.type === 'subtitle') {
                             showSubtitle(msg.text, msg.isFinal, msg.enabled);
                         } else if (msg.type === 'reaction') {
@@ -1098,8 +1159,12 @@
             };
 
             ws.onclose = () => {
+                // Stop the heartbeat for this connection
+                if (pingIntervalId) { clearInterval(pingIntervalId); pingIntervalId = null; }
+                if (pongTimeoutId)  { clearTimeout(pongTimeoutId);   pongTimeoutId  = null; }
                 ws = null;
                 if (!isListening) return;   // user pressed Stop — do not reconnect
+                if (guideMuted)   return;   // guide active on this device — BroadcastChannel will reconnect
                 updateStatus('connecting', 'Reconnecting…');
                 console.log('[WS] Closed — reconnecting in 1 s…');
                 setTimeout(connectWebSocket, 1000);
@@ -1128,13 +1193,16 @@
             if (arrivalHistory.length > 10) arrivalHistory.shift();
             lateArrivalRate = arrivalHistory.filter(d => d > 100).length / arrivalHistory.length;
 
-            // Advance expected time by one chunk period
-            expectedArrivalTime = now + CHUNK_DURATION_MS;
-
             // Decode and enqueue
             const floatData = pcm16ToFloat32(arrayBuffer);
             const audioBuffer = audioContext.createBuffer(1, floatData.length, audioContext.sampleRate);
             audioBuffer.getChannelData(0).set(floatData);
+
+            // Derive expected inter-chunk interval from the actual buffer duration so
+            // lateArrivalRate tracks real jitter rather than a stale hardcoded constant.
+            chunkDurationMs = audioBuffer.duration * 1000;
+            expectedArrivalTime = now + chunkDurationMs;
+
             jitterQueue.push({ buffer: audioBuffer, arrivedAt: now });
         }
 
@@ -1142,6 +1210,20 @@
         function drainQueue() {
             if (!audioContext || jitterQueue.length === 0) return;
             const now = Date.now();
+
+            // ── Burst-backlog guard ────────────────────────────────────────────
+            // If the playback schedule has drifted more than MAX_LOOKAHEAD_SEC
+            // ahead of the audio clock, a burst of stale packets arrived all at
+            // once (e.g. after a network hiccup, iOS background, or reconnect).
+            // Scheduling them all sequentially would push live audio 30+ seconds
+            // into the future. Flush and snap back to the live stream instead.
+            const MAX_LOOKAHEAD_SEC = 1.5;
+            if (nextPlayTime > audioContext.currentTime + MAX_LOOKAHEAD_SEC) {
+                console.log('[Jitter] Burst backlog detected — flushing to snap to live audio.',
+                            'nextPlayTime ahead by', (nextPlayTime - audioContext.currentTime).toFixed(2) + 's');
+                flushQueue();
+                return;
+            }
 
             while (jitterQueue.length > 0) {
                 if ((now - jitterQueue[0].arrivedAt) < bufferMs) break;
@@ -1158,22 +1240,45 @@
                 source.connect(gainNode);
                 source.start(nextPlayTime);
                 nextPlayTime += item.buffer.duration;
+
+                // Track so flushQueue() can stop it if a burst-backlog flush fires
+                // before this node has finished playing.
+                activeSourceNodes.push(source);
+                source.onended = () => {
+                    const idx = activeSourceNodes.indexOf(source);
+                    if (idx >= 0) activeSourceNodes.splice(idx, 1);
+                };
             }
         }
 
-        /** Discard all queued audio (called on reconnect to prevent echo). */
+        /** Discard all queued and in-flight audio (called on reconnect / burst backlog). */
         function flushQueue() {
             const count = jitterQueue.length;
             jitterQueue = [];
+
+            // Stop every AudioBufferSourceNode that has already been handed to the
+            // Web Audio scheduler but hasn't finished playing yet.  Without this,
+            // nodes scheduled in the future survive the flush and play again after
+            // new audio starts — producing an audible double-play of the same audio.
+            for (const src of activeSourceNodes) {
+                try { src.stop(); } catch(e) { /* already ended — safe to ignore */ }
+            }
+            activeSourceNodes = [];
+
             nextPlayTime = audioContext ? audioContext.currentTime : 0;
             flushCount++;
-            console.log('[Jitter] Flushed', count, 'chunks | total flushes:', flushCount);
+            console.log('[Jitter] Flushed', count, 'chunks | stopped', activeSourceNodes.length,
+                        'in-flight nodes | total flushes:', flushCount);
         }
 
-        /** Adjust bufferMs based on the rolling lateArrivalRate. */
+        /** Adjust bufferMs based on the rolling lateArrivalRate.
+         *  Tiers are tuned for LAN (local router) use where jitter is typically < 20 ms.
+         *  Good:   < 5% late  → 100 ms hold (≈ 4–5 chunks queued at 21 ms each)
+         *  Moderate: 5–20%    → 300 ms hold (smooths occasional WiFi retransmits)
+         *  Poor:   > 20% late → 600 ms hold (heavy congestion — still under 1 second) */
         function recalcBufferMs() {
-            const newMs = lateArrivalRate < 0.05 ? 500 :
-                          lateArrivalRate <= 0.20 ? 1500 : 3000;
+            const newMs = lateArrivalRate < 0.05 ? 100 :
+                          lateArrivalRate <= 0.20 ? 300 : 600;
             if (newMs !== bufferMs) {
                 console.log('[Jitter] bufferMs', bufferMs, '→', newMs,
                             '| lateArrivalRate', (lateArrivalRate * 100).toFixed(1) + '%');

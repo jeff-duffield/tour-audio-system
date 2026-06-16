@@ -570,6 +570,7 @@ app.get('/success.txt', sendCaptiveResponse);
 const clients = new Set();
 let broadcastCount = 0;
 let skippedClients = 0;
+let skippedRounds  = 0;   // rounds where ≥1 client had to be skipped (meaningful skip rate)
 let clientCountBroadcastTimeout = null;
 
 // Extended metrics tracking
@@ -722,6 +723,12 @@ wss.on('connection', (ws) => {
             let msg;
             try { msg = JSON.parse(data.toString()); } catch(e) { return; /* malformed */ }
 
+            // ── Heartbeat ping ────────────────────────────────────────────────
+            if (msg.type === 'ping') {
+                try { ws.send(JSON.stringify({ type: 'pong' })); } catch(e) { /* ignore */ }
+                return;
+            }
+
             // ── Reaction from any participant ─────────────────────────────────
             if (msg.type === 'reaction' && VALID_REACTIONS.includes(msg.reaction)) {
                 // Server-side cooldown enforcement — silently drop repeat taps within the window
@@ -826,12 +833,14 @@ wss.on('connection', (ws) => {
             }
         }
 
+        if (skippedThisRound > 0) skippedRounds++;
+
         if (broadcastCount % 500 === 0) {
             console.log('Broadcast stats: Total=' + broadcastCount + ', Clients=' + clients.size +
-                       ', Skipped=' + skippedClients + ' (' + ((skippedClients / broadcastCount) * 100).toFixed(1) + '%)');
+                       ', SkippedRounds=' + skippedRounds + ' (' + ((skippedRounds / broadcastCount) * 100).toFixed(1) + '%)');
         }
         if (skippedThisRound > 5) {
-            console.warn('Skipped ' + skippedThisRound + ' slow clients this broadcast');
+            console.warn('Skipped ' + skippedThisRound + ' slow clients this broadcast round');
         }
     });
 
@@ -950,7 +959,12 @@ app.get('/health', (req, res) => {
         performance: {
             totalBroadcasts: broadcastCount,
             skippedPackets: skippedClients,
-            skipRate: broadcastCount > 0 ? ((skippedClients / broadcastCount) * 100).toFixed(2) + '%' : '0%',
+            // skipRate = % of audio rounds where at least one client had to be skipped.
+            // Previous formula (skippedClients/broadcastCount) overcounted because
+            // skippedClients tallied per-client skips while broadcastCount is per-round.
+            // With N listeners one slow client could show 100×N% skip rate. Now capped
+            // at 100% and directly answers "how often was anyone left behind?"
+            skipRate: broadcastCount > 0 ? ((skippedRounds / broadcastCount) * 100).toFixed(2) + '%' : '0%',
             avgBufferSize: avgBuffer,
             maxBufferSize: maxBuffer,
             slowClients: slowClients

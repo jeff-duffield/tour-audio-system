@@ -114,6 +114,20 @@ function handleMessage(event) {
             const stripped = text.replace(/[\s.,!?;:\-'"…]+/g, '');
             if (stripped.length < 2) text = '';
 
+            // Step 3: Block known whisper-tiny silence hallucinations.
+            // When given silence or low-energy audio, whisper-tiny.en reliably
+            // produces these phrases. They are never valid tour guide output.
+            if (text) {
+                const normalized = text.toLowerCase().replace(/[.,!?;:'"…\-]+/g, '').trim();
+                const SILENCE_HALLUCINATIONS = new Set([
+                    'you', 'thank you', 'thanks', 'bye', 'goodbye', 'see you',
+                    'see you later', 'thank you for watching', 'thanks for watching',
+                    'thanks for listening', 'please subscribe', 'i', 'the', 'a',
+                    'uh', 'um', 'hmm', 'mm', 'ah', 'oh', 'okay', 'ok',
+                ]);
+                if (SILENCE_HALLUCINATIONS.has(normalized)) text = '';
+            }
+
             self.postMessage({ type: 'result', text });
         });
     }
