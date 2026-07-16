@@ -69,6 +69,47 @@
             color: rgba(255,255,255,0.45);
             line-height: 1.5;
         }
+        .guide-link {
+            font-size: 13px;
+            color: rgba(255,255,255,0.35);
+        }
+        .guide-link a {
+            color: rgba(255,255,255,0.55);
+            text-decoration: none;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+            padding-bottom: 1px;
+        }
+        .guide-link a:active { opacity: 0.7; }
+        .relay-warning {
+            background: rgba(255,165,0,0.10);
+            border: 1px solid rgba(255,165,0,0.32);
+            border-radius: 12px;
+            padding: 12px 14px;
+            font-size: 13px;
+            color: rgba(255,255,255,0.78);
+            line-height: 1.5;
+            text-align: left;
+            width: 100%;
+        }
+        .relay-warning strong { color: rgba(255,200,80,0.95); }
+        .portal-btn {
+            display: block;
+            width: 100%;
+            background: transparent;
+            color: rgba(255,255,255,0.6);
+            padding: 14px;
+            border-radius: 50px;
+            text-decoration: none;
+            font-size: 16px;
+            font-weight: 600;
+            border: 1.5px solid rgba(255,255,255,0.22);
+            text-align: center;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .portal-btn:active { opacity: 0.7; }
+        .or-sep { font-size: 12px; color: rgba(255,255,255,0.3); }
+        .portal-note { font-size: 12px; color: rgba(255,255,255,0.35); line-height: 1.4; }
         /* Entrance animation */
         @keyframes fadeUp {
             from { opacity: 0; transform: translateY(14px); }
@@ -93,32 +134,50 @@
 
         <h1 class="a1">You are connected.<br>Open the Tour Audio app<br>to begin listening.</h1>
 
+        <div id="relayWarning" style="display:none;" class="relay-warning a2">
+            <strong>⚠ iCloud Private Relay</strong> may prevent the app from loading in Safari on this network.<br>
+            To disable: <strong>Settings → Wi-Fi → [network] → ⓘ → Limit IP Address Tracking → Off</strong>
+        </div>
+
         <button class="open-btn a2" onclick="openInSafari()">
-            Open Tour Audio →
+            Open in Browser →
         </button>
+
+        <p class="or-sep a3">or</p>
+        <a href="https://audio.eftours.travel/index.html" class="portal-btn a3">
+            Listen in this window
+        </a>
+        <p class="portal-note a3">📷 Camera not available in captive portal</p>
 
         <p class="hint a3">
             If the button doesn't open, tap <strong style="color:rgba(255,255,255,0.7)">Done</strong>
             then open <strong style="color:rgba(255,255,255,0.7)">Safari</strong> and go to:<br>
             <strong style="color:rgba(255,255,255,0.7)">audio.eftours.travel</strong>
         </p>
+        <p class="guide-link a3">
+            Tour guide? <a href="#" onclick="openGuide();return false;">Open guide app →</a>
+        </p>
     </div>
     <script>
-        var APP_URL = 'https://audio.eftours.travel/index.html';
-
-        function openInSafari() {
+        // Open a URL in the device's real browser, not the captive portal mini-browser.
+        // x-safari-https:// hands the URL to Safari on iOS; Android respects _blank.
+        function openInBrowser(url) {
             var isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
             if (isIOS) {
-                // x-safari-https:// is an undocumented iOS URL scheme that hands
-                // the URL directly to Safari instead of keeping it in the CNA
-                // mini-browser. Falls back to window.open after 400ms if it
-                // doesn't fire (e.g. on older iOS or Android).
-                window.location.href = 'x-safari-https://audio.eftours.travel/index.html';
-                setTimeout(function () { window.open(APP_URL, '_blank'); }, 400);
+                window.location.href = url.replace('https://', 'x-safari-https://');
+                setTimeout(function () { window.open(url, '_blank'); }, 500);
             } else {
-                // Android / other: _blank reliably opens the default browser.
-                window.open(APP_URL, '_blank');
+                window.open(url, '_blank');
             }
+        }
+
+        function openInSafari() { openInBrowser('https://audio.eftours.travel/index.html'); }
+        function openGuide()    { openInBrowser('https://audio.eftours.travel/guide.html'); }
+
+        // Show iCloud Private Relay tip on iOS — see welcome.html for why this
+        // can't be detected directly from within the captive portal.
+        if (/iphone|ipad|ipod/i.test(navigator.userAgent)) {
+            document.getElementById('relayWarning').style.display = 'block';
         }
     </script>
 </body>

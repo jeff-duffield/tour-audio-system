@@ -105,6 +105,20 @@ chmod 600 "$SSL_DIR/server.key"
 rm -rf "$TMPDIR"
 echo "OK:Certificate installed"
 
+# ── Sync device clock ──────────────────────────────────────────────────────────
+# The GL-MT3000 has no battery-backed RTC — after a reboot/power loss its
+# clock resets to an old build date and only self-corrects once it re-syncs
+# via NTP. If that sync hasn't happened yet, "days remaining" below gets
+# computed against a stale "now", even though the cert's actual expiry date
+# is correct. Sync here (we already know we have internet since the cert
+# download above succeeded) so the days-remaining math is accurate.
+echo "STEP:Syncing device clock"
+if ntpd -q -p pool.ntp.org >/dev/null 2>&1; then
+    echo "OK:Clock synced"
+else
+    echo "OK:Clock sync skipped — days-remaining may be inaccurate until the clock corrects itself"
+fi
+
 # ── Update /tmp/ef-status.json ────────────────────────────────────────────────
 echo "STEP:Updating device status"
 

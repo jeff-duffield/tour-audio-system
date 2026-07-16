@@ -54,6 +54,8 @@
             font-size: 17px;
             font-weight: 700;
             transition: all 0.2s ease;
+            border: none;
+            cursor: pointer;
         }
         .continue-btn:hover {
             background: #e0237f;
@@ -61,6 +63,49 @@
             box-shadow: 0 8px 24px rgba(255,50,155,0.35);
         }
         .continue-btn:active { transform: translateY(0); box-shadow: none; }
+        .guide-link {
+            margin-top: 20px;
+            font-size: 14px;
+            color: rgba(255,255,255,0.45);
+        }
+        .guide-link a {
+            color: rgba(255,255,255,0.65);
+            text-decoration: none;
+            border-bottom: 1px solid rgba(255,255,255,0.25);
+            padding-bottom: 1px;
+        }
+        .guide-link a:active { opacity: 0.7; }
+        .relay-warning {
+            background: rgba(255,165,0,0.10);
+            border: 1px solid rgba(255,165,0,0.32);
+            border-radius: 12px;
+            padding: 12px 14px;
+            font-size: 13px;
+            color: rgba(255,255,255,0.78);
+            line-height: 1.5;
+            text-align: left;
+            margin-bottom: 8px;
+            width: 100%;
+        }
+        .relay-warning strong { color: rgba(255,200,80,0.95); }
+        .portal-btn {
+            display: block;
+            width: 100%;
+            background: transparent;
+            color: rgba(255,255,255,0.6);
+            padding: 14px;
+            border-radius: 50px;
+            text-decoration: none;
+            font-size: 16px;
+            font-weight: 600;
+            border: 1.5px solid rgba(255,255,255,0.22);
+            text-align: center;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .portal-btn:active { opacity: 0.7; }
+        .or-sep { font-size: 12px; color: rgba(255,255,255,0.3); margin: 4px 0; }
+        .portal-note { font-size: 12px; color: rgba(255,255,255,0.35); margin-top: 4px; line-height: 1.4; }
         /* Easter egg tap dots */
         .tap-dots {
             display: flex;
@@ -116,11 +161,39 @@
         </div>
         <h1 class="anim-1">Tour Audio</h1>
         <p class="subtitle anim-1">Listen to your guide in real-time</p>
-        <a href="https://audio.eftours.travel/index.html" class="continue-btn anim-2">
-            Start Listening
+        <div id="relayWarning" style="display:none;" class="relay-warning anim-2">
+            <strong>⚠ iCloud Private Relay</strong> may prevent the app from loading in Safari on this network.<br>
+            To disable: <strong>Settings → Wi-Fi → [network] → ⓘ → Limit IP Address Tracking → Off</strong>
+        </div>
+        <button class="continue-btn anim-2" onclick="openInBrowser('https://audio.eftours.travel/index.html')">
+            Open in Browser
+        </button>
+        <p class="or-sep anim-2">or</p>
+        <a href="https://audio.eftours.travel/index.html" class="portal-btn anim-2">
+            Listen in this window
         </a>
+        <p class="portal-note anim-2">📷 Camera not available in captive portal</p>
+        <p class="guide-link anim-2">
+            Tour guide? <a href="#" onclick="openInBrowser('https://audio.eftours.travel/guide.html');return false;">Open guide app →</a>
+        </p>
     </div>
     <script>
+        // Open a URL in the device's real browser (Safari on iOS, default on Android).
+        // In the captive portal mini-browser, normal navigation stays inside the CNA.
+        // x-safari-https:// is an iOS URL scheme that hands the URL to Safari directly.
+        // Android's CNA respects window.open(_blank) so we use that as the fallback.
+        function openInBrowser(url) {
+            var isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+            if (isIOS) {
+                window.location.href = url.replace('https://', 'x-safari-https://');
+                // Fallback in case x-safari-https doesn't fire (older iOS / future changes)
+                setTimeout(function () { window.open(url, '_blank'); }, 500);
+            } else {
+                window.open(url, '_blank');
+            }
+        }
+
+        // 5-tap easter egg — opens guide app in the real browser
         (function () {
             var count = 0, timer = null;
             var wrap = document.getElementById('logoWrap');
@@ -147,12 +220,22 @@
                 }
                 if (count >= 5) {
                     reset();
-                    window.location.href = 'https://audio.eftours.travel/guide.html';
+                    openInBrowser('https://audio.eftours.travel/guide.html');
                     return;
                 }
                 timer = setTimeout(reset, 3000);
             });
         })();
+
+        // Show iCloud Private Relay tip on iOS. Private Relay is temporarily
+        // suspended while this captive portal page is open, so it can't be
+        // detected directly — but it resumes once the user opens Safari, which
+        // can prevent audio.eftours.travel (a local-network-only hostname) from
+        // resolving. Warn iOS users up front so they know what to check if the
+        // browser app doesn't load.
+        if (/iphone|ipad|ipod/i.test(navigator.userAgent)) {
+            document.getElementById('relayWarning').style.display = 'block';
+        }
     </script>
 </body>
 </html>

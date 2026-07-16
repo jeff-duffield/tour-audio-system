@@ -534,7 +534,91 @@
             transition: transform 0.1s, background 0.1s;
         }
         .shutter-btn:active { transform: translateX(-50%) scale(0.88); background: rgba(255,255,255,0.6); }
-        .shutter-inner { width: 52px; height: 52px; border-radius: 50%; background: #fff; pointer-events: none; }
+        .shutter-btn.recording { border-color: #ff3b30; }
+        .shutter-inner {
+            width: 52px; height: 52px; border-radius: 50%; background: #fff;
+            pointer-events: none; transition: width 0.15s, height 0.15s, border-radius 0.15s, background 0.15s;
+        }
+        .shutter-inner.recording { width: 30px; height: 30px; border-radius: 8px; background: #ff3b30; }
+
+        /* Zoom controls — sit just above the shutter button */
+        .zoom-controls {
+            position: fixed;
+            bottom: 194px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            background: rgba(0,0,0,0.45);
+            border-radius: 50px;
+            padding: 6px 10px;
+            z-index: 10;
+        }
+        .zoom-btn {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            border: 1.5px solid rgba(255,255,255,0.4);
+            background: rgba(255,255,255,0.12);
+            color: #fff;
+            font-size: 18px;
+            font-weight: 600;
+            font-family: inherit;
+            line-height: 1;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .zoom-btn:active { background: rgba(255,255,255,0.3); }
+        .zoom-label { color: #fff; font-size: 13px; font-weight: 600; min-width: 34px; text-align: center; }
+
+        /* Photo / Video mode toggle — just above the shutter button */
+        .mode-toggle {
+            position: fixed;
+            bottom: 140px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 4px;
+            background: rgba(0,0,0,0.35);
+            border-radius: 50px;
+            padding: 3px;
+            z-index: 10;
+        }
+        .mode-btn {
+            border: none;
+            background: transparent;
+            color: rgba(255,255,255,0.55);
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            font-family: inherit;
+            padding: 6px 16px;
+            border-radius: 50px;
+            cursor: pointer;
+        }
+        .mode-btn.active { background: rgba(255,255,255,0.92); color: #111; }
+
+        /* Recording timer — top center while a video is being recorded */
+        .rec-timer {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            background: rgba(0,0,0,0.55);
+            border-radius: 50px;
+            padding: 6px 14px;
+            z-index: 10;
+        }
+        .rec-dot { width: 9px; height: 9px; border-radius: 50%; background: #ff3b30; animation: recBlink 1s infinite; }
+        @keyframes recBlink { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+        #recTimerText { color: #fff; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
         #cameraToast {
             position: absolute;
             top: 50%;
@@ -568,16 +652,37 @@
             align-items: center;
             gap: 6px;
         }
-        .photo-preview-card img {
+        .photo-preview-card img,
+        .photo-preview-card video {
             width: 120px;
             height: 90px;
             object-fit: cover;
             border-radius: 8px;
             display: block;
             /* Must be default (not none) for the iOS long-press context menu
-               to offer "Save to Photo Library" */
+               to offer "Save to Photo Library" / "Save Video" */
             -webkit-touch-callout: default;
         }
+        .preview-save-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            width: 100%;
+            min-width: 120px;
+            box-sizing: border-box;
+            background: rgba(255,255,255,0.16);
+            border: 1px solid rgba(255,255,255,0.4);
+            color: #fff;
+            font-size: 12px;
+            font-weight: 700;
+            font-family: inherit;
+            padding: 7px 12px;
+            border-radius: 50px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .preview-save-btn:active { background: rgba(255,255,255,0.34); }
         .photo-preview-label {
             color: rgba(255,255,255,0.85);
             font-size: 11px;
@@ -787,20 +892,34 @@
         <video id="cameraVideo" autoplay playsinline muted></video>
         <div class="camera-overlay-ui">
             <button class="camera-close" onclick="closeCamera()" aria-label="Close camera">✕</button>
+            <div id="recTimer" style="display:none;" class="rec-timer">
+                <span class="rec-dot"></span><span id="recTimerText">0:00</span>
+            </div>
             <div id="cameraDenied" style="display:none;">
                 Camera access denied.<br>Please allow camera access in your browser settings.
             </div>
-            <button class="shutter-btn" id="shutterBtn" onclick="takePhoto()" aria-label="Take photo">
-                <div class="shutter-inner"></div>
+            <div id="zoomControls" class="zoom-controls">
+                <button class="zoom-btn" onclick="zoomOut()" aria-label="Zoom out">−</button>
+                <span class="zoom-label" id="zoomLabel">1.0×</span>
+                <button class="zoom-btn" onclick="zoomIn()" aria-label="Zoom in">+</button>
+            </div>
+            <div id="modeToggle" class="mode-toggle">
+                <button class="mode-btn active" id="modeBtnPhoto" onclick="setCameraMode('photo')">PHOTO</button>
+                <button class="mode-btn" id="modeBtnVideo" onclick="setCameraMode('video')">VIDEO</button>
+            </div>
+            <button class="shutter-btn" id="shutterBtn" onclick="onShutterTap()" aria-label="Take photo">
+                <div class="shutter-inner" id="shutterInner"></div>
             </button>
         </div>
-        <!-- Photo preview card — shown after shutter tap.
+        <!-- Photo/video preview card — shown after the shutter is used.
              Long-pressing the thumbnail shows iOS's native "Save to Photo Library"
-             context menu — a short, focused list with no app-exiting options. -->
+             / "Save Video" context menu — a short, focused list with no app-exiting options. -->
         <div id="photoPreviewCard" style="display:none;" class="photo-preview-card">
             <button class="photo-preview-dismiss" onclick="dismissPhotoPreview()" aria-label="Dismiss">✕</button>
-            <img id="photoPreviewImg" alt="Captured photo">
-            <p class="photo-preview-label">Hold photo to save</p>
+            <img id="photoPreviewImg" alt="Captured photo" style="display:none;">
+            <video id="videoPreviewVid" playsinline muted loop style="display:none;"></video>
+            <button class="preview-save-btn" onclick="saveMedia()">⬇ Save to Photos</button>
+            <p class="photo-preview-label" id="previewLabel">Hold photo to save</p>
         </div>
         <div id="cameraToast"></div>
     </div>
@@ -1420,9 +1539,14 @@
 
         // ── Camera ────────────────────────────────────────────────────────────
         var cameraStream = null;
-        var _cameraZoom  = 1;   // current digital-zoom multiplier (1–5×)
-        var _pinchDist0  = 0;   // finger separation when pinch began
-        var _pinchZoom0  = 1;   // zoom level when pinch began
+        var _cameraZoom  = 1;      // current UI zoom multiplier (1–5×)
+        var _pinchDist0  = 0;      // finger separation when pinch began
+        var _pinchZoom0  = 1;      // zoom level when pinch began
+        var _zoomTrack   = null;   // video track, if it exposes native optical/hybrid zoom
+        var _zoomCaps    = null;   // {min, max, step} from track.getCapabilities().zoom
+        var _cameraMode  = 'photo'; // 'photo' | 'video'
+        var _previewBlob = null;   // blob currently shown in the preview card
+        var _previewKind = null;   // 'photo' | 'video' — what _previewBlob contains
 
         function _getPinchDist(touches) {
             var dx = touches[0].clientX - touches[1].clientX;
@@ -1448,9 +1572,53 @@
             if (e.touches.length !== 2) return;
             e.preventDefault();
             var dist = _getPinchDist(e.touches);
-            _cameraZoom = Math.min(5, Math.max(1, _pinchZoom0 * dist / _pinchDist0));
-            document.getElementById('cameraVideo').style.transform =
-                'scale(' + _cameraZoom + ')';
+            setZoom(_pinchZoom0 * dist / _pinchDist0);
+        }
+
+        // Sets the UI zoom level (1–5×). Uses the camera's native zoom
+        // (Android Chrome, some Android WebViews) when available, since that
+        // gives real optical/hybrid zoom instead of a cropped digital zoom.
+        // Falls back to a CSS transform scale everywhere else (iOS Safari).
+        function setZoom(uiValue) {
+            _cameraZoom = Math.min(5, Math.max(1, uiValue));
+            var video = document.getElementById('cameraVideo');
+            if (_zoomTrack && _zoomCaps) {
+                var native = _zoomCaps.min + (_cameraZoom - 1) / 4 * (_zoomCaps.max - _zoomCaps.min);
+                _zoomTrack.applyConstraints({ advanced: [{ zoom: native }] }).catch(function () {});
+                video.style.transform = '';
+            } else {
+                video.style.transform = 'scale(' + _cameraZoom + ')';
+            }
+            updateZoomLabel();
+        }
+
+        function updateZoomLabel() {
+            document.getElementById('zoomLabel').textContent = _cameraZoom.toFixed(1) + '×';
+        }
+
+        function zoomIn()  { setZoom(_cameraZoom + 0.5); }
+        function zoomOut() { setZoom(_cameraZoom - 0.5); }
+
+        // Switches between photo and video capture mode. Locked while a
+        // recording is in progress so the mode can't change mid-clip.
+        function setCameraMode(mode) {
+            if (_isRecording) return;
+            _cameraMode = mode;
+            document.getElementById('modeBtnPhoto').classList.toggle('active', mode === 'photo');
+            document.getElementById('modeBtnVideo').classList.toggle('active', mode === 'video');
+            document.getElementById('shutterBtn').setAttribute(
+                'aria-label', mode === 'photo' ? 'Take photo' : 'Record video'
+            );
+        }
+
+        function onShutterTap() {
+            if (_cameraMode === 'photo') {
+                takePhoto();
+            } else if (_isRecording) {
+                stopRecording();
+            } else {
+                startRecording();
+            }
         }
 
         async function openCamera() {
@@ -1465,6 +1633,12 @@
             video.style.display   = 'block';
             video.style.transform = '';
             _cameraZoom = 1;
+            _zoomTrack  = null;
+            _zoomCaps   = null;
+            updateZoomLabel();
+            setCameraMode('photo');
+            document.getElementById('zoomControls').style.display = 'flex';
+            document.getElementById('modeToggle').style.display   = window.MediaRecorder ? 'flex' : 'none';
             overlay.style.display = 'block';
 
             // Lock browser page-zoom while the camera overlay is open.
@@ -1481,12 +1655,48 @@
             video.addEventListener('touchstart',  _onPinchStart, { passive: false });
             video.addEventListener('touchmove',   _onPinchMove,  { passive: false });
 
+            // Ask for as high a resolution as the device supports — without
+            // explicit ideal width/height, browsers often default to a much
+            // lower-res stream (sometimes ~640×480), which is why in-app
+            // photos looked soft. `ideal` lets the browser pick the closest
+            // match the hardware actually supports (native devices report
+            // capabilities up to 4K+), instead of hard-failing like `min`/`exact`.
+            var videoConstraints = {
+                facingMode: 'environment',
+                width:  { ideal: 3840 },
+                height: { ideal: 2160 }
+            };
+
             try {
-                cameraStream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: 'environment' },
-                    audio: false
-                });
+                try {
+                    // Request the mic too so video recordings capture audio.
+                    cameraStream = await navigator.mediaDevices.getUserMedia({
+                        video: videoConstraints,
+                        audio: true
+                    });
+                } catch (err) {
+                    // Camera+mic are requested as one unit — if the traveler
+                    // declines the mic prompt (or no mic is available), the
+                    // whole call fails even though the camera would've been
+                    // fine. Retry video-only so photos/video-without-audio
+                    // still work.
+                    cameraStream = await navigator.mediaDevices.getUserMedia({
+                        video: videoConstraints,
+                        audio: false
+                    });
+                }
                 video.srcObject = cameraStream;
+
+                // Check for native zoom support (mostly Android Chrome).
+                // iOS Safari never exposes this, so it stays on the CSS fallback.
+                try {
+                    var track = cameraStream.getVideoTracks()[0];
+                    var caps  = track.getCapabilities && track.getCapabilities();
+                    if (caps && caps.zoom) {
+                        _zoomTrack = track;
+                        _zoomCaps  = caps.zoom;
+                    }
+                } catch (e) { /* getCapabilities unsupported — CSS fallback stays active */ }
             } catch (err) {
                 video.style.display   = 'none';
                 shutter.style.display = 'none';
@@ -1499,6 +1709,9 @@
         function closeCamera() {
             var overlay = document.getElementById('cameraOverlay');
             var video   = document.getElementById('cameraVideo');
+
+            // Discard (don't preview) any in-progress recording — the user is leaving the camera
+            if (_isRecording) stopRecording(true);
 
             // Remove pinch-zoom handlers
             overlay.removeEventListener('touchmove', _onOverlayTouchMove);
@@ -1516,6 +1729,8 @@
                 cameraStream.getTracks().forEach(function (t) { t.stop(); });
                 cameraStream = null;
             }
+            _zoomTrack = null;
+            _zoomCaps  = null;
             video.srcObject       = null;
             video.style.display   = 'block';
             video.style.transform = '';
@@ -1535,14 +1750,121 @@
             canvas.height = video.videoHeight;
             canvas.getContext('2d').drawImage(video, 0, 0);
 
-            // Use a blob URL as the image src so iOS offers full-resolution
-            // "Save to Photo Library" on long-press (the native context menu —
-            // smaller and more focused than the full share sheet).
+            // Use a blob URL as the image src so iOS still offers "Save to
+            // Photo Library" on long-press as a backup, in addition to the
+            // Save button (which uses the Web Share API — see saveMedia()).
             canvas.toBlob(function (blob) {
                 var url = URL.createObjectURL(blob);
-                document.getElementById('photoPreviewImg').src = url;
+                var img = document.getElementById('photoPreviewImg');
+                var vid = document.getElementById('videoPreviewVid');
+                img.src = url;
+                img.style.display = 'block';
+                vid.pause();
+                vid.style.display = 'none';
+                _previewBlob = blob;
+                _previewKind = 'photo';
+                document.getElementById('previewLabel').style.display = 'block';
+                document.getElementById('previewLabel').textContent = 'Or hold photo to save';
                 document.getElementById('photoPreviewCard').style.display = 'flex';
             }, 'image/jpeg', 0.92);
+        }
+
+        // ── Video recording ──────────────────────────────────────────────────
+        var _mediaRecorder    = null;
+        var _recordedChunks   = [];
+        var _isRecording      = false;
+        var _recStartTime     = 0;
+        var _recTimerInterval = null;
+
+        function _pickVideoMimeType() {
+            var candidates = ['video/mp4', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+            for (var i = 0; i < candidates.length; i++) {
+                if (window.MediaRecorder && MediaRecorder.isTypeSupported(candidates[i])) return candidates[i];
+            }
+            return '';
+        }
+
+        function startRecording() {
+            if (!cameraStream || !window.MediaRecorder) return;
+            _recordedChunks = [];
+            var mimeType = _pickVideoMimeType();
+            try {
+                _mediaRecorder = mimeType
+                    ? new MediaRecorder(cameraStream, { mimeType: mimeType })
+                    : new MediaRecorder(cameraStream);
+            } catch (err) {
+                console.warn('MediaRecorder error:', err);
+                showCameraToast('Video recording not supported');
+                return;
+            }
+
+            _mediaRecorder._discard = false;
+            _mediaRecorder.ondataavailable = function (e) {
+                if (e.data && e.data.size > 0) _recordedChunks.push(e.data);
+            };
+            _mediaRecorder.onstop = function () {
+                var discard = this._discard;
+                var type    = this.mimeType || 'video/mp4';
+                if (!discard && _recordedChunks.length) {
+                    showVideoPreview(new Blob(_recordedChunks, { type: type }));
+                }
+                _recordedChunks = [];
+            };
+
+            _mediaRecorder.start();
+            _isRecording  = true;
+            _recStartTime = Date.now();
+
+            if (!cameraStream.getAudioTracks().length) {
+                showCameraToast('Recording without audio — mic unavailable');
+            }
+
+            document.getElementById('shutterBtn').classList.add('recording');
+            document.getElementById('shutterInner').classList.add('recording');
+            document.getElementById('zoomControls').style.display = 'none';
+            document.getElementById('modeToggle').style.display   = 'none';
+            document.getElementById('recTimer').style.display     = 'flex';
+            _updateRecTimer();
+            _recTimerInterval = setInterval(_updateRecTimer, 250);
+        }
+
+        function _updateRecTimer() {
+            var secs = Math.floor((Date.now() - _recStartTime) / 1000);
+            var m = Math.floor(secs / 60);
+            var s = secs % 60;
+            document.getElementById('recTimerText').textContent = m + ':' + (s < 10 ? '0' : '') + s;
+        }
+
+        function stopRecording(discard) {
+            if (!_isRecording || !_mediaRecorder) return;
+            _mediaRecorder._discard = discard === true;
+            _mediaRecorder.stop();
+            _isRecording = false;
+
+            clearInterval(_recTimerInterval);
+            _recTimerInterval = null;
+
+            document.getElementById('shutterBtn').classList.remove('recording');
+            document.getElementById('shutterInner').classList.remove('recording');
+            document.getElementById('zoomControls').style.display = 'flex';
+            document.getElementById('modeToggle').style.display   = 'flex';
+            document.getElementById('recTimer').style.display     = 'none';
+        }
+
+        function showVideoPreview(blob) {
+            var url = URL.createObjectURL(blob);
+            var vid = document.getElementById('videoPreviewVid');
+            var img = document.getElementById('photoPreviewImg');
+            vid.src = url;
+            vid.style.display = 'block';
+            img.style.display = 'none';
+            _previewBlob = blob;
+            _previewKind = 'video';
+            // Long-press "Save Video" is unreliable for blob-URL <video> elements
+            // on iOS Safari, so lean entirely on the Save button for video.
+            document.getElementById('previewLabel').style.display = 'none';
+            document.getElementById('photoPreviewCard').style.display = 'flex';
+            vid.play().catch(function () {});
         }
 
         function dismissPhotoPreview() {
@@ -1550,7 +1872,55 @@
             // Revoke the blob URL to free memory
             if (img.src && img.src.startsWith('blob:')) URL.revokeObjectURL(img.src);
             img.src = '';
+            img.style.display = 'none';
+
+            var vid = document.getElementById('videoPreviewVid');
+            if (vid.src && vid.src.startsWith('blob:')) URL.revokeObjectURL(vid.src);
+            vid.pause();
+            vid.removeAttribute('src');
+            vid.load();
+            vid.style.display = 'none';
+
+            _previewBlob = null;
+            _previewKind = null;
             document.getElementById('photoPreviewCard').style.display = 'none';
+        }
+
+        // Saves the currently-previewed photo/video using the Web Share API
+        // (navigator.share with a File) — on iOS/Android this opens the native
+        // share sheet with a one-tap "Save Image"/"Save Video" option, which is
+        // far more reliable than relying on a long-press context menu,
+        // especially for video where long-press doesn't offer a save option.
+        async function saveMedia() {
+            if (!_previewBlob) return;
+            var isVideo = _previewKind === 'video';
+            var ext = isVideo
+                ? (_previewBlob.type.indexOf('mp4') !== -1 ? 'mp4' : 'webm')
+                : 'jpg';
+            var filename = 'tour-' + Date.now() + '.' + ext;
+            var file = new File([_previewBlob], filename, { type: _previewBlob.type });
+
+            try {
+                if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                    await navigator.share({ files: [file] });
+                    return;
+                }
+            } catch (err) {
+                if (err && err.name === 'AbortError') return; // user cancelled the share sheet
+                console.warn('Share failed, falling back to download:', err);
+            }
+
+            // Fallback for browsers without file-sharing support (older iOS
+            // Safari, most desktop browsers): trigger a normal file download.
+            var url = URL.createObjectURL(_previewBlob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+            if (!isVideo) showCameraToast('Or hold photo to save');
         }
 
         function showCameraToast(msg) {
