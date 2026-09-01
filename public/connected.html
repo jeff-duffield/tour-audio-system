@@ -80,18 +80,75 @@
             padding-bottom: 1px;
         }
         .guide-link a:active { opacity: 0.7; }
+        #captiveControls {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            width: 100%;
+        }
         .relay-warning {
-            background: rgba(255,165,0,0.10);
-            border: 1px solid rgba(255,165,0,0.32);
-            border-radius: 12px;
-            padding: 12px 14px;
-            font-size: 13px;
-            color: rgba(255,255,255,0.78);
+            background: rgba(255,50,155,0.10);
+            border: 1.5px solid rgba(255,50,155,0.4);
+            border-radius: 14px;
+            padding: 16px;
+            font-size: 14px;
+            color: rgba(255,255,255,0.85);
             line-height: 1.5;
             text-align: left;
             width: 100%;
         }
-        .relay-warning strong { color: rgba(255,200,80,0.95); }
+        .relay-warning strong { color: #FF9AD1; }
+        .relay-warning .relay-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 700;
+            font-size: 15px;
+            color: #FF9AD1;
+            margin-bottom: 6px;
+        }
+        .relay-warning .relay-steps {
+            display: block;
+            margin-top: 10px;
+            padding: 10px 12px;
+            background: rgba(255,255,255,0.08);
+            border-radius: 8px;
+            font-weight: 600;
+            color: #fff;
+        }
+        .url-copy-widget {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            width: 100%;
+            background: rgba(255,255,255,0.08);
+            border: 1.5px solid rgba(255,255,255,0.18);
+            border-radius: 50px;
+            padding: 8px 8px 8px 20px;
+        }
+        .url-copy-widget .url-text {
+            font-size: 15px;
+            font-weight: 600;
+            color: #fff;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .url-copy-widget .copy-action {
+            flex-shrink: 0;
+            background: #FF329B;
+            color: #fff;
+            border: none;
+            border-radius: 50px;
+            padding: 10px 20px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+            transition: opacity 0.2s ease;
+        }
+        .url-copy-widget .copy-action:active { opacity: 0.7; }
         .portal-btn {
             display: block;
             width: 100%;
@@ -134,26 +191,34 @@
 
         <h1 class="a1">You are connected.<br>Open the Tour Audio app<br>to begin listening.</h1>
 
-        <div id="relayWarning" style="display:none;" class="relay-warning a2">
-            <strong>⚠ iCloud Private Relay</strong> may prevent the app from loading in Safari on this network.<br>
-            To disable: <strong>Settings → Wi-Fi → [network] → ⓘ → Limit IP Address Tracking → Off</strong>
+        <div id="captiveControls">
+            <div id="relayWarning" style="display:none;" class="relay-warning a2">
+                <div class="relay-title">Want to use the camera or mic?</div>
+                This tour's Wi-Fi has no internet connection, so if <strong>Private Relay</strong> is on, Safari won't be able to load the app.
+                <span class="relay-steps">Quick fix (10 sec): Settings → Wi-Fi → ⓘ next to this network → Limit IP Address Tracking → Off</span>
+            </div>
+
+            <div class="url-copy-widget a2">
+                <span class="url-text">audio.eftours.travel</span>
+                <button class="copy-action" onclick="copyUrl(this)">Copy</button>
+            </div>
+            <p class="hint a2">
+                Tap <strong style="color:rgba(255,255,255,0.7)">Copy</strong>, then tap
+                <strong style="color:rgba(255,255,255,0.7)">Done</strong> above, open
+                <strong style="color:rgba(255,255,255,0.7)">Safari</strong>, and paste it in.
+            </p>
+
+            <p class="or-sep a3">or</p>
+            <a href="https://audio.eftours.travel/index.html" class="portal-btn a3">
+                Listen in this window
+            </a>
+            <p class="portal-note a3">Camera not available in captive portal</p>
         </div>
-
-        <button class="open-btn a2" onclick="openInSafari()">
-            Open in Browser →
-        </button>
-
-        <p class="or-sep a3">or</p>
-        <a href="https://audio.eftours.travel/index.html" class="portal-btn a3">
-            Listen in this window
-        </a>
-        <p class="portal-note a3">📷 Camera not available in captive portal</p>
-
-        <p class="hint a3">
-            If the button doesn't open, tap <strong style="color:rgba(255,255,255,0.7)">Done</strong>
-            then open <strong style="color:rgba(255,255,255,0.7)">Safari</strong> and go to:<br>
-            <strong style="color:rgba(255,255,255,0.7)">audio.eftours.travel</strong>
-        </p>
+        <div id="directControls" style="display:none;">
+            <a href="https://audio.eftours.travel/index.html" class="open-btn a2">
+                Continue to Tour Audio →
+            </a>
+        </div>
         <p class="guide-link a3">
             Tour guide? <a href="#" onclick="openGuide();return false;">Open guide app →</a>
         </p>
@@ -171,13 +236,68 @@
             }
         }
 
-        function openInSafari() { openInBrowser('https://audio.eftours.travel/index.html'); }
-        function openGuide()    { openInBrowser('https://audio.eftours.travel/guide.html'); }
+        function openGuide() { openInBrowser('https://audio.eftours.travel/guide.html'); }
 
-        // Show iCloud Private Relay tip on iOS — see welcome.html for why this
-        // can't be detected directly from within the captive portal.
-        if (/iphone|ipad|ipod/i.test(navigator.userAgent)) {
-            document.getElementById('relayWarning').style.display = 'block';
+        // Fallback for when there's no way to escape the popup: let the user
+        // copy the address so they can paste it into Safari themselves.
+        function copyUrl(btn) {
+            var url = 'audio.eftours.travel';
+            var original = btn.textContent;
+            function done(ok) {
+                btn.textContent = ok ? 'Copied!' : 'Copy failed';
+                setTimeout(function () { btn.textContent = original; }, 2000);
+            }
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(url).then(function () { done(true); }, function () { done(false); });
+            } else {
+                try {
+                    var ta = document.createElement('textarea');
+                    ta.value = url;
+                    ta.style.position = 'fixed';
+                    ta.style.opacity = '0';
+                    document.body.appendChild(ta);
+                    ta.focus();
+                    ta.select();
+                    var ok = document.execCommand('copy');
+                    document.body.removeChild(ta);
+                    done(ok);
+                } catch (e) {
+                    done(false);
+                }
+            }
+        }
+
+        // Detect whether this page is running inside the OS's captive-portal
+        // mini-browser vs. a real browser. iOS 17+ made the CNA's WKWebView
+        // indistinguishable from real Safari from inside the page itself
+        // (sessionStorage works, UA includes "Safari/"), so the server now
+        // makes this call — see server.js's isCaptiveRequest() — and injects
+        // the result as window.__EF_CAPTIVE_SERVER__ into <head>. The old
+        // client-side storage probe is kept only as a fallback for the rare
+        // case this page is loaded without going through the server route.
+        function isCaptivePortalBrowser() {
+            if (typeof window.__EF_CAPTIVE_SERVER__ === 'boolean') {
+                return window.__EF_CAPTIVE_SERVER__;
+            }
+            try {
+                var k = '__ef_captive_test__';
+                window.sessionStorage.setItem(k, '1');
+                window.sessionStorage.removeItem(k);
+                return false;
+            } catch (e) {
+                return true;
+            }
+        }
+
+        if (isCaptivePortalBrowser()) {
+            // Show iCloud Private Relay tip on iOS — see welcome.html for why this
+            // can't be detected directly from within the captive portal.
+            if (/iphone|ipad|ipod/i.test(navigator.userAgent)) {
+                document.getElementById('relayWarning').style.display = 'block';
+            }
+        } else {
+            document.getElementById('captiveControls').style.display = 'none';
+            document.getElementById('directControls').style.display = 'block';
         }
     </script>
 </body>

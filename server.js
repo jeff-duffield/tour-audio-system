@@ -182,6 +182,42 @@ async function checkInternet() {
     return !err;
 }
 
+// ---- Automatic clock sync --------------------------------------------------
+// The GL-MT3000 has no battery-backed RTC — its clock resets to an old
+// build date on every power loss/reboot and only self-corrects via NTP once
+// it has real internet access again. Since the tour Wi-Fi is normally
+// offline, a stale clock can silently break TLS (clients reject the cert as
+// expired/not-yet-valid based on their own — usually correct — date vs. the
+// router's wrong one) long after the actual cause (a power cycle) happened.
+// Rather than relying on someone noticing and running `ntpd` by hand, sync
+// automatically whenever we have a moment where internet is confirmed:
+// right after a successful Wi-Fi uplink connect, shortly after boot, and
+// periodically in the background as a safety net.
+let lastClockSyncAt = null; // ms epoch of the last sync attempt
+let lastClockSyncOk = null; // true / false / null (never attempted)
+const CLOCK_SYNC_MIN_INTERVAL_MS = 30 * 60 * 1000; // don't hammer NTP servers
+
+async function syncClock(reason = 'periodic') {
+    // Multiple -p peers — busybox ntpd queries all and picks the best.
+    const { err } = await sh(
+        'ntpd -q -p pool.ntp.org -p time.cloudflare.com -p time.google.com',
+        10000
+    );
+    lastClockSyncAt = Date.now();
+    lastClockSyncOk = !err;
+    console.log(`[clock-sync] ${reason}: ${!err ? 'OK' : 'FAILED'} — now ${new Date().toISOString()}`);
+    return !err;
+}
+
+// Throttled wrapper — safe to call opportunistically (e.g. on every
+// wifi/connect success) without risking a flood of NTP queries.
+async function syncClockIfDue(reason = 'periodic') {
+    if (lastClockSyncAt && (Date.now() - lastClockSyncAt) < CLOCK_SYNC_MIN_INTERVAL_MS) {
+        return lastClockSyncOk;
+    }
+    return syncClock(reason);
+}
+
 async function getConnectedSsid() {
     // Ask the GL.iNet repeater daemon for the live connection status first
     const { stdout } = await sh('ubus call repeater status 2>/dev/null', 2000);
@@ -206,10 +242,81 @@ function readJsonSafe(p) {
     } catch { return null; }
 }
 
+// ── Live audio tuning ("dials") ────────────────────────────────────────────
+// Lets a TD adjust capture/playback parameters from the Admin Panel in the
+// field (different group sizes / WiFi conditions call for different
+// tradeoffs) without a code redeploy. Persisted to a file next to server.js
+// (survives service restarts and reboots, unlike /tmp) so a saved setting
+// sticks across the "Update Device" flow. Guide/traveler pages fetch this
+// once on load via the public, unauthenticated /api/audio-config endpoint —
+// it contains no secrets, just tuning numbers, and both pages are reachable
+// pre-auth.
+const AUDIO_CONFIG_PATH = path.join(__dirname, 'audio-config.json');
+const DEFAULT_AUDIO_CONFIG = {
+    bufferSize: 1024  // guide's ScriptProcessor size in samples — 1024/2048/4096
+    // NOTE: a "fadeMs" traveler inter-chunk fade setting used to live here.
+    // Removed (2026-08 crackle investigation) — the fade forced each chunk's
+    // volume to zero and back at every chunk boundary (chunks are scheduled
+    // back-to-back with no overlap, so it never actually crossfaded), which
+    // is audio-rate amplitude modulation and was the crackle's real cause,
+    // audible even at 1ms. Do not re-add without implementing a true
+    // overlapping crossfade in index.html's drainQueue().
+};
+const ALLOWED_BUFFER_SIZES = [1024, 2048, 4096];
+
+function loadAudioConfig() {
+    const saved = readJsonSafe(AUDIO_CONFIG_PATH) || {};
+    const cfg = Object.assign({}, DEFAULT_AUDIO_CONFIG, saved);
+    if (!ALLOWED_BUFFER_SIZES.includes(cfg.bufferSize)) cfg.bufferSize = DEFAULT_AUDIO_CONFIG.bufferSize;
+    delete cfg.fadeMs; // drop any stale value from a previously saved audio-config.json
+    return cfg;
+}
+
+let audioConfig = loadAudioConfig();
+
+function saveAudioConfig(cfg) {
+    try {
+        fs.writeFileSync(AUDIO_CONFIG_PATH, JSON.stringify(cfg));
+        return true;
+    } catch (e) {
+        console.error('Failed to save audio-config.json:', e.message);
+        return false;
+    }
+}
+
+// Public — read by guide.html and index.html before they set up audio.
+// No secrets in this payload, so no adminAuth gate (both pages load pre-auth).
+app.get('/api/audio-config', (req, res) => {
+    res.json(audioConfig);
+});
+
+// Admin-only — TD adjusts the dials from the Advanced Audio Settings panel.
+app.post('/api/admin/audio-config', adminAuth, (req, res) => {
+    const body = req.body || {};
+    const next = Object.assign({}, audioConfig);
+
+    if (body.bufferSize !== undefined) {
+        const bs = parseInt(body.bufferSize, 10);
+        if (!ALLOWED_BUFFER_SIZES.includes(bs)) {
+            return res.status(400).json({ success: false, message: 'bufferSize must be one of ' + ALLOWED_BUFFER_SIZES.join(', ') });
+        }
+        next.bufferSize = bs;
+    }
+
+    audioConfig = next;
+    saveAudioConfig(audioConfig);
+    res.json({ success: true, config: audioConfig });
+});
+
 // ---- Phase 2: status + internet ------------------------------------------
 app.get('/api/admin/status', adminAuth, async (req, res) => {
     const saved = readJsonSafe('/tmp/ef-status.json') || {};
     const [connected, ssid] = await Promise.all([checkInternet(), getConnectedSsid()]);
+
+    // Opportunistic clock sync — this endpoint is polled regularly by the
+    // admin UI, so it's a reliable way to catch "internet just came back"
+    // without a dedicated poller. Throttled internally, so this is cheap.
+    if (connected) syncClockIfDue('status-poll').catch(() => {});
 
     // Build response, falling back to sensible defaults when fields are missing
     const currentVersion = getAppVersion();
@@ -230,8 +337,266 @@ app.get('/api/admin/status', adminAuth, async (req, res) => {
         certificate: cert,
         app: { ...app, currentVersion: app.currentVersion || currentVersion },
         lastUpdate,
-        internet: { connected, connectedSsid: connected ? ssid : null }
+        internet: { connected, connectedSsid: connected ? ssid : null },
+        clock: {
+            lastSyncAt: lastClockSyncAt ? new Date(lastClockSyncAt).toISOString() : null,
+            lastSyncOk: lastClockSyncOk,
+        },
     });
+});
+
+// ── Diagnostic ring buffer (choppy-audio investigation) ───────────────────
+// Keeps the last N audio_format / flush_snapshot / audible_glitch_marker
+// events in memory so the Admin Panel can display them without SSH/logread
+// access. Intentionally small and volatile — cleared on service restart,
+// not meant as a permanent audit log.
+const DIAG_LOG_MAX = 300;
+const diagLog = [];
+function pushDiagLog(entry) {
+    diagLog.push(Object.assign({ at: new Date().toISOString() }, entry));
+    if (diagLog.length > DIAG_LOG_MAX) diagLog.shift();
+}
+
+app.get('/api/admin/diag-log', adminAuth, (req, res) => {
+    res.json({ entries: diagLog });
+});
+
+app.post('/api/admin/diag-log/clear', adminAuth, (req, res) => {
+    diagLog.length = 0;
+    res.json({ success: true });
+});
+
+// ── WiFi congestion sampling (choppy-audio investigation) ─────────────────
+// Correlates audible glitches/flushes with 2.4GHz channel contention.
+// Reuses the same iwpriv get_site_survey call already proven to work in
+// /api/admin/wifi/scan. Only runs while a guide is actively broadcasting
+// (see wss 'connection' handler below) — both to keep it relevant and
+// because an active site-survey briefly takes the radio off-channel, which
+// we don't want happening constantly when no one is listening anyway.
+// Sampled infrequently (60s) since the scan itself takes several seconds.
+const WIFI_CONGESTION_SAMPLE_MS = 60 * 1000;
+let congestionTimer = null;
+
+// Resolve the 2.4GHz radio's actual operating channel (tourist SSID lives on ra0).
+// Two lookups are needed because neither alone is reliable on this router:
+//  1. `iwinfo ra0 info` asks the driver what channel it's ACTUALLY using —
+//     works even when UCI has channel set to 'auto' (a non-numeric string).
+//  2. UCI fallback: on the GL-MT3000's MediaTek ('mtk') wireless driver,
+//     `channel` lives on the wifi-DEVICE section (e.g. mt798111), not on the
+//     wifi-iface section named 'wifi2g' — querying wireless.wifi2g.channel
+//     directly always returns empty. We look up which device the wifi2g
+//     iface points at, then read the channel from that device section.
+async function getOwnChannel() {
+    const info = await sh('iwinfo ra0 info 2>/dev/null', 3000);
+    const liveMatch = info.stdout.match(/Channel:\s*(\d+)/);
+    if (liveMatch) return parseInt(liveMatch[1], 10);
+
+    const devRes = await sh('uci -q get wireless.wifi2g.device', 1500);
+    const device = devRes.stdout.trim();
+    if (device) {
+        const chRes = await sh(`uci -q get wireless.${device}.channel`, 1500);
+        const ch = parseInt(chRes.stdout.trim(), 10);
+        if (!isNaN(ch)) return ch;
+    }
+    return null;
+}
+
+// Runs the 2.4GHz site survey and tallies how many neighboring networks sit
+// on each channel. Shared by the periodic congestion sampler (diagnostics)
+// and the on-demand "optimize channel" endpoint (guide app) so both use the
+// exact same scan/parse logic.
+async function surveyChannelCounts() {
+    const { stdout, err } = await sh('iwpriv ra0 get_site_survey 2>/dev/null', 15000);
+    if (err || !stdout.includes('BSSID')) return null;
+    const nets = parseIwprivSiteSurvey(stdout);
+    const channelCounts = {};
+    for (const n of nets) {
+        if (n.channel == null) continue;
+        channelCounts[n.channel] = (channelCounts[n.channel] || 0) + 1;
+    }
+    return { nets, channelCounts };
+}
+
+// Resolve the 5GHz radio's actual operating channel (guide SSID lives on rax0).
+// Same live-driver-first / UCI-fallback approach as getOwnChannel(), just
+// pointed at the 5GHz interface/iface name.
+async function getOwn5gChannel() {
+    const info = await sh('iwinfo rax0 info 2>/dev/null', 3000);
+    const liveMatch = info.stdout.match(/Channel:\s*(\d+)/);
+    if (liveMatch) return parseInt(liveMatch[1], 10);
+
+    const devRes = await sh('uci -q get wireless.wifi5g.device', 1500);
+    const device = devRes.stdout.trim();
+    if (device) {
+        const chRes = await sh(`uci -q get wireless.${device}.channel`, 1500);
+        const ch = parseInt(chRes.stdout.trim(), 10);
+        if (!isNaN(ch)) return ch;
+    }
+    return null;
+}
+
+// Read-only 5GHz site survey — visibility only, no auto-switch. The guide
+// is expected to be right next to the router, and 5GHz has many more
+// non-overlapping channels than 2.4GHz, so contention here is expected to
+// be rare. This just gives us data to confirm that assumption (or catch it
+// if a venue ever proves otherwise) without adding another `wifi reload`
+// disruption vector.
+async function survey5gChannelCounts() {
+    const { stdout, err } = await sh('iwpriv rax0 get_site_survey 2>/dev/null', 15000);
+    if (err || !stdout.includes('BSSID')) return null;
+    const nets = parseIwprivSiteSurvey(stdout);
+    const channelCounts = {};
+    for (const n of nets) {
+        if (n.channel == null) continue;
+        channelCounts[n.channel] = (channelCounts[n.channel] || 0) + 1;
+    }
+    return { nets, channelCounts };
+}
+
+async function sampleWifiCongestion() {
+    try {
+        const survey = await surveyChannelCounts();
+        if (!survey) return;
+        const { nets, channelCounts } = survey;
+
+        const ownChannel = await getOwnChannel();
+        const sameChannelCount = ownChannel != null ? (channelCounts[ownChannel] || 0) : null;
+
+        // 5GHz — best-effort, read-only. Failures here shouldn't affect the
+        // 2.4GHz sample already gathered above.
+        let own5gChannel = null, sameChannelCount5g = null, totalNetworks5g = null, channelCounts5g = null;
+        try {
+            const survey5g = await survey5gChannelCounts();
+            if (survey5g) {
+                own5gChannel = await getOwn5gChannel();
+                sameChannelCount5g = own5gChannel != null ? (survey5g.channelCounts[own5gChannel] || 0) : null;
+                totalNetworks5g = survey5g.nets.length;
+                channelCounts5g = survey5g.channelCounts;
+            }
+        } catch (e) { /* best-effort — 5GHz visibility only */ }
+
+        console.log(`[diag] wifi_congestion ownChannel=${ownChannel} totalNetworks=${nets.length} ` +
+                    `sameChannelCount=${sameChannelCount} channelCounts=${JSON.stringify(channelCounts)} ` +
+                    `own5gChannel=${own5gChannel} totalNetworks5g=${totalNetworks5g} ` +
+                    `sameChannelCount5g=${sameChannelCount5g} channelCounts5g=${JSON.stringify(channelCounts5g)}`);
+        pushDiagLog({
+            type: 'wifi_congestion', ownChannel, totalNetworks: nets.length,
+            sameChannelCount, channelCounts,
+            own5gChannel, totalNetworks5g, sameChannelCount5g, channelCounts5g
+        });
+    } catch (e) { /* best-effort diagnostic only */ }
+}
+
+function startWifiCongestionSampling() {
+    if (congestionTimer) return;
+    sampleWifiCongestion(); // immediate first sample
+    congestionTimer = setInterval(sampleWifiCongestion, WIFI_CONGESTION_SAMPLE_MS);
+}
+
+function stopWifiCongestionSampling() {
+    if (congestionTimer) { clearInterval(congestionTimer); congestionTimer = null; }
+}
+
+// ── Auto-optimize WiFi channel (guide app) ─────────────────────────────────
+// One-tap fix for the "30 networks on channel 6" problem: scans the same
+// site survey used for congestion diagnostics, picks whichever of the 3
+// non-overlapping 2.4GHz channels (1/6/11) has the fewest competing
+// networks, and applies it live. Only touches the 2.4GHz radio (tourist
+// SSID on ra0) — the guide's own 5GHz connection is untouched, so this is
+// safe to run while broadcasting.
+// No adminAuth: intentionally reachable from the guide app on the tour
+// WiFi (same trust boundary as the audio WebSocket itself), so it's usable
+// in the field without the admin token.
+//
+// Cooldown: switching channels forces a `wifi reload`, which drops every
+// connected client (guide + all travelers) for several seconds to over a
+// minute in practice. Repeated taps in a short window (e.g. someone unsure
+// if the first tap worked) can cause the channel to bounce back and forth
+// as a fresh scan sees slightly different neighbor counts each time — each
+// bounce costs everyone another reconnect. This cooldown blocks a second
+// *actual switch* soon after the last one; checking (and a same-channel
+// no-op result) is still always allowed.
+const OPTIMIZE_SWITCH_COOLDOWN_MS = 3 * 60 * 1000; // 3 minutes
+let lastOptimizeSwitchAt = 0;
+let optimizeInProgress = false;
+app.post('/api/guide/optimize-wifi', async (req, res) => {
+    if (optimizeInProgress) {
+        return res.status(409).json({ success: false, message: 'An optimization is already running — try again in a few seconds.' });
+    }
+    optimizeInProgress = true;
+    try {
+        const survey = await surveyChannelCounts();
+        if (!survey) {
+            return res.status(500).json({ success: false, message: 'WiFi scan failed — try again.' });
+        }
+        const { channelCounts } = survey;
+        const ownChannel = await getOwnChannel();
+
+        const CANDIDATE_CHANNELS = [1, 6, 11];
+        let bestChannel = CANDIDATE_CHANNELS[0];
+        let bestCount = Infinity;
+        for (const ch of CANDIDATE_CHANNELS) {
+            const count = channelCounts[ch] || 0;
+            if (count < bestCount) { bestCount = count; bestChannel = ch; }
+        }
+        const ownCount = ownChannel != null ? (channelCounts[ownChannel] || 0) : null;
+
+        // Already on the best (or equally good) channel — nothing to change.
+        if (ownChannel === bestChannel || (ownCount != null && ownCount <= bestCount)) {
+            console.log(`[optimize-wifi] already optimal: channel=${ownChannel} count=${ownCount} channelCounts=${JSON.stringify(channelCounts)}`);
+            return res.json({
+                success: true, changed: false,
+                oldChannel: ownChannel, newChannel: ownChannel,
+                channelCounts
+            });
+        }
+
+        // A real switch is warranted — but if we just switched recently,
+        // hold off rather than bouncing the radio again on possibly-noisy
+        // scan data. Reports back how long until it's allowed again.
+        const sinceLastSwitch = Date.now() - lastOptimizeSwitchAt;
+        if (sinceLastSwitch < OPTIMIZE_SWITCH_COOLDOWN_MS) {
+            const waitSec = Math.ceil((OPTIMIZE_SWITCH_COOLDOWN_MS - sinceLastSwitch) / 1000);
+            console.log(`[optimize-wifi] cooldown active: ${waitSec}s remaining (candidate ${ownChannel} -> ${bestChannel})`);
+            return res.status(429).json({
+                success: false, cooldown: true, waitSeconds: waitSec,
+                message: `Channel was just changed — wait ${waitSec}s before switching again to avoid disrupting everyone repeatedly.`,
+                oldChannel: ownChannel, newChannel: ownChannel,
+                channelCounts
+            });
+        }
+
+        const devRes = await sh('uci -q get wireless.wifi2g.device', 1500);
+        const device = devRes.stdout.trim();
+        if (!device) {
+            return res.status(500).json({ success: false, message: 'Could not identify the 2.4GHz radio device.' });
+        }
+
+        const setRes = await sh(`uci set wireless.${device}.channel='${bestChannel}' && uci commit wireless`, 5000);
+        if (setRes.err) {
+            return res.status(500).json({ success: false, message: 'Failed to apply new channel via UCI.' });
+        }
+        await sh('wifi reload', 15000);
+        lastOptimizeSwitchAt = Date.now();
+
+        console.log(`[optimize-wifi] switched channel ${ownChannel} -> ${bestChannel} ` +
+                    `(was ${ownCount} competitors, now ${bestCount}) channelCounts=${JSON.stringify(channelCounts)}`);
+        pushDiagLog({
+            type: 'wifi_optimize', oldChannel: ownChannel, newChannel: bestChannel,
+            oldCount: ownCount, newCount: bestCount, channelCounts
+        });
+
+        res.json({
+            success: true, changed: true,
+            oldChannel: ownChannel, newChannel: bestChannel,
+            oldCount: ownCount, newCount: bestCount,
+            channelCounts
+        });
+    } catch (e) {
+        res.status(500).json({ success: false, message: 'Unexpected error during optimization.' });
+    } finally {
+        optimizeInProgress = false;
+    }
 });
 
 app.get('/api/admin/internet', adminAuth, async (req, res) => {
@@ -331,10 +696,11 @@ function parseIwprivSiteSurvey(raw) {
         const macM = line.match(macRe);
         if (!macM) continue;
         const bssidIdx = line.indexOf(macM[1]);
-        // Before BSSID: "0   6   My Network Name       "
-        const prefixM = line.substring(0, bssidIdx).match(/^\s*\d+\s+\d+\s+(.+?)\s*$/);
+        // Before BSSID: "0   6   My Network Name       "  (index, channel, ssid)
+        const prefixM = line.substring(0, bssidIdx).match(/^\s*\d+\s+(\d+)\s+(.+?)\s*$/);
         if (!prefixM) continue;
-        const ssid = prefixM[1].trim();
+        const channel = parseInt(prefixM[1], 10);
+        const ssid = prefixM[2].trim();
         if (!ssid) continue; // hidden network
         // After BSSID: "WPA2/AES   -79   26   11b/g/n/ax   NONE   In ..."
         const parts = line.substring(bssidIdx + macM[1].length).trim().split(/\s+/);
@@ -346,7 +712,10 @@ function parseIwprivSiteSurvey(raw) {
             if (rssi >= -60) strength = 'strong';
             else if (rssi >= -75) strength = 'medium';
         }
-        networks.push({ ssid, signal: isNaN(rssi) ? null : rssi, strength, secured, encryption: security });
+        networks.push({
+            ssid, channel: isNaN(channel) ? null : channel,
+            signal: isNaN(rssi) ? null : rssi, strength, secured, encryption: security
+        });
     }
     return networks;
 }
@@ -472,6 +841,10 @@ app.post('/api/admin/wifi/connect', adminAuth, async (req, res) => {
     // Confirm actual internet reachability (repeater connected ≠ hotspot has data)
     if (connected) connected = await checkInternet();
 
+    // We now have a confirmed internet path — a perfect, low-cost moment to
+    // fix the router's clock before it causes a TLS date error for anyone.
+    if (connected) syncClock('wifi-connect').catch(() => {});
+
     res.json({
         success: connected,
         message: connected
@@ -487,6 +860,16 @@ app.post('/api/admin/wifi/disconnect', adminAuth, async (req, res) => {
         return res.status(500).json({ success: false, message: 'Disconnect failed', detail: stderr.slice(0, 200) });
     }
     res.json({ success: true, message: 'Disconnected from uplink Wi-Fi' });
+});
+
+// Temporary diagnostic logging: log every direct hit to connected.html /
+// welcome.html (e.g. from the CNA mini-browser's user-portal-url fetch)
+// so we can see the real User-Agent that renders the portal page — the
+// captive-probe log only covers the OS's own connectivity-check requests,
+// not the page the user actually sees.
+app.get(['/connected.html', '/welcome.html'], (req, res) => {
+    logCaptiveProbe(req, 200);
+    sendCaptiveAwareHtml(req, res, req.path.slice(1));
 });
 
 // Serve static files
@@ -520,14 +903,75 @@ function logCaptiveProbe(req, status) {
     );
 }
 
+// ── Server-side captive-portal detection ───────────────────────────────
+// iOS 17+ has made the CNA mini-browser's WKWebView indistinguishable from
+// real Safari on both signals our client-side JS used to rely on (it now
+// allows sessionStorage and includes the "Safari/" UA token), so the page
+// can no longer tell them apart from inside the page itself.
+//
+// Instead we correlate on the server: the CNA always fetches the RFC 8910
+// /captive JSON endpoint immediately before loading user-portal-url, so any
+// hit to /connected.html or /welcome.html from the same client IP shortly
+// after a /captive hit is almost certainly the CNA, not a real browser the
+// user opened separately. The old UA check is kept as a fallback signal for
+// older iOS versions / cases where the timing window is missed.
+const CAPTIVE_HIT_WINDOW_MS = 20 * 1000;
+const recentCaptiveHits = new Map(); // client ip -> timestamp of last /captive hit
+
+function markCaptiveHit(req) {
+    recentCaptiveHits.set(req.ip, Date.now());
+}
+
+function wasRecentCaptiveClient(req) {
+    const ts = recentCaptiveHits.get(req.ip);
+    if (ts === undefined) return false;
+    if (Date.now() - ts > CAPTIVE_HIT_WINDOW_MS) {
+        recentCaptiveHits.delete(req.ip);
+        return false;
+    }
+    return true;
+}
+
+function looksLikeCaptiveUA(req) {
+    const ua = req.headers['user-agent'] || '';
+    const isAppleMobile = /iphone|ipad|ipod/i.test(ua);
+    return isAppleMobile && !/safari\//i.test(ua);
+}
+
+function isCaptiveRequest(req) {
+    return wasRecentCaptiveClient(req) || looksLikeCaptiveUA(req);
+}
+
+// Serve connected.html / welcome.html with a server-computed
+// `window.__EF_CAPTIVE_SERVER__` flag injected into <head>, so the page's
+// own script can trust the server's determination instead of (no longer
+// reliable) in-page heuristics. `forceCaptive` is used for routes that are
+// only ever hit by an OS captive-check mechanism, never a real browser.
+function sendCaptiveAwareHtml(req, res, filename, forceCaptive) {
+    fs.readFile(path.join(__dirname, 'public', filename), 'utf8', (err, html) => {
+        if (err) {
+            res.status(404).end();
+            return;
+        }
+        const captive = forceCaptive === true ? true : isCaptiveRequest(req);
+        const flagScript = `<script>window.__EF_CAPTIVE_SERVER__ = ${captive};</script>`;
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        res.setHeader('Cache-Control', 'no-store');
+        res.send(html.replace('<head>', '<head>\n    ' + flagScript));
+    });
+}
+
 // Shared captive response — served for probe path requests.
 // Returns connected.html so the iOS CNA mini-browser shows the
 // branded "Open Tour Audio" page.
 // NOTE: this is NOT what suspends Private Relay. That requires
 // the RFC 8910 JSON response below — these are two separate mechanisms.
+// These paths are only ever fetched by an OS's own captive-check
+// mechanism, so `forceCaptive` is always true here.
 function sendCaptiveResponse(req, res) {
     logCaptiveProbe(req, 200);
-    res.sendFile(path.join(__dirname, 'public', 'connected.html'));
+    markCaptiveHit(req);
+    sendCaptiveAwareHtml(req, res, 'connected.html', true);
 }
 
 // ── RFC 8910 Captive Portal API endpoint ─────────────────────────────
@@ -542,6 +986,7 @@ function sendCaptiveResponse(req, res) {
 // ─────────────────────────────────────────────────────────────────────
 app.get('/captive', (req, res) => {
     logCaptiveProbe(req, 200);
+    markCaptiveHit(req);
     res.setHeader('Content-Type', 'application/captive+json');
     res.setHeader('Cache-Control', 'no-store');
     res.json({
@@ -596,6 +1041,64 @@ let reactionLog       = [];       // [{ reaction, timestamp, clientId }]
 let reactionTimer     = null;     // setInterval handle for batched guide updates
 // Map<clientId, Map<reactionType, lastTimestamp>> — server-side cooldown enforcement
 const reactionCooldowns = new Map();
+
+// ── Traveler telemetry (light client-side diagnostics) ──────────────────────
+// Map<clientId, { bufferMs, lateArrivalRate, queueDepth, reconnects, flushes,
+//                  wsDrops, suspends, audioState, updatedAt }>
+// Populated by the 'telemetry' message handler above; summarized and pushed
+// to the guide(s) every TELEMETRY_BATCH_MS so the dashboard can surface
+// traveler-side audio issues that never register as a server-side skip.
+const travelerTelemetry = new Map();
+const TELEMETRY_BATCH_MS = 10 * 1000;
+const TELEMETRY_STALE_MS = 30 * 1000; // drop entries not refreshed in this long (client stopped/closed)
+let telemetryTimer = null;
+
+/** Build and send an aggregated traveler-diagnostics summary to the guide(s). */
+function sendTelemetrySummaryToGuides() {
+    const now = Date.now();
+    // Prune stale entries (client stopped listening or tab closed without a clean 'close' event)
+    for (const [id, t] of travelerTelemetry) {
+        if (now - t.updatedAt > TELEMETRY_STALE_MS) travelerTelemetry.delete(id);
+    }
+
+    if (travelerTelemetry.size === 0) {
+        if (telemetryTimer) { clearInterval(telemetryTimer); telemetryTimer = null; }
+    }
+
+    const entries = Array.from(travelerTelemetry.values());
+    const count = entries.length;
+    const sum = (key) => entries.reduce((a, e) => a + (e[key] || 0), 0);
+    const avg = (key) => count > 0 ? sum(key) / count : 0;
+
+    const payload = JSON.stringify({
+        type: 'traveler-diagnostics',
+        reportingCount: count,
+        totalReconnects: sum('reconnects'),
+        totalFlushes: sum('flushes'),
+        totalWsDrops: sum('wsDrops'),
+        totalSuspends: sum('suspends'),
+        avgLateArrivalRate: Math.round(avg('lateArrivalRate') * 100) / 100,
+        avgQueueDepth: Math.round(avg('queueDepth') * 10) / 10,
+        strugglingCount: entries.filter(e =>
+            e.lateArrivalRate > 0.2 || e.bufferMs >= 600 || e.audioState === 'suspended').length
+    });
+
+    if (activeBroadcaster && activeBroadcaster.readyState === WebSocket.OPEN) {
+        try { activeBroadcaster.send(payload); } catch (e) { /* ignore */ }
+    }
+    watchingGuides.forEach(wg => {
+        if (wg.readyState === WebSocket.OPEN) {
+            try { wg.send(payload); } catch (e) { /* ignore */ }
+        }
+    });
+}
+
+/** Start the batch timer if not already running. */
+function scheduleTelemetryBatch() {
+    if (!telemetryTimer) {
+        telemetryTimer = setInterval(sendTelemetrySummaryToGuides, TELEMETRY_BATCH_MS);
+    }
+}
 
 /** Send current rolling-window counts to the guide (active broadcaster + watchers). */
 function sendReactionCountsToGuides() {
@@ -709,6 +1212,18 @@ wss.on('connection', (ws) => {
     ws.clientId = clientId;
     ws.send(JSON.stringify({ type: 'client-id', id: clientId }));
 
+    // ── Zombie-connection detection (protocol-level ping/pong) ─────────────
+    // A phone that loses WiFi mid-session, gets force-killed, or switches
+    // networks often never sends a TCP FIN — the socket just goes silent.
+    // Node/the OS can take minutes to notice, during which this "zombie"
+    // sits in the `clients` Set and drags the skip-rate metric toward 100%
+    // (see heartbeatInterval below, which pings + reaps these on a timer).
+    // This is separate from the client's own JSON ping/pong (used for its
+    // reconnect logic) — this one lets the *server* clean up its own state
+    // even if the client-side JS never gets a chance to run at all.
+    ws.isAlive = true;
+    ws.on('pong', () => { ws.isAlive = true; });
+
     console.log(`Client #${clientId} connected. Total clients: ${clients.size}`);
 
     // Send updated count to all clients
@@ -765,6 +1280,70 @@ wss.on('connection', (ws) => {
                 return;
             }
 
+            // ── Diagnostics: sample-clock mismatch / flush forensics ───────────
+            // Temporary instrumentation for the choppy-audio investigation.
+            // Logged to stdout (for `logread`) AND kept in a small in-memory
+            // ring buffer so the Admin Panel can show it live without needing
+            // shell access to the router — see pushDiagLog()/GET /api/admin/diag-log.
+            if (msg.type === 'audio_format') {
+                console.log(`[diag] audio_format client#${ws.clientId} role=${msg.role} ` +
+                            `sampleRate=${msg.sampleRate} chunkFrames=${msg.chunkFrames || ''} ` +
+                            `chunkDurationMs=${msg.chunkDurationMs || ''} at ${new Date().toISOString()}`);
+                pushDiagLog({
+                    type: 'audio_format', clientId: ws.clientId, role: msg.role,
+                    sampleRate: msg.sampleRate, chunkFrames: msg.chunkFrames,
+                    chunkDurationMs: msg.chunkDurationMs
+                });
+                return;
+            }
+            if (msg.type === 'flush_snapshot') {
+                console.log(`[diag] flush_snapshot client#${ws.clientId} reason=${msg.reason} ` +
+                            `queueDepth=${msg.queueDepth} activeNodes=${msg.activeNodes} ` +
+                            `aheadSec=${msg.aheadSec} bufferMs=${msg.bufferMs} ` +
+                            `lateArrivalRate=${msg.lateArrivalRate} rate=${msg.currentPlaybackRate} ` +
+                            `audioState=${msg.audioState} totalFlushesSoFar=${msg.totalFlushesSoFar} ` +
+                            `at ${new Date().toISOString()}`);
+                pushDiagLog({
+                    type: 'flush_snapshot', clientId: ws.clientId, reason: msg.reason,
+                    queueDepth: msg.queueDepth, activeNodes: msg.activeNodes,
+                    aheadSec: msg.aheadSec, bufferMs: msg.bufferMs,
+                    lateArrivalRate: msg.lateArrivalRate, currentPlaybackRate: msg.currentPlaybackRate,
+                    audioState: msg.audioState, totalFlushesSoFar: msg.totalFlushesSoFar
+                });
+                return;
+            }
+            if (msg.type === 'audible_glitch_marker') {
+                console.log(`[diag] AUDIBLE_GLITCH client#${ws.clientId} aheadSec=${msg.aheadSec} ` +
+                            `bufferMs=${msg.bufferMs} queueDepth=${msg.queueDepth} at ${new Date().toISOString()}`);
+                pushDiagLog({
+                    type: 'audible_glitch_marker', clientId: ws.clientId,
+                    aheadSec: msg.aheadSec, bufferMs: msg.bufferMs, queueDepth: msg.queueDepth
+                });
+                return;
+            }
+
+            // ── Traveler diagnostics (light client-side telemetry) ─────────────
+            // Listener apps self-report jitter buffer state every 10 s. Kept as a
+            // handful of counters (not raw logs) so it stays cheap over WiFi.
+            // Aggregated and pushed to the guide dashboard on a timer below —
+            // this surfaces traveler-side issues (WiFi drops, AudioContext
+            // suspensions) that never show up as a server-side skip.
+            if (msg.type === 'telemetry') {
+                travelerTelemetry.set(ws.clientId, {
+                    bufferMs: msg.bufferMs || 0,
+                    lateArrivalRate: msg.lateArrivalRate || 0,
+                    queueDepth: msg.queueDepth || 0,
+                    reconnects: msg.reconnects || 0,
+                    flushes: msg.flushes || 0,
+                    wsDrops: msg.wsDrops || 0,
+                    suspends: msg.suspends || 0,
+                    audioState: msg.audioState || 'unknown',
+                    updatedAt: Date.now()
+                });
+                scheduleTelemetryBatch();
+                return;
+            }
+
             // ── Subtitles — active broadcaster only ───────────────────────────
             if (ws !== activeBroadcaster) return;
             if (msg.type === 'subtitle') {
@@ -786,6 +1365,31 @@ wss.on('connection', (ws) => {
             activeBroadcaster = ws;
             guideConnected = true;
             broadcastStartTime = Date.now();
+            // NOTE: periodic WiFi congestion sampling is intentionally NOT started
+            // here anymore. The site survey it runs (iwpriv ra0 get_site_survey)
+            // briefly takes the 2.4GHz radio off-channel to scan neighbors — the
+            // same radio travelers' audio rides on. Running it every 60s during a
+            // live broadcast was found to correlate with recurring burst-backlog
+            // flushes / audible cutouts (packets delayed while the radio was off
+            // -channel, then a pile-up flush once they arrived). The on-demand
+            // scan in /api/guide/optimize-wifi (one-time, guide-triggered) is kept
+            // since a single interruption there is an acceptable trade-off, unlike
+            // a recurring one every minute for the whole broadcast.
+            //
+            // ── Disable the WiFi-uplink repeater/STA client while broadcasting ──
+            // The gl-repeater daemon (used for the router's own internet uplink)
+            // retries a remembered network every ~30s whenever it isn't connected
+            // to one — scanning BOTH apcli0 (2.4GHz, shares the radio with ra0 /
+            // travelers) and apclix0 (5GHz, shares the radio with rax0 / guide).
+            // Each retry briefly takes the radio off-channel, which was found to
+            // line up almost exactly with recurring burst-backlog flushes/audible
+            // cutouts on both bands. Internet isn't needed for the tour app to
+            // function, so the uplink is simply disconnected for the duration of
+            // the broadcast; it stays disconnected afterward until an admin
+            // explicitly reconnects it from the admin panel (Option A — no
+            // auto-reconnect, to avoid resurrecting the same retry loop the
+            // moment the remembered network isn't in range).
+            sh('ubus call repeater disconnect \'{}\'', 5000).catch(() => { /* best-effort */ });
             console.log(`Guide #${ws.clientId} started broadcasting`);
         } else if (activeBroadcaster !== ws) {
             // A different guide is already broadcasting — put this one in watch mode
@@ -848,6 +1452,7 @@ wss.on('connection', (ws) => {
         clients.delete(ws);
         releaseClientId(ws.clientId);
         reactionCooldowns.delete(ws.clientId);  // clean up per-client cooldown state
+        travelerTelemetry.delete(ws.clientId);  // clean up per-client diagnostics state
         console.log(`Client #${ws.clientId} disconnected. Total clients: ${clients.size}`);
 
         if (ws === activeBroadcaster) {
@@ -855,6 +1460,7 @@ wss.on('connection', (ws) => {
             activeBroadcaster = null;
             guideConnected = false;
             broadcastStartTime = null;
+            stopWifiCongestionSampling();
             console.log('Active broadcaster stopped');
             watchingGuides.forEach((wg) => {
                 if (wg.readyState === WebSocket.OPEN) {
@@ -878,6 +1484,7 @@ wss.on('connection', (ws) => {
             activeBroadcaster = null;
             guideConnected = false;
             broadcastStartTime = null;
+            stopWifiCongestionSampling();
             watchingGuides.forEach((wg) => {
                 if (wg.readyState === WebSocket.OPEN) {
                     try { wg.send(JSON.stringify({ type: 'broadcaster_ended' })); } catch (e) { /* ignore */ }
@@ -891,6 +1498,39 @@ wss.on('connection', (ws) => {
         broadcastClientCount();
     });
 });
+
+// ── Zombie-connection reaper ────────────────────────────────────────────────
+// Every 15 s, ping every open socket. A socket only gets terminated after
+// missing TWO consecutive pings (~30 s of total silence) — one miss alone is
+// tolerated in case a phone is briefly out of range (behind a building, an
+// elevator, a momentary dead zone) so a real, still-alive connection isn't
+// killed for a single bad beat. Two misses in a row means the TCP connection
+// almost certainly died without a clean close (WiFi drop, app killed,
+// network switch) — a true zombie that would otherwise sit in `clients`
+// inflating the skip-rate metric and wasting a broadcast attempt every round.
+// terminate() forces the socket closed immediately, which fires the normal
+// 'close' handler above and does all the usual cleanup (removes from
+// `clients`, releases the client ID, clears telemetry/cooldown state, and
+// hands off the broadcaster slot if it was the active guide).
+const HEARTBEAT_INTERVAL_MS = 15000;
+const MAX_MISSED_PINGS = 2;
+const heartbeatInterval = setInterval(() => {
+    wss.clients.forEach((ws) => {
+        if (ws.isAlive) {
+            ws.missedPings = 0;
+        } else {
+            ws.missedPings = (ws.missedPings || 0) + 1;
+            if (ws.missedPings >= MAX_MISSED_PINGS) {
+                console.warn(`Client #${ws.clientId} missed ${ws.missedPings} pings — terminating zombie connection`);
+                return ws.terminate();
+            }
+        }
+        ws.isAlive = false;
+        try { ws.ping(); } catch (e) { /* socket already closing */ }
+    });
+}, HEARTBEAT_INTERVAL_MS);
+
+wss.on('close', () => clearInterval(heartbeatInterval));
 
 // Health check endpoint with performance metrics
 app.get('/health', (req, res) => {
@@ -1008,14 +1648,15 @@ httpApp.use((req, res, next) => {
     const host = (req.headers.host || '').split(':')[0].toLowerCase();
     if (CAPTIVE_PROBE_HOSTS.has(host)) {
         logCaptiveProbe(req, 200);
-        return res.sendFile(path.join(__dirname, 'public', 'connected.html'));
+        markCaptiveHit(req);
+        return sendCaptiveAwareHtml(req, res, 'connected.html', true);
     }
     next();
 });
 
 // Redirect root to welcome page (BEFORE static middleware)
 httpApp.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'welcome.html'));
+    sendCaptiveAwareHtml(req, res, 'welcome.html');
 });
 
 // Redirect any non-whitelisted HTTP request to HTTPS.
@@ -1030,6 +1671,14 @@ httpApp.use((req, res, next) => {
     ];
     if (captivePortalPaths.includes(req.path)) return next();
     return res.redirect(301, 'https://' + req.hostname + req.url);
+});
+
+// Temporary diagnostic logging: log every direct HTTP hit to connected.html /
+// welcome.html (e.g. from the CNA mini-browser's user-portal-url fetch) so we
+// can see the real User-Agent that renders the portal page.
+httpApp.get(['/connected.html', '/welcome.html'], (req, res) => {
+    logCaptiveProbe(req, 200);
+    sendCaptiveAwareHtml(req, res, req.path.slice(1));
 });
 
 // Serve static files for welcome.html resources (CSS, images etc.)
@@ -1056,10 +1705,7 @@ httpApp.get('/captive', (req, res) => {
     '/redirect',
     '/success.txt',
 ].forEach(p => {
-    httpApp.get(p, (req, res) => {
-        logCaptiveProbe(req, 200);
-        res.sendFile(path.join(__dirname, 'public', 'connected.html'));
-    });
+    httpApp.get(p, sendCaptiveResponse);
 });
 
 const httpServer = http.createServer(httpApp);
@@ -1134,3 +1780,17 @@ setInterval(() => {
     const uptime = process.uptime();
     console.log(`Server uptime: ${Math.floor(uptime / 3600)}h ${Math.floor((uptime % 3600) / 60)}m`);
 }, 3600000); // Every hour
+
+// ---- Background clock sync -------------------------------------------------
+// Safety net independent of the admin UI being open: check for internet and
+// sync the clock shortly after boot (the router has no RTC, so a fresh boot
+// almost always means a stale date), then keep checking periodically in case
+// connectivity appears later (e.g. someone joins uplink Wi-Fi from the admin
+// panel while no one is watching the status page).
+setTimeout(async () => {
+    if (await checkInternet()) await syncClock('startup');
+}, 15000); // give networking a few seconds to come up after service start
+
+setInterval(async () => {
+    if (await checkInternet()) await syncClockIfDue('background');
+}, 15 * 60 * 1000); // check every 15 min; actual sync itself throttled to 30 min

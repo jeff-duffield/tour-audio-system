@@ -1,0 +1,15 @@
+{
+  "name": "EF Tour Guide",
+  "short_name": "Tour Guide",
+  "description": "Broadcast live audio to your tour group",
+  "start_url": "/guide.html",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#D0107A",
+  "theme_color": "#D0107A",
+  "icons": [
+    { "src": "/icons/icon-192-guide.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512-guide.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

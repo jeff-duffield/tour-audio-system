@@ -16,7 +16,12 @@ console.log('  opkg update');
 console.log('  opkg install openssl-util');
 console.log('');
 console.log('Then run this command:');
-console.log('  openssl req -x509 -newkey rsa:2048 -keyout ssl/server.key -out ssl/server.crt -days 365 -nodes -subj "/C=US/ST=State/L=City/O=EF Tours/CN=192.168.8.1"');
+console.log('  openssl req -x509 -newkey rsa:2048 -keyout ssl/server.key -out ssl/server.crt -days 365 -nodes \\');
+console.log('    -subj "/C=US/ST=State/L=City/O=EF Tours/CN=audio.eftours.travel" \\');
+console.log('    -addext "subjectAltName=DNS:audio.eftours.travel,DNS:192.168.8.1,IP:192.168.8.1"');
+console.log('');
+console.log('(The subjectAltName is required — Android/Chrome reject certs that only');
+console.log('have a CN and no SAN, even if self-signed and manually trusted.)');
 console.log('');
 console.log('For testing on Windows, you can use Git Bash or WSL to run the openssl command.');
 

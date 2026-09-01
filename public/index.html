@@ -5,6 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EF Tour Audio - Listen</title>
     <link rel="icon" type="image/png" href="EF-Logos_EF Logo Pink.png">
+    <!-- PWA: lets travelers add this page to their home screen for one-tap
+         access next time, skipping the captive portal flow. -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#003C64">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Tour Audio">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
     <style>
         /* Full-bleed gradient on html prevents white overscroll flash */
         html { background: #00243C; }
@@ -114,6 +123,21 @@
         .ios-note hr { border: none; border-top: 1px solid rgba(255,255,255,0.15); margin-bottom: 12px; }
         .ios-note p { font-size: 12px; color: rgba(255,255,255,0.5); line-height: 1.6; }
         .ios-note strong { color: rgba(255,255,255,0.7); }
+        /* Subtle "Add to Home Screen" tip — shown once, dismissible */
+        .pwa-hint { width: 100%; text-align: center; padding-top: 10px; }
+        .pwa-hint hr { border: none; border-top: 1px solid rgba(255,255,255,0.15); margin-bottom: 12px; }
+        .pwa-hint p { font-size: 12px; color: rgba(255,255,255,0.5); line-height: 1.6; margin-bottom: 6px; }
+        .pwa-hint strong { color: rgba(255,255,255,0.7); }
+        .pwa-hint-dismiss {
+            background: none;
+            border: none;
+            color: rgba(255,255,255,0.4);
+            font-size: 12px;
+            text-decoration: underline;
+            cursor: pointer;
+            font-family: inherit;
+            padding: 2px 6px;
+        }
         /* Entrance animations — staggered fade + slide up */
         @keyframes fadeUp {
             from { opacity: 0; transform: translateY(16px); }
@@ -736,7 +760,7 @@
             <span class="status-text" id="statusText">Not connected</span>
             <span class="battery-indicator" id="batteryIndicator" style="display:none;"></span>
         </div>
-        <div class="battery-warning" id="batteryWarning" style="display:none;">⚠️ Low battery — consider plugging in</div>
+        <div class="battery-warning" id="batteryWarning" style="display:none;">Low battery — consider plugging in</div>
 
         <!-- Waveform — CSS-animated, appears when audio is received -->
         <div class="waveform" id="waveform">
@@ -778,6 +802,12 @@
         <footer id="iosNote" class="ios-note anim-5">
             <hr>
             <p>iPhone users: check that your silent switch is <strong>OFF</strong>, or use headphones.</p>
+        </footer>
+
+        <footer id="pwaHint" class="pwa-hint anim-5" style="display:none;">
+            <hr>
+            <p id="pwaHintText"></p>
+            <button class="pwa-hint-dismiss" onclick="dismissPwaHint()">Got it</button>
         </footer>
     </div>
 
@@ -850,7 +880,7 @@
             <div class="lock-wave-bar"></div>
             <div class="lock-wave-bar"></div>
         </div>
-        <div class="lock-audio-label" id="lockAudioLabel">🎧 Audio playing</div>
+        <div class="lock-audio-label" id="lockAudioLabel">Audio playing</div>
 
         <div class="lock-unlock-label">Tap 3× to unlock</div>
         <div class="lock-dots">
@@ -928,6 +958,17 @@
     <canvas id="cameraCanvas" style="display:none;"></canvas>
 
     <script>
+        // Register a no-op service worker purely so the app qualifies as an
+        // installable PWA (Android "Add to Home Screen" / iOS Share sheet).
+        // It does not cache or intercept anything — see public/sw.js — so
+        // it cannot serve stale content or interfere with the live
+        // WebSocket audio stream or camera widget.
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js').catch(function (err) {
+                console.warn('Service worker registration failed:', err);
+            });
+        }
+
         let ws = null;
         let isListening = false;
         let audioContext = null;
@@ -946,9 +987,11 @@
         let chunkDurationMs = 21;  // ~21 ms for 1024 samples at 48 kHz; updated on first chunk
         let lateArrivalRate = 0;        // 0.0 – 1.0 fraction of late arrivals
         let activeSourceNodes = [];     // AudioBufferSourceNodes scheduled but not yet finished
+        let currentPlaybackRate = 1.0;  // gentle speed-up applied while catching up on drift (see drainQueue)
 
         let drainIntervalId   = null;   // handle for 20 ms drain loop
         let metricsIntervalId = null;   // handle for 5 s metrics / recalc loop
+        let telemetryIntervalId = null; // handle for 10 s traveler-telemetry report to server
         let pingIntervalId    = null;   // handle for 5 s heartbeat ping
         let pongTimeoutId     = null;   // 4 s timeout — close socket if pong never arrives
 
@@ -957,6 +1000,12 @@
         let flushCount = 0;
         let receivedPacketCount = 0;
         let hasConnectedOnce = false;   // distinguishes first connect from reconnects
+        // Light client-side diagnostics — reported to the server so the guide
+        // dashboard can see traveler-side issues that never show up as a
+        // server-side skip (e.g. AudioContext suspended while backgrounded,
+        // WiFi drop forcing a reconnect).
+        let wsDropCount = 0;
+        let suspendCount = 0;
 
         // Lock screen state
         let isLocked = false;
@@ -1008,22 +1057,54 @@
             const lockBtn = document.getElementById('lockBtn');
             const reactionBar = document.getElementById('reactionBar');
             const iosNote     = document.getElementById('iosNote');
+            const pwaHint     = document.getElementById('pwaHint');
             btn.className = 'btn-primary';
             if (isListening) {
                 btn.textContent = 'Stop Listening';
                 if (lockBtn)  lockBtn.style.display = '';
                 if (iosNote)  iosNote.style.display = 'none';
+                if (pwaHint)  pwaHint.style.display = 'none';
                 if (reactionBar) reactionBar.style.display = 'flex';
                 syncBodyPadding();
             } else {
                 btn.textContent = 'Start Listening';
                 if (lockBtn)  lockBtn.style.display = 'none';
                 if (iosNote)  iosNote.style.display = '';
+                if (pwaHint)  pwaHint.style.display = pwaHintEligible ? '' : 'none';
                 if (reactionBar) reactionBar.style.display = 'none';
                 document.body.style.paddingBottom = '';
                 const captionBar = document.getElementById('captionBar');
                 if (captionBar) captionBar.style.bottom = '0';
             }
+        }
+
+        // ── "Add to Home Screen" hint ───────────────────────────────────────
+        // Shown once (dismissible) so repeat travelers can skip the welcome
+        // page next time. Hidden entirely if already installed as a PWA, or
+        // if the traveler already dismissed it.
+        const PWA_HINT_DISMISSED_KEY = 'ef_pwa_hint_dismissed';
+        const isStandalonePwa = window.navigator.standalone === true ||
+            (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+        const pwaHintEligible = !isStandalonePwa && !localStorage.getItem(PWA_HINT_DISMISSED_KEY);
+
+        if (pwaHintEligible) {
+            const pwaHintText = document.getElementById('pwaHintText');
+            const isIOSDevice = /iphone|ipad|ipod/i.test(navigator.userAgent);
+            if (pwaHintText) {
+                pwaHintText.innerHTML = isIOSDevice
+                    ? 'Tip: tap <strong>Share</strong> → <strong>Add to Home Screen</strong> for one-tap access next time.'
+                    : 'Tip: open the menu → <strong>Add to Home screen</strong> for one-tap access next time.';
+            }
+            // Show immediately on load (updateButton only re-toggles it once
+            // listening starts/stops).
+            const pwaHintEl = document.getElementById('pwaHint');
+            if (pwaHintEl) pwaHintEl.style.display = '';
+        }
+
+        function dismissPwaHint() {
+            localStorage.setItem(PWA_HINT_DISMISSED_KEY, '1');
+            const pwaHint = document.getElementById('pwaHint');
+            if (pwaHint) pwaHint.style.display = 'none';
         }
 
         function setVolume(value) {
@@ -1119,15 +1200,31 @@
                 flushCount = 0;
                 receivedPacketCount = 0;
                 hasConnectedOnce = false;
+                wsDropCount = 0;
+                suspendCount = 0;
                 jitterQueue = [];
                 arrivalHistory = [];
                 bufferMs = 100;
                 lateArrivalRate = 0;
                 expectedArrivalTime = 0;
+                currentPlaybackRate = 1.0;
 
                 // Create AudioContext (must be inside a user gesture for iOS)
                 audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
                 console.log('AudioContext created, state:', audioContext.state);
+
+                // Diagnostic: iOS can silently suspend the AudioContext (screen
+                // lock, phone call/Siri interruption, camera mic session churn,
+                // etc.). While suspended, currentTime freezes and any audio
+                // scheduled against it is effectively lost — this is a likely
+                // cause of "missed audio" reports that don't show up as a
+                // server-side skip. Logging every transition, with a wall-clock
+                // timestamp, lets us correlate gaps against this state later.
+                audioContext.onstatechange = () => {
+                    console.log('[AudioContext] state changed →', audioContext.state,
+                                'at', new Date().toISOString());
+                    if (audioContext.state === 'suspended') suspendCount++;
+                };
 
                 if (audioContext.state === 'suspended') {
                     console.log('Resuming AudioContext for iOS…');
@@ -1222,10 +1319,15 @@
             ws.binaryType = 'arraybuffer';
             console.log('[WS] Connecting to', protocol + '//' + location.host);
 
+            // Consecutive missed-pong counter for this connection — see heartbeat
+            // setup in onopen below. Declared here (not inside onopen) so onmessage's
+            // pong handler can reset it back to 0 on any successful reply.
+            let missedPongs = 0;
+
             ws.onopen = () => {
                 if (hasConnectedOnce) {
                     // Reconnect: flush stale audio so there is no echo/double-play
-                    flushQueue();
+                    flushQueue('reconnect');
                     reconnectCount++;
                     console.log('[Jitter] Reconnected. reconnects:', reconnectCount);
                 } else {
@@ -1236,19 +1338,42 @@
                 updateButton();
                 updateLockWave();
 
+                // ── Diagnostic: report actual playback format ───────────────────
+                // Confirms what sample rate this traveler's AudioContext actually
+                // landed on (browsers honour the requested 16kHz hint only loosely),
+                // so it can be compared against the guide's reported rate to rule
+                // in/out a clock mismatch as a cause of jitter-buffer flushes.
+                try {
+                    ws.send(JSON.stringify({
+                        type: 'audio_format',
+                        role: 'traveler',
+                        sampleRate: audioContext.sampleRate
+                    }));
+                } catch (e) { /* best-effort diagnostics */ }
+
                 // ── Heartbeat ping ─────────────────────────────────────────────
-                // Send a ping every 5 s. If no pong arrives within 4 s the TCP
-                // connection is stale (e.g. WiFi drop that hasn't closed the socket
-                // yet). Close it immediately so the 1-s reconnect fires, rather than
-                // waiting up to 90 s for the OS TCP timeout to kick in.
+                // Send a ping every 5 s. A single missed pong is tolerated (walking
+                // away from the router naturally raises round-trip latency — a pong
+                // arriving a bit late doesn't mean the socket is actually dead).
+                // Only after TWO consecutive missed pongs (~9-14 s of no reply) do we
+                // treat the connection as stale and close it, so the 1-s reconnect
+                // fires — instead of waiting up to 90 s for the OS TCP timeout.
+                // A too-tight single-miss timeout was closing perfectly-alive but
+                // momentarily-slow connections, forcing an unnecessary flush/resync
+                // (audible dropout) purely from a brief signal-strength dip.
                 if (pingIntervalId) clearInterval(pingIntervalId);
                 pingIntervalId = setInterval(() => {
                     if (!ws || ws.readyState !== WebSocket.OPEN) return;
                     if (pongTimeoutId) clearTimeout(pongTimeoutId);
                     pongTimeoutId = setTimeout(() => {
                         pongTimeoutId = null;
-                        console.log('[WS] Pong timeout — closing stale connection');
-                        if (ws) ws.close();
+                        missedPongs++;
+                        if (missedPongs >= 2) {
+                            console.log('[WS] Pong timeout x2 — closing stale connection');
+                            if (ws) ws.close();
+                        } else {
+                            console.log('[WS] Pong timeout (1st miss — tolerating)');
+                        }
                     }, 4000);
                     try { ws.send(JSON.stringify({ type: 'ping' })); } catch(e) { /* ignore */ }
                 }, 5000);
@@ -1262,8 +1387,11 @@
                             document.getElementById('travelerNumber').textContent = msg.id;
                             document.getElementById('travelerId').style.display = 'inline-block';
                         } else if (msg.type === 'pong') {
-                            // Heartbeat alive — cancel the stale-connection timeout
+                            // Heartbeat alive — cancel the stale-connection timeout and
+                            // reset the missed-pong streak (a late-but-arrived pong means
+                            // the connection recovered, not that it's still degrading).
                             if (pongTimeoutId) { clearTimeout(pongTimeoutId); pongTimeoutId = null; }
+                            missedPongs = 0;
                         } else if (msg.type === 'subtitle') {
                             showSubtitle(msg.text, msg.isFinal, msg.enabled);
                         } else if (msg.type === 'reaction') {
@@ -1284,6 +1412,7 @@
                 ws = null;
                 if (!isListening) return;   // user pressed Stop — do not reconnect
                 if (guideMuted)   return;   // guide active on this device — BroadcastChannel will reconnect
+                wsDropCount++;
                 updateStatus('connecting', 'Reconnecting…');
                 console.log('[WS] Closed — reconnecting in 1 s…');
                 setTimeout(connectWebSocket, 1000);
@@ -1336,12 +1465,38 @@
             // once (e.g. after a network hiccup, iOS background, or reconnect).
             // Scheduling them all sequentially would push live audio 30+ seconds
             // into the future. Flush and snap back to the live stream instead.
-            const MAX_LOOKAHEAD_SEC = 1.5;
-            if (nextPlayTime > audioContext.currentTime + MAX_LOOKAHEAD_SEC) {
+            // Raised from 1.5s → 3s: for a walking tour, a couple seconds of extra
+            // latency is inaudible/irrelevant (this isn't a live call), but every
+            // flush here throws away audio that was already successfully received
+            // — audibly worse than just letting it play a bit late. A short WiFi
+            // fade-and-recover while walking easily produces >1.5s of backlog on
+            // reconnect/retransmit even though nothing was actually lost, so the
+            // old threshold was flushing far more often than genuinely needed.
+            const MAX_LOOKAHEAD_SEC = 3.0;
+            const aheadSec = nextPlayTime - audioContext.currentTime;
+            if (aheadSec > MAX_LOOKAHEAD_SEC) {
+                const aheadBy = aheadSec.toFixed(2) + 's';
                 console.log('[Jitter] Burst backlog detected — flushing to snap to live audio.',
-                            'nextPlayTime ahead by', (nextPlayTime - audioContext.currentTime).toFixed(2) + 's');
-                flushQueue();
+                            'nextPlayTime ahead by', aheadBy);
+                flushQueue('burst-backlog(' + aheadBy + ')');
                 return;
+            }
+
+            // ── Drift micro-correction ──────────────────────────────────────────
+            // Rather than doing nothing until drift crosses MAX_LOOKAHEAD_SEC and
+            // then hard-flushing (an audible gap), gently speed up playback while
+            // moderately ahead so the lead bleeds off silently. 0.5–3s ahead is
+            // "catching up" territory — a 3% rate bump is imperceptible in pitch
+            // (~0.5 semitone) but clears ~30ms of lead per second of audio played,
+            // closing a 1s backlog in well under a minute without ever flushing.
+            // Below 0.5s ahead, playback runs at normal speed — that's within
+            // normal bufferMs hold territory and isn't worth correcting.
+            const targetRate = aheadSec > 0.5 ? 1.03 : 1.0;
+            if (targetRate !== currentPlaybackRate) {
+                currentPlaybackRate = targetRate;
+                for (const src of activeSourceNodes) {
+                    try { src.playbackRate.setTargetAtTime(targetRate, audioContext.currentTime, 0.5); } catch(e) {}
+                }
             }
 
             while (jitterQueue.length > 0) {
@@ -1356,9 +1511,31 @@
 
                 const source = audioContext.createBufferSource();
                 source.buffer = item.buffer;
+                source.playbackRate.setValueAtTime(currentPlaybackRate, audioContext.currentTime);
+
+                // ── No inter-chunk fade (2026-08 crackle investigation) ─────────
+                // A per-chunk fade-to-silence-and-back was tried here to mask
+                // sample-boundary mismatches between adjacent chunks. It made
+                // things WORSE, not better: because chunks are scheduled fully
+                // back-to-back with no overlap, the fade doesn't blend one chunk
+                // into the next — it forces the volume down to zero and back up
+                // at every single chunk boundary. At ~24–47 chunks/sec that's an
+                // audio-rate amplitude modulation, heard as buzz/crackle — and it
+                // was audible even at a 1ms fade width. Removing the fade
+                // entirely (i.e. playing chunks back-to-back with no per-chunk
+                // gain envelope) sounds clearly cleaner. A real fix would require
+                // an actual crossfade (overlapping playback of adjacent chunks),
+                // not a fade-to-silence — not implemented, revisit only if
+                // crackle reappears under heavy multi-device WiFi contention.
+                const chunkDur = item.buffer.duration / currentPlaybackRate;
+
                 source.connect(gainNode);
                 source.start(nextPlayTime);
-                nextPlayTime += item.buffer.duration;
+                // Account for the sped-up (or normal) playback rate so the schedule
+                // reflects the buffer's actual on-wire duration, not its real-time
+                // playback duration — otherwise the catch-up correction wouldn't
+                // actually close the gap between nextPlayTime and the audio clock.
+                nextPlayTime += chunkDur;
 
                 // Track so flushQueue() can stop it if a burst-backlog flush fires
                 // before this node has finished playing.
@@ -1370,34 +1547,65 @@
             }
         }
 
-        /** Discard all queued and in-flight audio (called on reconnect / burst backlog). */
-        function flushQueue() {
+        /** Discard all queued and in-flight audio (called on reconnect / burst backlog).
+         *  @param {string} [reason] - why the flush happened, for diagnosing
+         *  client-side audio gaps that don't show up as a server-side skip. */
+        function flushQueue(reason) {
             const count = jitterQueue.length;
+
+            // ── Diagnostic: snapshot state right before we discard it ──────────
+            // Once jitterQueue/activeSourceNodes are cleared below, the exact
+            // conditions that triggered this flush are gone. Capture them first
+            // so pre-flush scheduler state can be correlated with audible-glitch
+            // markers and clock-drift telemetry after the fact.
+            try {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    const aheadSec = audioContext ? (nextPlayTime - audioContext.currentTime) : 0;
+                    ws.send(JSON.stringify({
+                        type: 'flush_snapshot',
+                        reason: reason || 'unspecified',
+                        queueDepth: count,
+                        activeNodes: activeSourceNodes.length,
+                        aheadSec: Math.round(aheadSec * 1000) / 1000,
+                        bufferMs,
+                        lateArrivalRate: Math.round(lateArrivalRate * 100) / 100,
+                        currentPlaybackRate,
+                        audioState: audioContext ? audioContext.state : 'closed',
+                        totalFlushesSoFar: flushCount
+                    }));
+                }
+            } catch (e) { /* best-effort diagnostics */ }
+
             jitterQueue = [];
 
             // Stop every AudioBufferSourceNode that has already been handed to the
             // Web Audio scheduler but hasn't finished playing yet.  Without this,
             // nodes scheduled in the future survive the flush and play again after
             // new audio starts — producing an audible double-play of the same audio.
+            const stoppedCount = activeSourceNodes.length;
             for (const src of activeSourceNodes) {
                 try { src.stop(); } catch(e) { /* already ended — safe to ignore */ }
             }
             activeSourceNodes = [];
+            currentPlaybackRate = 1.0;
 
             nextPlayTime = audioContext ? audioContext.currentTime : 0;
             flushCount++;
-            console.log('[Jitter] Flushed', count, 'chunks | stopped', activeSourceNodes.length,
-                        'in-flight nodes | total flushes:', flushCount);
+            console.log('[Jitter] Flushed', count, 'chunks | stopped', stoppedCount,
+                        'in-flight nodes | reason:', reason || 'unspecified',
+                        '| total flushes:', flushCount, '| at', new Date().toISOString());
         }
 
         /** Adjust bufferMs based on the rolling lateArrivalRate.
-         *  Tiers are tuned for LAN (local router) use where jitter is typically < 20 ms.
-         *  Good:   < 5% late  → 100 ms hold (≈ 4–5 chunks queued at 21 ms each)
-         *  Moderate: 5–20%    → 300 ms hold (smooths occasional WiFi retransmits)
-         *  Poor:   > 20% late → 600 ms hold (heavy congestion — still under 1 second) */
+         *  Good:    < 5% late  → 100 ms hold (≈ 4–5 chunks queued at 21 ms each) — tight LAN conditions
+         *  Moderate: 5–20%     → 300 ms hold (smooths occasional WiFi retransmits)
+         *  Poor:    > 20% late → 900 ms hold (heavy congestion / walking-around mobile WiFi —
+         *           raised from 600ms since travelers move around and change distance/
+         *           obstruction relative to the router; a bigger hold here absorbs more
+         *           jitter before the burst-backlog guard has to flush and drop audio). */
         function recalcBufferMs() {
             const newMs = lateArrivalRate < 0.05 ? 100 :
-                          lateArrivalRate <= 0.20 ? 300 : 600;
+                          lateArrivalRate <= 0.20 ? 300 : 900;
             if (newMs !== bufferMs) {
                 console.log('[Jitter] bufferMs', bufferMs, '→', newMs,
                             '| lateArrivalRate', (lateArrivalRate * 100).toFixed(1) + '%');
@@ -1426,13 +1634,37 @@
                                 '| queueDepth:', jitterQueue.length);
                 }
             }, 5000);
+            telemetryIntervalId = setInterval(reportTelemetry, 10000);
         }
 
-        /** Stop the drain and metrics timers. */
+        /** Stop the drain, metrics, and telemetry timers. */
         function stopJitterTimers() {
             clearInterval(drainIntervalId);
             clearInterval(metricsIntervalId);
-            drainIntervalId = metricsIntervalId = null;
+            clearInterval(telemetryIntervalId);
+            drainIntervalId = metricsIntervalId = telemetryIntervalId = null;
+        }
+
+        /** Send a small diagnostics snapshot to the server every 10 s while listening.
+         *  Server aggregates these so the guide dashboard can surface traveler-side
+         *  issues (jitter flushes, WiFi drops, AudioContext suspensions) that never
+         *  show up as a server-side skip. Payload is intentionally tiny — a handful
+         *  of counters, not raw logs — to avoid adding meaningful bandwidth load. */
+        function reportTelemetry() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) return;
+            try {
+                ws.send(JSON.stringify({
+                    type: 'telemetry',
+                    bufferMs,
+                    lateArrivalRate: Math.round(lateArrivalRate * 100) / 100,
+                    queueDepth: jitterQueue.length,
+                    reconnects: reconnectCount,
+                    flushes: flushCount,
+                    wsDrops: wsDropCount,
+                    suspends: suspendCount,
+                    audioState: audioContext ? audioContext.state : 'closed'
+                }));
+            } catch (e) { /* ignore — best-effort diagnostics */ }
         }
 
         // ═══════════════════════════════════════════════════════════════════════════
@@ -1547,6 +1779,8 @@
         var _cameraMode  = 'photo'; // 'photo' | 'video'
         var _previewBlob = null;   // blob currently shown in the preview card
         var _previewKind = null;   // 'photo' | 'video' — what _previewBlob contains
+        var _micRequested = false; // whether a mic track has been requested/added for this camera session
+        var _micPromise   = null; // in-flight _ensureVideoAudio() promise, so callers can await it
 
         function _getPinchDist(touches) {
             var dx = touches[0].clientX - touches[1].clientX;
@@ -1599,16 +1833,72 @@
         function zoomIn()  { setZoom(_cameraZoom + 0.5); }
         function zoomOut() { setZoom(_cameraZoom - 0.5); }
 
+        // ── Camera audio-session management ────────────────────────────────
+        // Photos never need the mic, so openCamera() only grabs video. The mic
+        // is requested lazily, only when the user actually switches to VIDEO
+        // mode — this is what triggers iOS to switch the page's AVAudioSession
+        // to PlayAndRecord and reroute all page audio (including the live tour
+        // stream) to the loudspeaker at full volume, causing feedback. Keeping
+        // the mic off in photo mode avoids that entirely for the common case.
+        function _setAudioSessionType(type) {
+            try { if (navigator.audioSession) navigator.audioSession.type = type; } catch (e) {}
+        }
+
+        // iOS can get "stuck" routing to the loudspeaker after a PlayAndRecord
+        // session ends. Bouncing through 'auto' before settling on 'playback'
+        // forces it to re-evaluate routing (community-reported workaround for
+        // WebKit's audio-session routing bug).
+        function _kickAudioSessionToPlayback() {
+            if (!navigator.audioSession) return;
+            _setAudioSessionType('auto');
+            setTimeout(function () { _setAudioSessionType('playback'); }, 50);
+        }
+
+        function _ensureVideoAudio() {
+            if (!cameraStream || _micRequested) return _micPromise || Promise.resolve();
+            _micRequested = true;
+            _setAudioSessionType('play-and-record');
+            _micPromise = navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(function (micStream) {
+                    var audioTrack = micStream.getAudioTracks()[0];
+                    if (audioTrack) cameraStream.addTrack(audioTrack);
+                })
+                .catch(function (err) {
+                    console.warn('Mic access for video recording denied/unavailable:', err.name);
+                    _kickAudioSessionToPlayback();
+                });
+            return _micPromise;
+        }
+
+        function _releaseVideoAudio() {
+            _micRequested = false;
+            _micPromise   = null;
+            if (cameraStream) {
+                cameraStream.getAudioTracks().forEach(function (t) {
+                    t.stop();
+                    cameraStream.removeTrack(t);
+                });
+            }
+            _kickAudioSessionToPlayback();
+        }
+
         // Switches between photo and video capture mode. Locked while a
         // recording is in progress so the mode can't change mid-clip.
         function setCameraMode(mode) {
             if (_isRecording) return;
+            var prevMode = _cameraMode;
             _cameraMode = mode;
             document.getElementById('modeBtnPhoto').classList.toggle('active', mode === 'photo');
             document.getElementById('modeBtnVideo').classList.toggle('active', mode === 'video');
             document.getElementById('shutterBtn').setAttribute(
                 'aria-label', mode === 'photo' ? 'Take photo' : 'Record video'
             );
+
+            if (mode === 'video') {
+                _ensureVideoAudio();
+            } else if (prevMode === 'video') {
+                _releaseVideoAudio();
+            }
         }
 
         function onShutterTap() {
@@ -1635,11 +1925,20 @@
             _cameraZoom = 1;
             _zoomTrack  = null;
             _zoomCaps   = null;
+            _micRequested = false;
+            _micPromise   = null;
             updateZoomLabel();
             setCameraMode('photo');
             document.getElementById('zoomControls').style.display = 'flex';
             document.getElementById('modeToggle').style.display   = window.MediaRecorder ? 'flex' : 'none';
             overlay.style.display = 'block';
+
+            // The reaction bar is fixed to the bottom of the viewport and sits
+            // above the camera overlay in z-index, which made it overlap the
+            // shutter button. Hide it while the camera is open; closeCamera()
+            // restores it via updateButton().
+            var reactionBarEl = document.getElementById('reactionBar');
+            if (reactionBarEl) reactionBarEl.style.display = 'none';
 
             // Lock browser page-zoom while the camera overlay is open.
             // This keeps the buttons fixed in place and prevents the app
@@ -1668,23 +1967,15 @@
             };
 
             try {
-                try {
-                    // Request the mic too so video recordings capture audio.
-                    cameraStream = await navigator.mediaDevices.getUserMedia({
-                        video: videoConstraints,
-                        audio: true
-                    });
-                } catch (err) {
-                    // Camera+mic are requested as one unit — if the traveler
-                    // declines the mic prompt (or no mic is available), the
-                    // whole call fails even though the camera would've been
-                    // fine. Retry video-only so photos/video-without-audio
-                    // still work.
-                    cameraStream = await navigator.mediaDevices.getUserMedia({
-                        video: videoConstraints,
-                        audio: false
-                    });
-                }
+                // Video-only — the mic is requested separately, lazily, only
+                // when the user switches to VIDEO mode (see _ensureVideoAudio).
+                // Requesting it here unconditionally forced iOS into
+                // PlayAndRecord mode for every photo too, rerouting the live
+                // tour audio to the loudspeaker at full volume.
+                cameraStream = await navigator.mediaDevices.getUserMedia({
+                    video: videoConstraints,
+                    audio: false
+                });
                 video.srcObject = cameraStream;
 
                 // Check for native zoom support (mostly Android Chrome).
@@ -1739,6 +2030,15 @@
             document.getElementById('cameraDenied').style.display  = 'none';
             document.getElementById('shutterBtn').style.display    = 'flex';
             // ws and audioContext are completely untouched — audio keeps playing
+
+            // Release the mic (if it was ever requested) and kick the audio
+            // session back to plain playback so routing drops out of the
+            // loudspeaker regardless of which mode the camera was left in.
+            _micRequested = false;
+            _kickAudioSessionToPlayback();
+
+            // Restore the reaction bar (hidden while the camera was open).
+            updateButton();
         }
 
         function takePhoto() {
@@ -1784,8 +2084,16 @@
             return '';
         }
 
-        function startRecording() {
+        async function startRecording() {
             if (!cameraStream || !window.MediaRecorder) return;
+
+            // The mic is requested asynchronously when the user switches to
+            // VIDEO mode (setCameraMode). Give that a moment to finish so the
+            // recording captures audio from the very first frame instead of
+            // starting silent and then never gaining an audio track.
+            if (_micPromise) { try { await _micPromise; } catch (e) {} }
+            if (!cameraStream) return; // camera may have been closed while awaiting
+
             _recordedChunks = [];
             var mimeType = _pickVideoMimeType();
             try {
@@ -2018,7 +2326,7 @@
             if (!wave || !label) return;
             if (isListening) {
                 wave.classList.remove('paused');
-                label.textContent = '🎧 Audio playing';
+                label.textContent = 'Audio playing';
             } else {
                 wave.classList.add('paused');
                 label.textContent = '⏸ Not connected';
@@ -2074,6 +2382,21 @@
             if (reactionCooldowns[reaction]) return;
 
             ws.send(JSON.stringify({ type: 'reaction', reaction }));
+
+            // ── Diagnostic: thumbs-down doubles as an audible-glitch marker ─────
+            // Lets a timestamped "I just heard a chop" event be correlated
+            // server-side against flush_snapshot / audio_format / clock-drift
+            // logs, without adding a separate UI control during testing.
+            if (reaction === 'thumbs-down') {
+                try {
+                    ws.send(JSON.stringify({
+                        type: 'audible_glitch_marker',
+                        aheadSec: audioContext ? Math.round((nextPlayTime - audioContext.currentTime) * 1000) / 1000 : null,
+                        bufferMs,
+                        queueDepth: jitterQueue.length
+                    }));
+                } catch (e) { /* best-effort diagnostics */ }
+            }
 
             // Find the tapped button and apply tap pulse → cooldown gray-out
             const btn = document.querySelector(`.reaction-btn[onclick*="'${reaction}'"]`);
@@ -2261,7 +2584,7 @@
 
             const indicator = document.getElementById('batteryIndicator');
             if (indicator) {
-                indicator.textContent = (charging ? '⚡ ' : '') + pct + '%';
+                indicator.textContent = pct + '%' + (charging ? ' (charging)' : '');
                 indicator.style.display = '';
             }
 

@@ -7,8 +7,13 @@ if (-not (Test-Path $sslDir)) {
     New-Item -ItemType Directory -Path $sslDir | Out-Null
 }
 
-# Generate self-signed certificate
-$cert = New-SelfSignedCertificate -DnsName "192.168.8.1", "localhost" -CertStoreLocation "Cert:\CurrentUser\My" -NotAfter (Get-Date).AddYears(1)
+# Generate self-signed certificate.
+# DnsName entries become the certificate's subjectAltName (SAN) list — required
+# by Android/Chrome, which reject certs that only carry a CN with no matching
+# SAN entry (RFC 2818 CN fallback was removed years ago; iOS/Safari is more
+# lenient, especially once a cert is manually trusted, which is why this only
+# surfaced as a warning on Android).
+$cert = New-SelfSignedCertificate -DnsName "audio.eftours.travel", "192.168.8.1", "localhost" -CertStoreLocation "Cert:\CurrentUser\My" -NotAfter (Get-Date).AddYears(1)
 
 # Export certificate
 $certPath = Join-Path $sslDir "server.crt"

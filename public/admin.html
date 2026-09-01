@@ -137,6 +137,14 @@
         .log-entry .what { color: #003C64; margin-top: 2px; }
 
         .hidden { display: none !important; }
+
+        /* Advanced Audio Settings ("dials") */
+        .dial-row { margin-bottom: 16px; }
+        .dial-row label { display: flex; justify-content: space-between;
+                           font-size: 13px; font-weight: 600; color: #003C64; margin-bottom: 6px; }
+        .dial-row .dial-val { color: #009EEB; font-weight: 700; }
+        .dial-row input[type="range"] { width: 100%; accent-color: #009EEB; }
+        .dial-hint { font-size: 12px; color: #666; margin-top: 4px; }
     </style>
 </head>
 <body>
@@ -175,6 +183,12 @@
         <!-- Section 2: Internet / WiFi -->
         <div class="section">
             <h2>Step 1: Connect to Internet</h2>
+            <div style="font-size: 12px; color: #666; margin: -4px 0 10px;">
+                ℹ️ The internet uplink is automatically disconnected whenever a guide
+                starts broadcasting (a background WiFi reconnect scan was found to
+                cause periodic audio glitches). It stays disconnected afterward — use
+                "Connect" here anytime you need internet back (e.g. to run an update).
+            </div>
             <div id="inetStatus" class="inet-status checking">
                 <span class="dot"></span>
                 <span id="inetText">Checking connection…</span>
@@ -245,6 +259,11 @@
                     Try Again
                 </button>
             </div>
+            <div style="margin-top: 8px;">
+                <button class="toggle-link" onclick="window.open('/api/admin/diag-log', '_blank')">
+                    📋 View diagnostic log (raw JSON)
+                </button>
+            </div>
         </div>
 
         <hr class="section-hr">
@@ -262,6 +281,60 @@
             <div id="logPanel" class="collapse-body hidden">
                 <div class="log-list" id="logList">
                     <div style="color:#888; font-size:13px; text-align:center; padding:12px 0;">No updates recorded yet.</div>
+                </div>
+            </div>
+        </div>
+
+        <hr class="section-hr">
+
+        <!-- Section: Advanced Audio Settings ("dials") — lets a TD tune the guide's
+             capture buffer size in the field (testing with 1 person vs. 20+ calls
+             for different tradeoffs) without a code redeploy. The guide page picks
+             this up on load and again each time broadcasting starts. -->
+        <div class="section">
+            <button class="toggle-link" onclick="toggleAudioDials()">
+                <span id="audioDialsArrow">▶</span> Advanced Audio Settings
+            </button>
+            <div id="audioDialsPanel" class="collapse-body hidden">
+                <div class="dial-row">
+                    <label>Guide capture buffer size <span class="dial-val" id="bufferSizeVal">1024</span></label>
+                    <input type="range" id="bufferSizeSlider" min="0" max="2" step="1" value="0"
+                           oninput="onBufferSizeInput(this.value)">
+                    <div class="dial-hint">
+                        Smaller (1024, ~21ms/packet) = lowest latency, more packets/sec.
+                        Larger (2048/4096) = fewer inter-chunk seams (may reduce crackle),
+                        but a dropped packet loses more audio at once. Guide must
+                        restart broadcasting for a change to take effect.
+                    </div>
+                </div>
+                <button id="saveAudioConfigBtn" class="btn btn-primary" style="margin-top:4px;" onclick="saveAudioConfig()">
+                    Save Audio Settings
+                </button>
+                <div id="audioConfigMsg" class="inline-msg"></div>
+            </div>
+        </div>
+
+        <hr class="section-hr">
+
+        <!-- Section 5: Diagnostics — audio_format / flush_snapshot / glitch markers /
+             wifi_congestion (sampled every 60s while a guide is broadcasting).
+             Temporary instrumentation for the choppy-audio investigation; reads
+             from an in-memory ring buffer (see /api/admin/diag-log), so it
+             resets on every service restart. -->
+        <div class="section">
+            <button class="toggle-link" onclick="toggleDiag()">
+                <span id="diagArrow">▶</span> Audio Diagnostics Log
+            </button>
+            <div id="diagPanel" class="collapse-body hidden">
+                <div style="display:flex; gap:8px; margin-bottom:8px;">
+                    <button class="btn btn-secondary" style="width:auto; padding:8px 14px; font-size:13px;" onclick="loadDiagLog()">🔄 Refresh</button>
+                    <button class="btn btn-secondary" style="width:auto; padding:8px 14px; font-size:13px;" onclick="clearDiagLog()">🗑️ Clear</button>
+                    <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:#003C64; margin-left:auto;">
+                        <input type="checkbox" id="diagAutoRefresh" checked onchange="onDiagAutoRefreshToggle()"> Auto-refresh
+                    </label>
+                </div>
+                <div class="log-list" id="diagList" style="max-height:320px; font-family:monospace; font-size:12px;">
+                    <div style="color:#888; font-size:13px; text-align:center; padding:12px 0;">No diagnostic events yet.</div>
                 </div>
             </div>
         </div>
@@ -580,6 +653,83 @@
             } catch (e) { /* endpoint may not exist yet (Phase 4) */ }
         }
 
+        // ---- Diagnostics (choppy-audio investigation) ---------------------
+        let diagInterval = null;
+
+        function toggleDiag() {
+            const b = document.getElementById('diagPanel');
+            b.classList.toggle('hidden');
+            document.getElementById('diagArrow').textContent = b.classList.contains('hidden') ? '▶' : '▼';
+            if (!b.classList.contains('hidden')) {
+                loadDiagLog();
+                if (document.getElementById('diagAutoRefresh').checked) startDiagAutoRefresh();
+            } else {
+                stopDiagAutoRefresh();
+            }
+        }
+        function startDiagAutoRefresh() {
+            stopDiagAutoRefresh();
+            diagInterval = setInterval(loadDiagLog, 2000);
+        }
+        function stopDiagAutoRefresh() {
+            clearInterval(diagInterval);
+            diagInterval = null;
+        }
+        function onDiagAutoRefreshToggle() {
+            const checked = document.getElementById('diagAutoRefresh').checked;
+            if (checked) startDiagAutoRefresh(); else stopDiagAutoRefresh();
+        }
+
+        // Renders a single diagnostic entry as one compact monospace line,
+        // color-coded by type so flushes/glitches stand out from routine
+        // format reports while scrolling a live log during a walk-test.
+        function fmtDiagEntry(e) {
+            const t = new Date(e.at).toLocaleTimeString();
+            let color = '#444', line = '';
+            if (e.type === 'audio_format') {
+                color = '#003C64';
+                line = `audio_format  role=${e.role} client#${e.clientId} sampleRate=${e.sampleRate} ` +
+                       `chunkFrames=${e.chunkFrames ?? ''} chunkMs=${e.chunkDurationMs ?? ''}`;
+            } else if (e.type === 'flush_snapshot') {
+                color = '#B8860B';
+                line = `flush         client#${e.clientId} reason=${e.reason} queueDepth=${e.queueDepth} ` +
+                       `activeNodes=${e.activeNodes} aheadSec=${e.aheadSec} bufferMs=${e.bufferMs} ` +
+                       `lateArr=${e.lateArrivalRate} rate=${e.currentPlaybackRate} state=${e.audioState} ` +
+                       `totalFlushes=${e.totalFlushesSoFar}`;
+            } else if (e.type === 'audible_glitch_marker') {
+                color = '#D54027';
+                line = `👎 GLITCH     client#${e.clientId} aheadSec=${e.aheadSec} bufferMs=${e.bufferMs} queueDepth=${e.queueDepth}`;
+            } else if (e.type === 'wifi_congestion') {
+                color = '#6A3FA0';
+                line = `wifi_congestion  ownChannel=${e.ownChannel ?? '?'} sameChannelCount=${e.sameChannelCount ?? '?'} ` +
+                       `totalNetworks=${e.totalNetworks} channels=${JSON.stringify(e.channelCounts)}`;
+            } else {
+                line = JSON.stringify(e);
+            }
+            return '<div class="log-entry"><span class="time">' + t + '</span> ' +
+                   '<span style="color:' + color + '">' + line + '</span></div>';
+        }
+
+        async function loadDiagLog() {
+            let d;
+            try { d = await api('/api/admin/diag-log'); }
+            catch (e) { return; }
+            const list = document.getElementById('diagList');
+            const entries = (d && d.entries) || [];
+            if (!entries.length) {
+                list.innerHTML = '<div style="color:#888; font-size:13px; text-align:center; padding:12px 0;">No diagnostic events yet.</div>';
+                return;
+            }
+            // Newest first
+            list.innerHTML = entries.slice().reverse().map(fmtDiagEntry).join('');
+        }
+
+        async function clearDiagLog() {
+            try { await api('/api/admin/diag-log/clear', { method: 'POST' }); }
+            catch (e) { /* ignore */ }
+            loadDiagLog();
+        }
+
         // ---- Update flow -------------------------------------------------
         async function startUpdate() {
             document.getElementById('updateArea').classList.add('hidden');
@@ -677,6 +827,63 @@
             document.getElementById('updateResult').textContent = '';
             document.getElementById('tryAgainBtn').classList.add('hidden');
             loadStatus();
+        }
+
+        // ---- Advanced Audio Settings ("dials") ----------------------------
+        const BUFFER_SIZE_STEPS = [1024, 2048, 4096];
+        let audioDialsOpen = false;
+
+        function toggleAudioDials() {
+            audioDialsOpen = !audioDialsOpen;
+            document.getElementById('audioDialsPanel').classList.toggle('hidden', !audioDialsOpen);
+            document.getElementById('audioDialsArrow').textContent = audioDialsOpen ? '▼' : '▶';
+            if (audioDialsOpen) loadAudioConfig();
+        }
+
+        function onBufferSizeInput(stepIdx) {
+            document.getElementById('bufferSizeVal').textContent = BUFFER_SIZE_STEPS[stepIdx];
+        }
+
+        async function loadAudioConfig() {
+            try {
+                const res = await fetch('/api/audio-config');
+                const cfg = await res.json();
+                const stepIdx = Math.max(0, BUFFER_SIZE_STEPS.indexOf(cfg.bufferSize));
+                document.getElementById('bufferSizeSlider').value = stepIdx;
+                document.getElementById('bufferSizeVal').textContent = BUFFER_SIZE_STEPS[stepIdx];
+            } catch (e) {
+                document.getElementById('audioConfigMsg').textContent = 'Could not load current settings';
+                document.getElementById('audioConfigMsg').className = 'inline-msg err';
+            }
+        }
+
+        async function saveAudioConfig() {
+            const btn = document.getElementById('saveAudioConfigBtn');
+            const msg = document.getElementById('audioConfigMsg');
+            btn.disabled = true;
+            msg.textContent = '';
+            const stepIdx = parseInt(document.getElementById('bufferSizeSlider').value, 10);
+            const bufferSize = BUFFER_SIZE_STEPS[stepIdx];
+            try {
+                const res = await fetch('/api/admin/audio-config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ bufferSize })
+                });
+                const data = await res.json();
+                if (res.ok && data.success) {
+                    msg.textContent = '✅ Saved — guides must restart broadcasting to pick it up.';
+                    msg.className = 'inline-msg ok';
+                } else {
+                    msg.textContent = '❌ ' + (data.message || 'Save failed');
+                    msg.className = 'inline-msg err';
+                }
+            } catch (e) {
+                msg.textContent = '❌ Could not reach the server';
+                msg.className = 'inline-msg err';
+            } finally {
+                btn.disabled = false;
+            }
         }
 
         // ---- Init --------------------------------------------------------

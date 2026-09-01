@@ -5,6 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EF Tour Audio - Guide</title>
     <link rel="icon" type="image/png" href="EF-Logos_EF Logo Pink.png">
+    <!-- PWA: lets guides add this page to their home screen for one-tap
+         access next time, skipping the captive portal flow. -->
+    <link rel="manifest" href="/guide-manifest.json">
+    <meta name="theme-color" content="#D0107A">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Tour Guide">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon-guide.png">
     <style>
         html { background: #D0107A; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -310,7 +319,6 @@
             margin-bottom: 20px;
         }
         .captive-banner.visible { display: flex; }
-        .captive-banner-icon { font-size: 28px; flex-shrink: 0; }
         .captive-banner-title {
             font-weight: 700;
             color: #003C64;
@@ -551,7 +559,6 @@
 
         <!-- Captive portal warning -->
         <div class="captive-banner" id="captiveBanner">
-            <div class="captive-banner-icon">⚠️</div>
             <div>
                 <div class="captive-banner-title">Open in Safari to broadcast</div>
                 <div class="captive-banner-sub">
@@ -714,50 +721,126 @@
                  border-radius:8px; margin-top:6px; max-height:140px; overflow-y:auto;"></div>
         </div>
 
-        <!-- Performance metrics (collapsible) -->
+        <!-- Advanced (collapsible) — WiFi channel optimization, performance
+             metrics, and traveler diagnostics. Always reachable, whether or
+             not this device is the one currently broadcasting, so a second
+             guide can check metrics / optimize the channel from their own
+             phone while a colleague broadcasts. -->
         <div class="metrics-section">
-            <button class="metrics-toggle" onclick="toggleMetrics()">
-                <span id="metricsArrow">▶</span> Performance Metrics
+            <button class="metrics-toggle" onclick="toggleAdvanced()">
+                <span id="advancedArrow">▶</span> Advanced
             </button>
-            <div id="metricsPanel" style="display: none;">
-                <div class="metrics-grid">
-                    <div class="metric-item">
-                        <span class="metric-dot" id="dotCpu"></span>
-                        <span class="metric-label">CPU</span>
-                        <span class="metric-value" id="metricCpu">—</span>
-                    </div>
-                    <div class="metric-item">
-                        <span class="metric-dot" id="dotRam"></span>
-                        <span class="metric-label">RAM Free</span>
-                        <span class="metric-value" id="metricRam">—</span>
-                    </div>
-                    <div class="metric-item">
-                        <span class="metric-dot" id="dotThroughput"></span>
-                        <span class="metric-label">Throughput</span>
-                        <span class="metric-value" id="metricThroughput">—</span>
-                    </div>
-                    <div class="metric-item">
-                        <span class="metric-dot" id="dotSkip"></span>
-                        <span class="metric-label">Skip Rate</span>
-                        <span class="metric-value" id="metricSkip">—</span>
-                    </div>
-                    <div class="metric-item">
-                        <span class="metric-dot" id="dotClients"></span>
-                        <span class="metric-label">Peak Clients</span>
-                        <span class="metric-value" id="metricClients">—</span>
-                    </div>
-                    <div class="metric-item">
-                        <span class="metric-dot" id="dotHeap"></span>
-                        <span class="metric-label">Node Heap</span>
-                        <span class="metric-value" id="metricHeap">—</span>
+            <div id="advancedPanel" style="display: none;">
+
+                <!-- Auto-optimize WiFi channel — scans for the least congested
+                     of channels 1/6/11 and switches the router to it. -->
+                <button id="optimizeWifiBtn" class="test-btn" onclick="optimizeWifi()" style="margin-top:2px;">
+                    Optimize WiFi Channel
+                </button>
+                <div class="test-status" id="optimizeWifiStatus"></div>
+
+                <!-- Performance metrics (collapsible) -->
+                <div class="metrics-section" style="border-top:none; margin-top:10px; padding-top:0;">
+                    <button class="metrics-toggle" onclick="toggleMetrics()">
+                        <span id="metricsArrow">▶</span> Performance Metrics
+                    </button>
+                    <div id="metricsPanel" style="display: none;">
+                        <div class="metrics-grid">
+                            <div class="metric-item">
+                                <span class="metric-dot" id="dotCpu"></span>
+                                <span class="metric-label">CPU</span>
+                                <span class="metric-value" id="metricCpu">—</span>
+                            </div>
+                            <div class="metric-item">
+                                <span class="metric-dot" id="dotRam"></span>
+                                <span class="metric-label">RAM Free</span>
+                                <span class="metric-value" id="metricRam">—</span>
+                            </div>
+                            <div class="metric-item">
+                                <span class="metric-dot" id="dotThroughput"></span>
+                                <span class="metric-label">Throughput</span>
+                                <span class="metric-value" id="metricThroughput">—</span>
+                            </div>
+                            <div class="metric-item">
+                                <span class="metric-dot" id="dotSkip"></span>
+                                <span class="metric-label">Skip Rate</span>
+                                <span class="metric-value" id="metricSkip">—</span>
+                            </div>
+                            <div class="metric-item">
+                                <span class="metric-dot" id="dotClients"></span>
+                                <span class="metric-label">Peak Clients</span>
+                                <span class="metric-value" id="metricClients">—</span>
+                            </div>
+                            <div class="metric-item">
+                                <span class="metric-dot" id="dotHeap"></span>
+                                <span class="metric-label">Node Heap</span>
+                                <span class="metric-value" id="metricHeap">—</span>
+                            </div>
+                        </div>
+                        <div class="metrics-updated" id="metricsUpdated">Tap to refresh</div>
                     </div>
                 </div>
-                <div class="metrics-updated" id="metricsUpdated">Tap to refresh</div>
+
+                <!-- Traveler diagnostics — light client-side telemetry reported by
+                     listeners, shown only once at least one traveler has reported
+                     in. Surfaces traveler-side audio issues that never register
+                     as a server-side skip. -->
+                <div class="metrics-section" id="travelerDiagSection" style="display:none; border-top:none; margin-top:10px; padding-top:0;">
+                    <button class="metrics-toggle" onclick="toggleTravelerDiag()">
+                        <span id="travelerDiagArrow">▶</span> Traveler Diagnostics
+                    </button>
+                    <div id="travelerDiagPanel" style="display: none;">
+                        <div class="metrics-grid">
+                            <div class="metric-item">
+                                <span class="metric-dot" id="dotDiagStruggling"></span>
+                                <span class="metric-label">Struggling</span>
+                                <span class="metric-value" id="metricDiagStruggling">—</span>
+                            </div>
+                            <div class="metric-item">
+                                <span class="metric-dot" id="dotDiagReporting"></span>
+                                <span class="metric-label">Reporting</span>
+                                <span class="metric-value" id="metricDiagReporting">—</span>
+                            </div>
+                            <div class="metric-item">
+                                <span class="metric-dot" id="dotDiagReconnects"></span>
+                                <span class="metric-label">Reconnects</span>
+                                <span class="metric-value" id="metricDiagReconnects">—</span>
+                            </div>
+                            <div class="metric-item">
+                                <span class="metric-dot" id="dotDiagFlushes"></span>
+                                <span class="metric-label">Flushes</span>
+                                <span class="metric-value" id="metricDiagFlushes">—</span>
+                            </div>
+                            <div class="metric-item">
+                                <span class="metric-dot" id="dotDiagDrops"></span>
+                                <span class="metric-label">WiFi Drops</span>
+                                <span class="metric-value" id="metricDiagDrops">—</span>
+                            </div>
+                            <div class="metric-item">
+                                <span class="metric-dot" id="dotDiagSuspends"></span>
+                                <span class="metric-label">Audio Suspends</span>
+                                <span class="metric-value" id="metricDiagSuspends">—</span>
+                            </div>
+                        </div>
+                        <div class="metrics-updated" id="travelerDiagUpdated">Waiting for traveler reports…</div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
+        // Register a no-op service worker purely so the app qualifies as an
+        // installable PWA (Android "Add to Home Screen" / iOS Share sheet).
+        // It does not cache or intercept anything — see public/sw.js — so
+        // it cannot serve stale content or interfere with the live
+        // WebSocket audio stream or mic broadcast.
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js').catch(function (err) {
+                console.warn('Service worker registration failed:', err);
+            });
+        }
+
         // Detect captive portal browser — these mini-browsers block getUserMedia.
         // Show a banner and disable broadcast controls so the guide gets a clear
         // instruction ("open in Safari") rather than a cryptic error.
@@ -893,6 +976,20 @@
         let stream = null;
         let wakeLock = null;
 
+        // ── Live audio config ("dials") ────────────────────────────────────────
+        // Fetched from the server once on load so a TD can adjust the capture
+        // buffer size from the Admin Panel without a redeploy. Falls back to the
+        // historical default if the fetch fails (e.g. very first load before the
+        // server has ever answered).
+        let audioConfig = { bufferSize: 1024 };
+        async function loadAudioConfig() {
+            try {
+                const res = await fetch('/api/audio-config');
+                if (res.ok) audioConfig = Object.assign(audioConfig, await res.json());
+            } catch (e) { /* keep defaults */ }
+        }
+        loadAudioConfig();
+
         // Request wake lock to prevent screen from sleeping during broadcast
         async function requestWakeLock() {
             try {
@@ -936,7 +1033,16 @@
             // autoGainControl re-enabled on all platforms — the browser's hardware-level
             // AGC boosts quiet voices before any Web Audio processing. Combined with the
             // software preamp GainNode it lets the guide speak from a comfortable distance.
-            return { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+            //
+            // noiseSuppression disabled (2026-08 crackle investigation): the browser's
+            // built-in noise suppression runs its own aggressive spectral-subtraction
+            // pipeline, which is a known source of subtle metallic/crackly artifacts —
+            // especially layered under our own highpass/lowpass/compressor/noise-gate
+            // chain, which is already handling wind/rumble/hiss rejection. Two
+            // independent noise-reduction stages fighting the same signal can introduce
+            // more artifacts than either alone. Turn back on if unwanted background
+            // noise becomes a bigger problem than the crackle it was trading off.
+            return { echoCancellation: true, noiseSuppression: false, autoGainControl: true };
         }
 
         // ── Listener count (module-level so updateStatusText can read it) ──────
@@ -1057,6 +1163,16 @@
 
         async function startBroadcast() {
             try {
+                // Kick off a refresh in case a TD changed the dial in the Admin
+                // Panel since page load — but do NOT await it here. iOS requires
+                // getUserMedia() to run synchronously within the user-gesture
+                // (button tap) call chain; an awaited network fetch beforehand
+                // breaks that chain and causes degraded/garbled mic capture.
+                // audioConfig is already populated from the page-load fetch, so
+                // this session uses that value; a refreshed value takes effect
+                // next time startBroadcast() runs.
+                loadAudioConfig();
+
                 // ── audioSession ──────────────────────────────────────────────
                 // Set type to 'play-and-record' BEFORE getUserMedia per MDN spec.
                 // This signals to iOS AVAudioSession that both capture and playback
@@ -1088,12 +1204,15 @@
                 analyser.fftSize = 256;
                 analyser.smoothingTimeConstant = 0.3;
 
-                // Buffer size 1024 → ~21 ms per packet at 48 kHz, ~47 packets/second.
-                // An earlier attempt at 4096 reduced packet rate but added 64 ms of
-                // capture latency and interacted badly with the jitter-buffer timing;
-                // the skip-rate problem that motivated the change is now fixed by
-                // disconnecting the listener WebSocket when the guide is broadcasting.
-                scriptProcessor = audioContext.createScriptProcessor(1024, 1, 1);
+                // Buffer size is admin-configurable (Advanced Audio Settings) —
+                // 1024 → ~21 ms/packet at 48 kHz (~47 packets/sec, default);
+                // 2048/4096 trade more per-packet latency for fewer inter-chunk
+                // seams (less crackle) at the cost of a chunkier loss unit if a
+                // packet is dropped. The skip-rate problem that motivated keeping
+                // this small historically is now fixed by disconnecting the
+                // listener WebSocket when the guide is broadcasting, so larger
+                // sizes are safe to try in the field.
+                scriptProcessor = audioContext.createScriptProcessor(audioConfig.bufferSize, 1, 1);
                 const silentGain = audioContext.createGain();
                 silentGain.gain.value = 0;
                 scriptProcessor.connect(silentGain);
@@ -1232,6 +1351,21 @@
                 ws.onopen = async () => {
                     console.log('WebSocket connected!');
 
+                    // ── Diagnostic: report actual capture format ──────────────────
+                    // Browsers honour the requested 16kHz AudioContext sampleRate only
+                    // loosely — this confirms what the guide is actually running at,
+                    // so it can be compared against the traveler's actual sampleRate
+                    // to rule in/out a clock mismatch as a cause of jitter-buffer flushes.
+                    try {
+                        ws.send(JSON.stringify({
+                            type: 'audio_format',
+                            role: 'guide',
+                            sampleRate: audioContext.sampleRate,
+                            chunkFrames: audioConfig.bufferSize,
+                            chunkDurationMs: Math.round((audioConfig.bufferSize / audioContext.sampleRate) * 100000) / 100
+                        }));
+                    } catch (e) { /* best-effort diagnostics */ }
+
                     scriptProcessor.onaudioprocess = (e) => {
                         if (!ws || ws.readyState !== WebSocket.OPEN) return;
                         const inputData = e.inputBuffer.getChannelData(0);
@@ -1311,6 +1445,8 @@
                             updateReactionDashboard(message.counts,
                                                     message.uniqueParticipants,
                                                     message.totalParticipants);
+                        } else if (message.type === 'traveler-diagnostics') {
+                            updateTravelerDiagnostics(message);
                         }
                     } catch (e) {
                         // Not JSON — ignore
@@ -1420,7 +1556,8 @@
             document.getElementById('testBtn').style.display = 'none';
             document.getElementById('visualizer').style.display = 'none';
 
-            // Auto-open metrics panel so watcher can see live data
+            // Auto-open Advanced + metrics panel so watcher can see live data
+            if (!advancedOpen) toggleAdvanced();
             if (!metricsOpen) toggleMetrics();
         }
 
@@ -1575,6 +1712,41 @@
                 testStatus.textContent = 'Playback error: ' + err.message;
                 testBtn.disabled = false;
                 console.error('Playback error:', err);
+            }
+        }
+
+        // ── Auto-optimize WiFi channel ───────────────────────────────────────
+        // Scans the 2.4GHz band for competing networks and switches the
+        // router to whichever of channels 1/6/11 has the fewest — fixes the
+        // "many other WiFi networks on the same channel" congestion that
+        // causes packet delays/audio drop-outs in busy locations (offices,
+        // hotels, etc). Lives here (not the admin panel) so it's usable
+        // right at the tour location, not just "back at the hotel".
+        async function optimizeWifi() {
+            const btn = document.getElementById('optimizeWifiBtn');
+            const status = document.getElementById('optimizeWifiStatus');
+            btn.disabled = true;
+            status.textContent = 'Scanning nearby WiFi networks…';
+            try {
+                const res = await fetch('/api/guide/optimize-wifi', { method: 'POST' });
+                const data = await res.json();
+                if (!res.ok || !data.success) {
+                    status.textContent = data.message || 'Optimization failed — try again.';
+                    return;
+                }
+                if (data.changed) {
+                    status.textContent =
+                        `Switched channel ${data.oldChannel ?? '?'} → ${data.newChannel} ` +
+                        `(${data.oldCount ?? '?'} → ${data.newCount} competing networks). Reconnecting…`;
+                } else {
+                    status.textContent = `Already on the best channel (${data.oldChannel ?? '?'}).`;
+                }
+                setTimeout(() => { status.textContent = ''; }, 8000);
+            } catch (err) {
+                status.textContent = 'Could not reach the router — try again.';
+                console.error('optimizeWifi error:', err);
+            } finally {
+                btn.disabled = false;
             }
         }
 
@@ -1863,6 +2035,18 @@
             subtitleToastTimer = setTimeout(() => toast.classList.remove('visible'), 3500);
         }
 
+        // ── Advanced section (WiFi optimize / metrics / traveler diagnostics) ──
+        // Always reachable, whether or not this device is broadcasting, so a
+        // second guide can check metrics or optimize the channel from their
+        // own phone while a colleague is broadcasting.
+        let advancedOpen = false;
+
+        function toggleAdvanced() {
+            advancedOpen = !advancedOpen;
+            document.getElementById('advancedPanel').style.display = advancedOpen ? 'block' : 'none';
+            document.getElementById('advancedArrow').textContent = advancedOpen ? '▼' : '▶';
+        }
+
         // ── Performance Metrics ───────────────────────────────────────────────
         let metricsOpen = false;
         let metricsInterval = null;
@@ -1882,6 +2066,44 @@
 
         function parsePct(str) {
             return parseFloat(str) || 0;
+        }
+
+        // ── Traveler Diagnostics ──────────────────────────────────────────────
+        let travelerDiagOpen = false;
+
+        function toggleTravelerDiag() {
+            travelerDiagOpen = !travelerDiagOpen;
+            document.getElementById('travelerDiagPanel').style.display = travelerDiagOpen ? 'block' : 'none';
+            document.getElementById('travelerDiagArrow').textContent = travelerDiagOpen ? '▼' : '▶';
+        }
+
+        /** Handle a 'traveler-diagnostics' summary pushed from the server (~every 10s
+         *  while any listener is reporting). Shows the section on first report so it
+         *  doesn't clutter the UI when no travelers are connected yet. */
+        function updateTravelerDiagnostics(msg) {
+            const section = document.getElementById('travelerDiagSection');
+            if (section) section.style.display = '';
+
+            document.getElementById('metricDiagReporting').textContent = msg.reportingCount ?? '—';
+            document.getElementById('dotDiagReporting').style.background = '#4CAF50';
+
+            document.getElementById('metricDiagStruggling').textContent = msg.strugglingCount ?? '—';
+            colorDot('dotDiagStruggling', msg.strugglingCount || 0, 1, Math.max(3, Math.ceil((msg.reportingCount || 0) / 2)));
+
+            document.getElementById('metricDiagReconnects').textContent = msg.totalReconnects ?? '—';
+            colorDot('dotDiagReconnects', msg.totalReconnects || 0, 3, 10);
+
+            document.getElementById('metricDiagFlushes').textContent = msg.totalFlushes ?? '—';
+            colorDot('dotDiagFlushes', msg.totalFlushes || 0, 5, 15);
+
+            document.getElementById('metricDiagDrops').textContent = msg.totalWsDrops ?? '—';
+            colorDot('dotDiagDrops', msg.totalWsDrops || 0, 3, 10);
+
+            document.getElementById('metricDiagSuspends').textContent = msg.totalSuspends ?? '—';
+            colorDot('dotDiagSuspends', msg.totalSuspends || 0, 1, 5);
+
+            document.getElementById('travelerDiagUpdated').textContent =
+                'Updated ' + new Date().toLocaleTimeString();
         }
 
         function colorDot(id, value, warnAt, redAt) {
@@ -2052,7 +2274,7 @@
             if (!wave || !label) return;
             if (isStreaming) {
                 wave.classList.remove('paused');
-                label.textContent = '🎙️ Broadcasting';
+                label.textContent = 'Broadcasting';
             } else {
                 wave.classList.add('paused');
                 label.textContent = '⏸ Paused';
@@ -2103,7 +2325,7 @@
             <div class="lock-wave-bar"></div>
             <div class="lock-wave-bar"></div>
         </div>
-        <div class="lock-audio-label" id="lockAudioLabel">🎙️ Broadcasting</div>
+        <div class="lock-audio-label" id="lockAudioLabel">Broadcasting</div>
         <div class="lock-dots">
             <div class="lock-dot" id="lockDot1"></div>
             <div class="lock-dot" id="lockDot2"></div>
