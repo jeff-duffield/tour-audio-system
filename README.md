@@ -163,8 +163,9 @@ That's it. One router, one battery pack.
 2. Open a browser and go to `http://192.168.8.1`
 3. Set an admin password when prompted. Use the router admin password from `secrets.txt`.
 4. Connect the router to another Wifi signal as a repeater (or connect to the internet via ethernet)
-4. Go to **Wireless** settings and change the SSID to your tour name (e.g., `EFTourAudio-1`)
-5. Set a WiFi password
+5. Set the WiFi password for both the 2.4GHz and 5GHz networks to the shared fleet password (see `secrets.txt`)
+
+> Leave the SSIDs (network names) as default for now — `setup-router.sh <router-number>` (Step 3 below) sets the correct unique tourist/guide network names automatically. See **Router Provisioning at Scale** for the naming convention and to claim the next available router number from the Fleet Registry.
 
 ### Step 2: Install Node.js on the Router
 
@@ -239,6 +240,8 @@ chmod +x /etc/init.d/tour-audio
 ### Step 5: Set Up SSL Certificate
 
 The SSL certificate for `audio.eftours.travel` is a **CA-signed Let's Encrypt certificate** managed by EF IT. It is installed via the Audio System Admin portal — no manual OpenSSL steps needed.
+
+> Before the real certificate is installed, `setup-router.sh` bootstraps a **temporary self-signed certificate** so the HTTPS server has something to start with. Expect a one-time browser security warning until "Update Device" replaces it with the trusted cert below.
 
 **One-time setup (done by IT over SSH):**
 ```bash
@@ -343,7 +346,7 @@ The system has been optimized to handle 50+ simultaneous connections with 0% pac
 | Component | Key Optimizations | Result |
 |-----------|-------------------|--------|
 | **Server** | 64KB backpressure, debounced broadcasts | 0% skip rate @ 52 clients |
-| **Guide App** | No client-side throttling, 1024 buffer | Continuous audio stream |
+| **Guide App** | No client-side throttling, tunable capture buffer (1024/2048/4096) | Continuous audio stream |
 | **Listener App** | 100ms initial buffer, drift handling | No gaps or stuttering |
 | **Router DHCP** | 100 client pool, rapid commit | Handles connection storms |
 | **Router WiFi** | 60 max clients/band, WMM QoS | Supports 120 total clients |
@@ -398,10 +401,10 @@ chmod +x /root/optimize-wifi.sh
 - Enables client isolation for security (can be disabled if needed)
 
 **WiFi bands are split into two SSIDs:**
-- **Tourists → `EF-TOUR-001` (2.4GHz)** — better range and wall/crowd penetration; more than enough bandwidth for audio
-- **Guides → `EF-TOUR-GUIDE` (5GHz)** — less congestion from tourist devices; guide is usually close to the router
+- **Tourists → 2.4GHz** — better range and wall/crowd penetration; more than enough bandwidth for audio
+- **Guides → 5GHz** — less congestion from tourist devices; guide is usually close to the router
 
-Both use the same password (`EFLearnFun`) and the same app. Tourists join `EF-TOUR-001`, guides join `EF-TOUR-GUIDE`.
+Router 1 (legacy) uses `EF-TOUR-001` (tourist) and `EF-TOUR-GUIDE` (guide). Additional fleet routers get numbered SSIDs (`EF-TOUR-002` / `EF-TOUR-GUIDE-002`, etc.) — see **Router Provisioning at Scale** for the naming convention. All routers share the same WiFi password (see `secrets.txt`).
 
 **Manual WiFi optimization (if script doesn't match your router):**
 
@@ -498,13 +501,15 @@ process.on('SIGTERM', () => {
 
 #### Guide App (guide.html):
 
-**1. Optimized Buffer Size: 1024 samples**
+**1. Tunable Capture Buffer Size (default 1024, field-tuned to 2048)**
 ```javascript
-// 1024 samples = 64ms chunks at 16kHz
-scriptProcessor = audioContext.createScriptProcessor(1024, 1, 1);
+// Buffer size comes from /api/audio-config — see "Dynamic Audio Configuration"
+// below — not a hardcoded constant, so a TD can change it from the admin
+// portal without a code redeploy.
+scriptProcessor = audioContext.createScriptProcessor(audioConfig.bufferSize, 1, 1);
 ```
-- **Impact:** Stable continuous audio capture
-- **Rationale:** 512 samples too small, caused processing gaps
+- **Impact:** Stable continuous audio capture; larger sizes trade a little latency for fewer inter-chunk seams
+- **Rationale:** 512 samples too small, caused processing gaps; 2048 has tested best for audio clarity with 40+ listeners (see [Dynamic Audio Configuration](#dynamic-audio-configuration))
 
 **2. No Client-Side Backpressure**
 ```javascript
@@ -717,6 +722,16 @@ free -m | grep Mem'
 
 **Note:** No security warnings — the site uses a trusted CA-signed certificate. The screen stays on while listening (Wake Lock).
 
+### Live Captions (Beta)
+
+The guide app can generate real-time captions that display on every listener's screen:
+
+- **Enable:** Guide taps **CC** (visible while broadcasting) to turn captions on/off
+- **Desktop guides:** Uses the browser's built-in Web Speech API
+- **Mobile guides:** Uses on-device Whisper (`whisper-tiny.en` via Transformers.js) running in a Web Worker — mobile browsers can't share the microphone between `getUserMedia` and the Web Speech API, so Whisper taps the existing audio stream instead. Model files are self-hosted on the router (`/models/`) so this works with no internet pass-through.
+- **Listener side:** Captions appear in a bar at the bottom of the screen with scroll-back (last 8 lines) and a mute toggle
+- **First use per guide device:** Whisper model download/load can take a few seconds up to ~90s depending on the device; subsequent toggles on the same page load are instant (model stays warm)
+
 ---
 
 ## Network Diagram
@@ -804,9 +819,23 @@ No Raspberry Pi. No ethernet cables. One device does everything.
 
 ### Changing the WiFi Network Name
 
+For a fleet router, don't rename it freely — use `setup-router.sh <router-number>` (see **Router Provisioning at Scale**) so the SSID follows the fleet's conflict-free numbering convention. For a one-off, non-fleet single-router setup:
+
 1. SSH into the router or use the admin panel at `192.168.8.1`
 2. Go to Wireless settings
 3. Change SSID to your preferred name (e.g., `EF-Tour-Rome`)
+
+### Dynamic Audio Configuration
+
+The guide's capture buffer size can be tuned in the field without redeploying code:
+
+- **Where:** Admin portal → **Advanced Audio Settings** (collapsed panel, tap to expand)
+- **Setting:** Buffer size — 1024 / 2048 / 4096 samples per chunk
+  - Smaller = lower latency, more packets/sec, but a dropped packet loses less audio
+  - Larger = fewer inter-chunk seams (can reduce crackle), but a dropped packet loses more audio at once
+  - **2048 is the current field-tested recommendation** — clearest audio with 40+ listeners
+- **How it works:** Saved to `audio-config.json` on the router (persists across reboots and "Update Device"). `guide.html` fetches it on page load and again each time broadcasting starts — the guide must restart broadcasting for a change to take effect.
+- **API:** `GET /api/audio-config` (public, read by guide/listener pages) and `POST /api/admin/audio-config` (admin-only, used by the dial)
 
 ### Monitoring Connected Clients
 
@@ -831,28 +860,89 @@ Visit `https://audio.eftours.travel/health` to see:
 
 ---
 
+## Router Provisioning at Scale
+
+As the fleet grows beyond a handful of routers, two complementary approaches keep new-router setup fast and consistent:
+
+### WiFi Naming Convention
+
+Every router in the fleet gets a unique number, which determines its WiFi SSIDs — this prevents two routers used near each other (same hotel, same city, adjacent tour groups) from ever broadcasting the same network name. Duplicate SSIDs aren't just confusing in a WiFi picker — phones remember networks by SSID+password and will silently auto-join whichever same-named AP is strongest, which can put a traveler on the wrong tour's router.
+
+| Router # | Tourist SSID (2.4GHz) | Guide SSID (5GHz) |
+|---|---|---|
+| 1 (legacy) | `EF-TOUR-001` | `EF-TOUR-GUIDE` *(unnumbered)* |
+| 2 | `EF-TOUR-002` | `EF-TOUR-GUIDE-002` |
+| 3 | `EF-TOUR-003` | `EF-TOUR-GUIDE-003` |
+| N | `EF-TOUR-0NN` | `EF-TOUR-GUIDE-0NN` |
+
+Router 1 keeps its original unnumbered guide SSID rather than being renamed for consistency (no benefit to re-pairing already-working guide devices). All routers **N ≥ 2** get both SSIDs numbered, zero-padded to 3 digits so names still sort correctly once the fleet passes 9 routers. The WiFi password stays identical across the whole fleet (see `secrets.txt`) — only the SSID varies.
+
+**Before provisioning a new router:** check the Fleet Registry in `secrets.txt` for the next unused number, and add a row for it once provisioning is done.
+
+### Option 1: Bootstrap Script (`setup-router.sh <router-number>`)
+
+Run once on a freshly flashed GL.iNet router, after Steps 1–3 of the Setup Guide (initial WiFi config, Node.js install, and `scp -r tour-audio-server` to `/root/`) — the script needs the app files already on the router since it runs `npm install` from within that directory. Pass the router's assigned fleet number as the only argument, e.g. `./setup-router.sh 2`. It then sets the unique WiFi SSIDs above, and automates the temporary self-signed SSL bootstrap (so HTTPS can start before the real cert is installed), dependency install, auto-start service setup, DNS (including the RFC 8910 captive-portal DHCP option for Android), timezone, and port-forwarding. Keep this script in sync with the Setup Guide steps above — it's the source of truth for "what a router needs."
+
+**Still manual after the script runs:**
+- Adding the new router + its SSIDs to the Fleet Registry in `secrets.txt`
+- Placing `/etc/ef-cert-token` (one-time, IT-managed secret — same token works across all routers)
+- Running "Update Device" once in the admin portal to fetch the real Let's Encrypt cert (replaces the script's temporary self-signed cert)
+- NTP auto-sync setup (Step 8) and DHCP/WiFi optimizations (`optimize-dhcp.sh` / `optimize-wifi.sh`) — run separately since they're independent, tour-size-dependent tunables
+
+### Option 2: Golden Image (`sysupgrade` backup/restore)
+
+Once one router is fully configured and verified end-to-end, take a backup and restore it onto identical hardware:
+
+```bash
+# On a known-good, fully-configured router:
+ssh root@192.168.8.1 "sysupgrade -b /tmp/backup.tar.gz"
+scp root@192.168.8.1:/tmp/backup.tar.gz ./golden-image-$(date +%Y%m%d).tar.gz
+
+# On a freshly flashed router of the SAME model/firmware version:
+scp golden-image-YYYYMMDD.tar.gz root@192.168.8.1:/tmp/
+ssh root@192.168.8.1 "sysupgrade -r /tmp/golden-image-YYYYMMDD.tar.gz"
+```
+
+This restores UCI config (WiFi, DHCP, firewall, dnsmasq) instantly. It does **not** include `/root/tour-audio-server` unless that path is added to `sysupgrade`'s backup list (`/etc/sysupgrade.conf`) — safest to still deploy the app files fresh via `scp` after restoring, so the app code always matches this repo rather than whatever was on the router when the image was captured.
+
+**Important:** the image also clones the source router's WiFi SSIDs. After restoring onto a new unit, re-run just the SSID step for its assigned number (`uci set wireless.<iface>.ssid=...` per the naming convention above, then `uci commit wireless && wifi reload`) — or re-run `setup-router.sh <router-number>` in full, which is idempotent and safe to repeat.
+
+**Recommendation:** Treat the bootstrap script as the documented, versioned procedure — fix it whenever the Setup Guide changes. Cut a fresh golden image from a script-provisioned router whenever onboarding several routers at once; it turns a ~15 minute manual setup into a ~2 minute restore, with the script as the fallback/reference when an image goes stale or hardware doesn't match.
+
+**Per-router values that stay unique regardless of method:** WiFi SSIDs (see naming convention above). The cert token, admin token, WiFi password, and app code are identical across the fleet by design.
+
+---
+
 ## File Structure
 
 ```
 tour-audio-server/
-├── server.js                          # Main server (dual HTTP/HTTPS)
+├── server.js                          # Main server (dual HTTP/HTTPS, admin API, captive portal)
 ├── ef-update.sh                       # Certificate update script (run by admin portal)
-├── setup-router.sh                    # Complete router setup automation
-├── package.json                       # Node.js dependencies
-├── README.md                          # This file
+├── setup-router.sh                    # Router bootstrap automation (SSID naming, SSL bootstrap, deps, DNS, port-forwarding)
 ├── optimize-dhcp.sh                   # Router DHCP optimization script
 ├── optimize-wifi.sh                   # Router WiFi optimization script
+├── package.json                       # Node.js dependencies
+├── README.md                          # This file
+├── audio-config.json                  # Saved dial settings (buffer size) — created on first save, persists across reboots
 ├── ssl/
 │   ├── server.crt                     # Let's Encrypt certificate (installed via Update Device)
 │   ├── server.key                     # EC private key (installed via Update Device)
 │   └── backup/                        # Timestamped backups of previous certs
+├── models/Xenova/                     # Self-hosted whisper-tiny.en model files for on-device captions
 └── public/
     ├── welcome.html                   # Captive portal splash page (HTTP) — 5-tap logo → guide app
     ├── connected.html                 # Captive portal "you're connected" page (shown by OS probe intercept)
-    ├── index.html                     # Listener interface (HTTPS) — dark blue, lock screen, wake lock
-    ├── guide.html                     # Tour guide broadcast interface (HTTPS) — pink, broadcaster lock, watch mode
-    ├── admin.html                     # Audio System Admin portal (Wi-Fi connect, cert update)
+    ├── index.html                     # Listener interface (HTTPS) — dark blue, lock screen, wake lock, captions
+    ├── guide.html                     # Tour guide broadcast interface (HTTPS) — pink, broadcaster lock, watch mode, dials, captions
+    ├── admin.html                     # Audio System Admin portal (Wi-Fi connect, cert update, Advanced Audio Settings dials)
     ├── waiting-room.html              # Waiting room for staggered connections
+    ├── whisper-worker.js              # On-device speech-to-text (Whisper via Transformers.js) — mobile guide captions
+    ├── transformers.min.js            # Transformers.js library (bundled, no CDN dependency)
+    ├── ort-wasm.wasm / ort-wasm-simd.wasm  # ONNX Runtime WASM backends for Whisper inference
+    ├── manifest.json / guide-manifest.json # PWA manifests (listener / guide "Add to Home Screen")
+    ├── sw.js                          # Service worker (PWA offline shell)
+    ├── icons/                         # PWA home-screen icons (listener + guide variants)
     └── EF-Logos_EF Logo Pink.png      # EF Tours logo
 ```
 
@@ -865,7 +955,7 @@ tour-audio-server/
 - ✅ **Low latency** (~200-300ms end-to-end)
 - ✅ **PCM Int16 encoding** for reliable real-time transmission
 - ✅ **16kHz sample rate** (good voice quality, efficient bandwidth)
-- ✅ **1024 sample buffer** (64ms chunks for stability)
+- ✅ **Tunable capture buffer** (1024/2048/4096 samples, field-adjustable — see [Dynamic Audio Configuration](#dynamic-audio-configuration))
 - ✅ **Drift correction** prevents buffer overflow/underflow
 - ✅ **100ms initial buffer** eliminates audio gaps
 
@@ -905,6 +995,7 @@ tour-audio-server/
 - ✅ **Guide easter egg** — tap the EF logo 5× on the welcome/captive portal page to navigate to the guide app
 - ✅ **Captive portal mini-browser detection** — guide app detects restricted browser and shows "Open in Safari" instructions
 - ✅ **Waiting room page** for staggered connections
+- ✅ **Live captions (beta)** — guide-toggled real-time subtitles (Web Speech API on desktop, on-device Whisper on mobile) shown on listener screens
 
 **Captive Portal:**
 - ✅ **Host-based OS probe intercept** — `captive.apple.com`, `www.apple.com`, `connectivitycheck.gstatic.com`, `clients3.google.com`, `www.msftconnecttest.com` all return `302` (never `204`)
@@ -915,6 +1006,7 @@ tour-audio-server/
 **Admin:**
 - ✅ **Fixed admin token** — URL never changes: `https://audio.eftours.travel/admin?token=EFAdminAudio02141`
 - ✅ **8-hour session cookie** — log in once, stay logged in for the day
+- ✅ **Dynamic Audio Configuration** — Advanced Audio Settings panel lets a TD tune the guide's capture buffer size (1024/2048/4096) in the field without a code redeploy; setting persists in `audio-config.json` across reboots and updates
 
 ### Performance Specifications
 
@@ -929,7 +1021,7 @@ tour-audio-server/
 | **Latency** | 200-300ms | Acceptable for tour commentary |
 | **Sample Rate** | 16 kHz | Good voice quality |
 | **Audio Encoding** | PCM Int16 | Lossless, low CPU |
-| **Buffer Size** | 1024 samples | 64ms chunks |
+| **Buffer Size** | 2048 samples (default 1024) | Tunable via admin dial; 2048 currently recommended |
 | **Initial Buffer** | 100ms | Prevents underruns |
 | **Backpressure** | 64KB | ~2 seconds of audio |
 

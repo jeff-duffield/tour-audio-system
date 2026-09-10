@@ -9,8 +9,8 @@ echo "Optimizing router for connection storms..."
 cp /etc/config/dhcp /etc/config/dhcp.backup
 echo "✅ Backed up /etc/config/dhcp"
 
-# Increase DHCP lease time to reduce churn
-uci set dhcp.lan.leasetime='2h'
+# DHCP lease time - 24h matches Router 1's current production config
+uci set dhcp.lan.leasetime='24h'
 
 # Increase DHCP limit
 uci set dhcp.lan.limit='100'
@@ -37,7 +37,7 @@ echo ""
 echo "Optimizations complete! Router can now handle connection storms better."
 echo ""
 echo "Changes made:"
-echo "  - DHCP lease time: 2 hours (reduces renewal traffic)"
+echo "  - DHCP lease time: 24 hours (reduces renewal traffic)"
 echo "  - DHCP limit: 100 clients"
 echo "  - DNS cache: 1000 entries"
 echo "  - Rapid commit: Enabled (faster DHCP)"
