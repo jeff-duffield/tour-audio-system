@@ -51,6 +51,7 @@ ssh root@192.168.8.1
 ```bash
 # Install dependencies (first time only)
 npm.cmd install
+```
 
 #### Open PowerShell and add Node.js to your PATH
 
@@ -70,7 +71,7 @@ cd "C:\Users\JeffDuffield\OneDrive - Education First\Documents\tour-audio-server
 npm.cmd install
 
 # Run with 40 simulated clients for 2 minutes
-node load-test.js --clients 80 --duration 120
+node load-test.js --clients 40 --duration 120
 ```
 
 > Make sure the guide app is actively broadcasting before starting the test, otherwise clients will connect but receive no audio data.
@@ -501,7 +502,7 @@ process.on('SIGTERM', () => {
 
 #### Guide App (guide.html):
 
-**1. Tunable Capture Buffer Size (default 1024, field-tuned to 2048)**
+**1. Tunable Capture Buffer Size (server default 2048, field-tuned from an original 1024)**
 ```javascript
 // Buffer size comes from /api/audio-config — see "Dynamic Audio Configuration"
 // below — not a hardcoded constant, so a TD can change it from the admin
@@ -719,8 +720,21 @@ free -m | grep Mem'
 4. Tap **Start Listening**
 5. Use headphones for best experience; adjust the on-screen volume slider as needed
 6. Tap the **lock icon** to lock the screen and prevent accidental taps while the phone is in your pocket — tap the screen 3 times to unlock
+7. Tap the **camera icon** (top-right) to take a photo or record a video without leaving the tour audio page — see **Camera Widget** below
 
 **Note:** No security warnings — the site uses a trusted CA-signed certificate. The screen stays on while listening (Wake Lock).
+
+### Camera Widget
+
+Tourists can snap photos or record short videos from the listener page itself, so they never have to leave the live audio stream to use their phone's own camera app:
+
+- **Open:** Tap the camera icon (top-right of the listener screen)
+- **Photo/Video toggle:** Switch modes with the on-screen **PHOTO** / **VIDEO** buttons (VIDEO mode only appears if the browser supports `MediaRecorder`)
+- **Front/back camera flip:** Shown automatically only on devices with both a front and back camera; the front-camera preview is mirrored (selfie-style) but the saved photo/video never is
+- **Zoom:** On-screen +/- buttons or pinch-to-zoom; uses the camera's native optical/hybrid zoom where supported (e.g. Android Chrome), falling back to a CSS scale elsewhere (e.g. iOS Safari)
+- **Camera switching is disabled mid-recording** — stop the recording first, then flip
+
+
 
 ### Live Captions (Beta)
 
@@ -918,12 +932,18 @@ This restores UCI config (WiFi, DHCP, firewall, dnsmasq) instantly. It does **no
 ```
 tour-audio-server/
 ├── server.js                          # Main server (dual HTTP/HTTPS, admin API, captive portal)
+├── admin-qr.js                        # CLI: prints/regenerates the admin token URL + QR image link
+├── load-test.js                       # WebSocket load-testing tool (see Load Testing)
 ├── ef-update.sh                       # Certificate update script (run by admin portal)
 ├── setup-router.sh                    # Router bootstrap automation (SSID naming, SSL bootstrap, deps, DNS, port-forwarding)
 ├── optimize-dhcp.sh                   # Router DHCP optimization script
 ├── optimize-wifi.sh                   # Router WiFi optimization script
-├── package.json                       # Node.js dependencies
+├── debug-cert.sh / diagnose-relay.sh  # Router-side diagnostic scripts (cert format / DNS+Private Relay checks)
+├── package.json / package-lock.json   # Node.js dependencies
 ├── README.md                          # This file
+├── HELP-GUIDE.md, WAKE-LOCK-GUIDE.md, IOS-SILENT-MODE-LIMITATION.md,
+│   SECURITY-RELIABILITY-AUDIT.md      # Supporting guides (see repo root)
+├── secrets.txt                        # Router/WiFi/admin passwords + Fleet Registry (not committed to source control)
 ├── audio-config.json                  # Saved dial settings (buffer size) — created on first save, persists across reboots
 ├── ssl/
 │   ├── server.crt                     # Let's Encrypt certificate (installed via Update Device)
@@ -933,7 +953,7 @@ tour-audio-server/
 └── public/
     ├── welcome.html                   # Captive portal splash page (HTTP) — 5-tap logo → guide app
     ├── connected.html                 # Captive portal "you're connected" page (shown by OS probe intercept)
-    ├── index.html                     # Listener interface (HTTPS) — dark blue, lock screen, wake lock, captions
+    ├── index.html                     # Listener interface (HTTPS) — dark blue, lock screen, wake lock, camera widget, captions
     ├── guide.html                     # Tour guide broadcast interface (HTTPS) — pink, broadcaster lock, watch mode, dials, captions
     ├── admin.html                     # Audio System Admin portal (Wi-Fi connect, cert update, Advanced Audio Settings dials)
     ├── waiting-room.html              # Waiting room for staggered connections
@@ -996,6 +1016,7 @@ tour-audio-server/
 - ✅ **Captive portal mini-browser detection** — guide app detects restricted browser and shows "Open in Safari" instructions
 - ✅ **Waiting room page** for staggered connections
 - ✅ **Live captions (beta)** — guide-toggled real-time subtitles (Web Speech API on desktop, on-device Whisper on mobile) shown on listener screens
+- ✅ **In-page camera widget** — travelers can take photos or record video without leaving the listener page; front/back camera toggle, pinch-to-zoom/native zoom, and photo/video mode toggle (see [Camera Widget](#camera-widget))
 
 **Captive Portal:**
 - ✅ **Host-based OS probe intercept** — `captive.apple.com`, `www.apple.com`, `connectivitycheck.gstatic.com`, `clients3.google.com`, `www.msftconnecttest.com` all return `302` (never `204`)
@@ -1021,7 +1042,7 @@ tour-audio-server/
 | **Latency** | 200-300ms | Acceptable for tour commentary |
 | **Sample Rate** | 16 kHz | Good voice quality |
 | **Audio Encoding** | PCM Int16 | Lossless, low CPU |
-| **Buffer Size** | 2048 samples (default 1024) | Tunable via admin dial; 2048 currently recommended |
+| **Buffer Size** | 2048 samples (server default) | Tunable via admin dial (1024/2048/4096); 2048 currently recommended |
 | **Initial Buffer** | 100ms | Prevents underruns |
 | **Backpressure** | 64KB | ~2 seconds of audio |
 

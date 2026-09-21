@@ -253,7 +253,11 @@ function readJsonSafe(p) {
 // pre-auth.
 const AUDIO_CONFIG_PATH = path.join(__dirname, 'audio-config.json');
 const DEFAULT_AUDIO_CONFIG = {
-    bufferSize: 1024  // guide's ScriptProcessor size in samples — 1024/2048/4096
+    bufferSize: 2048  // guide's ScriptProcessor size in samples — 1024/2048/4096.
+    // 2048 is the field-tested default (see README "Dynamic Audio Configuration"):
+    // 1024 saves ~64ms of latency but its more frequent capture callbacks caused
+    // audible choppiness in the field (2026-08 latency investigation); 2048 trades
+    // that latency back for materially smoother audio.
     // NOTE: a "fadeMs" traveler inter-chunk fade setting used to live here.
     // Removed (2026-08 crackle investigation) — the fade forced each chunk's
     // volume to zero and back at every chunk boundary (chunks are scheduled
@@ -1070,6 +1074,14 @@ function sendTelemetrySummaryToGuides() {
     const sum = (key) => entries.reduce((a, e) => a + (e[key] || 0), 0);
     const avg = (key) => count > 0 ? sum(key) / count : 0;
 
+    // Only average latency across listeners that have completed at least one
+    // measurement (0 means "no probe processed yet" — e.g. just connected).
+    const latencySamples = entries.map(e => e.endToEndLatencyMs).filter(v => v > 0);
+    const avgLatencyMs = latencySamples.length > 0
+        ? Math.round(latencySamples.reduce((a, v) => a + v, 0) / latencySamples.length)
+        : null;
+    const maxLatencyMs = latencySamples.length > 0 ? Math.round(Math.max(...latencySamples)) : null;
+
     const payload = JSON.stringify({
         type: 'traveler-diagnostics',
         reportingCount: count,
@@ -1079,6 +1091,8 @@ function sendTelemetrySummaryToGuides() {
         totalSuspends: sum('suspends'),
         avgLateArrivalRate: Math.round(avg('lateArrivalRate') * 100) / 100,
         avgQueueDepth: Math.round(avg('queueDepth') * 10) / 10,
+        avgLatencyMs,
+        maxLatencyMs,
         strugglingCount: entries.filter(e =>
             e.lateArrivalRate > 0.2 || e.bufferMs >= 600 || e.audioState === 'suspended').length
     });
@@ -1239,8 +1253,14 @@ wss.on('connection', (ws) => {
             try { msg = JSON.parse(data.toString()); } catch(e) { return; /* malformed */ }
 
             // ── Heartbeat ping ────────────────────────────────────────────────
+            // `ts` (server's own Date.now()) is echoed back so any client can
+            // estimate its wall-clock offset from the server (NTP-style:
+            // offset ≈ serverTs - (clientSendTs + clientReceiveTs) / 2). Used
+            // by the end-to-end latency measurement below to compare guide
+            // capture time against listener playback time without requiring
+            // guide and listener devices to share a clock directly.
             if (msg.type === 'ping') {
-                try { ws.send(JSON.stringify({ type: 'pong' })); } catch(e) { /* ignore */ }
+                try { ws.send(JSON.stringify({ type: 'pong', ts: Date.now() })); } catch(e) { /* ignore */ }
                 return;
             }
 
@@ -1338,6 +1358,12 @@ wss.on('connection', (ws) => {
                     wsDrops: msg.wsDrops || 0,
                     suspends: msg.suspends || 0,
                     audioState: msg.audioState || 'unknown',
+                    // End-to-end (capture-to-speaker) latency in ms, measured
+                    // client-side via the latency_probe marker — see
+                    // onChunkArrived/drainQueue in index.html. 0/undefined
+                    // means this listener hasn't completed a measurement yet
+                    // (e.g. just connected) and is excluded from the average.
+                    endToEndLatencyMs: msg.endToEndLatencyMs || 0,
                     updatedAt: Date.now()
                 });
                 scheduleTelemetryBatch();
@@ -1347,6 +1373,27 @@ wss.on('connection', (ws) => {
             // ── Subtitles — active broadcaster only ───────────────────────────
             if (ws !== activeBroadcaster) return;
             if (msg.type === 'subtitle') {
+                const payload = data.toString();
+                clients.forEach(client => {
+                    if (client !== ws &&
+                        !watchingGuides.has(client) &&
+                        client.readyState === WebSocket.OPEN) {
+                        try { client.send(payload); } catch(e) { /* ignore slow client */ }
+                    }
+                });
+                return;
+            }
+
+            // ── Latency probe — active broadcaster only ─────────────────────
+            // A tiny JSON marker the guide interleaves with the live audio
+            // stream every few seconds (see guide.html). It carries the
+            // guide's capture time already converted to server-clock terms
+            // (captureServerTime). Forwarded as-is, in stream order, so each
+            // listener's jitter buffer can slot it in right next to the audio
+            // chunk it followed and measure real end-to-end delay — this
+            // never touches the binary audio path, so it can't add latency
+            // or jitter to playback itself.
+            if (msg.type === 'latency_probe') {
                 const payload = data.toString();
                 clients.forEach(client => {
                     if (client !== ws &&

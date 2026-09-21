@@ -126,6 +126,14 @@ sh /root/tour-audio-server/ef-update.sh
 - **Use headphones** — significantly improves clarity in noisy outdoor environments.
 - **Tap the lock icon** — locks the screen to prevent accidental taps while the phone is in a pocket. Tap 3 times to unlock.
 
+### Camera widget (front/back toggle)
+Quick check after any deploy that touches `public/index.html`'s camera code:
+1. Tap the camera icon → the flip button (top-left, circular-arrow icon) should appear on any phone with both a front and back camera. On single-camera devices it should stay hidden.
+2. Tap the flip button — camera should switch between back and front, front-camera preview should be mirrored (selfie-style), and zoom should reset to 1×.
+3. Take a photo with the front camera and confirm the **saved** photo is *not* mirrored (the live preview mirrors; the captured image never should).
+4. Switch to Video mode, start recording, then tap the flip button — it should show a "Stop recording before switching cameras" toast instead of switching (track-swap mid-recording isn't supported), then flip normally once recording stops.
+5. Deny camera permission (or test on a device that has none) — the overlay should show "Camera access denied" with the flip button hidden, not a broken/blank flip control.
+
 ---
 
 ## 5. Performance Tips
@@ -160,3 +168,6 @@ sh /root/tour-audio-server/ef-update.sh
 | High skip rate in metrics | Listener tab open on guide's device | Close the listener tab on the guide's phone |
 | Echo / hearing own voice | Listener page open on guide's device | The app now auto-mutes it; close the tab to be safe |
 | CC showing wrong words | Background noise triggering Whisper | Lower the sensitivity slider; use Voice Isolation |
+| Camera flip button missing | Device only has one camera, or `enumerateDevices()` failed | Expected on single-camera devices; otherwise reopen the camera to retry detection |
+| Camera flip does nothing while recording | Blocked intentionally (track-swap mid-recording isn't reliable) | Stop recording first, then flip |
+| Colored bar behind home indicator in Lock Mode | `<html>` background not synced to lock/battery-save state | Fixed 2026-09 via `setRootBackground()`; if it reappears, check that every `setThemeColor()` call site also calls `setRootBackground()` |

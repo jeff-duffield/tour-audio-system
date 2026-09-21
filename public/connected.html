@@ -64,11 +64,6 @@
             cursor: pointer;
         }
         .open-btn:active { opacity: 0.75; }
-        .hint {
-            font-size: 13px;
-            color: rgba(255,255,255,0.45);
-            line-height: 1.5;
-        }
         .guide-link {
             font-size: 13px;
             color: rgba(255,255,255,0.35);
@@ -86,36 +81,50 @@
             gap: 16px;
             width: 100%;
         }
-        .relay-warning {
-            background: rgba(255,50,155,0.10);
-            border: 1.5px solid rgba(255,50,155,0.4);
-            border-radius: 14px;
-            padding: 16px;
+        .setup-steps {
+            list-style: none;
+            counter-reset: step;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            width: 100%;
+            text-align: left;
+        }
+        .setup-steps > li {
+            counter-increment: step;
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+        }
+        .setup-steps > li::before {
+            content: counter(step);
+            flex-shrink: 0;
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            background: rgba(255,50,155,0.18);
+            border: 1.5px solid rgba(255,50,155,0.5);
+            color: #FF9AD1;
+            font-size: 13px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 1px;
+        }
+        .setup-steps .step-body {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            min-width: 0;
+        }
+        .setup-steps .step-text {
             font-size: 14px;
             color: rgba(255,255,255,0.85);
             line-height: 1.5;
-            text-align: left;
-            width: 100%;
         }
-        .relay-warning strong { color: #FF9AD1; }
-        .relay-warning .relay-title {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-weight: 700;
-            font-size: 15px;
-            color: #FF9AD1;
-            margin-bottom: 6px;
-        }
-        .relay-warning .relay-steps {
-            display: block;
-            margin-top: 10px;
-            padding: 10px 12px;
-            background: rgba(255,255,255,0.08);
-            border-radius: 8px;
-            font-weight: 600;
-            color: #fff;
-        }
+        .setup-steps .step-text strong { color: #FF9AD1; }
         .url-copy-widget {
             display: flex;
             align-items: center;
@@ -166,7 +175,6 @@
         }
         .portal-btn:active { opacity: 0.7; }
         .or-sep { font-size: 12px; color: rgba(255,255,255,0.3); }
-        .portal-note { font-size: 12px; color: rgba(255,255,255,0.35); line-height: 1.4; }
         /* Entrance animation */
         @keyframes fadeUp {
             from { opacity: 0; transform: translateY(14px); }
@@ -192,27 +200,37 @@
         <h1 class="a1">You are connected.<br>Open the Tour Audio app<br>to begin listening.</h1>
 
         <div id="captiveControls">
-            <div id="relayWarning" style="display:none;" class="relay-warning a2">
-                <div class="relay-title">Want to use the camera or mic?</div>
-                This tour's Wi-Fi has no internet connection, so if <strong>Private Relay</strong> is on, Safari won't be able to load the app.
-                <span class="relay-steps">Quick fix (10 sec): Settings → Wi-Fi → ⓘ next to this network → Limit IP Address Tracking → Off</span>
-            </div>
-
-            <div class="url-copy-widget a2">
-                <span class="url-text">audio.eftours.travel</span>
-                <button class="copy-action" onclick="copyUrl(this)">Copy</button>
-            </div>
-            <p class="hint a2">
-                Tap <strong style="color:rgba(255,255,255,0.7)">Copy</strong>, then tap
-                <strong style="color:rgba(255,255,255,0.7)">Done</strong> above, open
-                <strong style="color:rgba(255,255,255,0.7)">Safari</strong>, and paste it in.
-            </p>
+            <ol class="setup-steps a1">
+                <li>
+                    <div class="step-body">
+                        <span class="step-text">Read all instructions before closing this window — this screen won't reopen once you leave it.</span>
+                    </div>
+                </li>
+                <li>
+                    <div class="step-body">
+                        <span class="step-text">Copy this URL — you'll need it later.</span>
+                        <div class="url-copy-widget">
+                            <span class="url-text">audio.eftours.travel</span>
+                            <button class="copy-action" onclick="copyUrl(this)">Copy</button>
+                        </div>
+                    </div>
+                </li>
+                <li>
+                    <div class="step-body">
+                        <span class="step-text" id="closeStepText"></span>
+                    </div>
+                </li>
+                <li id="relayStep" style="display:none;">
+                    <div class="step-body">
+                        <span class="step-text">Turn off Limit IP Address Tracking for this network: <strong>Settings → Wi-Fi → ⓘ next to this network → Limit IP Address Tracking → Off</strong>. This lets the camera and microphone work.</span>
+                    </div>
+                </li>
+            </ol>
 
             <p class="or-sep a3">or</p>
             <a href="https://audio.eftours.travel/index.html" class="portal-btn a3">
                 Listen in this window
             </a>
-            <p class="portal-note a3">Camera not available in captive portal</p>
         </div>
         <div id="directControls" style="display:none;">
             <a href="https://audio.eftours.travel/index.html" class="open-btn a2">
@@ -267,6 +285,27 @@
             }
         }
 
+        // Show only the steps for this traveler's own device (iPhone vs.
+        // Android) instead of listing both platforms — matches the printed
+        // card's per-device wording. Counter-based numbering (see
+        // .setup-steps CSS) automatically renumbers when relayStep is
+        // hidden, since a display:none <li> doesn't increment the CSS
+        // counter. Falls back to the Android-style flow for any UA that
+        // isn't recognizably iOS.
+        function applyPlatformSteps() {
+            var ua = navigator.userAgent || '';
+            var isIPhone = /iphone|ipad|ipod/i.test(ua);
+            var closeStepText = document.getElementById('closeStepText');
+            if (!closeStepText) return;
+            if (isIPhone) {
+                closeStepText.innerHTML = 'When you\'re ready to close this window, tap the <strong>✕</strong> in the top-right corner, then choose <strong>"Use Without Internet."</strong>';
+                document.getElementById('relayStep').style.display = '';
+            } else {
+                closeStepText.innerHTML = 'When you\'re ready to close this window, tap <strong>⋮</strong> (three dots) in the top-right corner, then choose <strong>"Use this network as is."</strong>';
+            }
+        }
+        applyPlatformSteps();
+
         // Detect whether this page is running inside the OS's captive-portal
         // mini-browser vs. a real browser. iOS 17+ made the CNA's WKWebView
         // indistinguishable from real Safari from inside the page itself
@@ -289,13 +328,11 @@
             }
         }
 
-        if (isCaptivePortalBrowser()) {
-            // Show iCloud Private Relay tip on iOS — see welcome.html for why this
-            // can't be detected directly from within the captive portal.
-            if (/iphone|ipad|ipod/i.test(navigator.userAgent)) {
-                document.getElementById('relayWarning').style.display = 'block';
-            }
-        } else {
+        // The device-specific steps above (see applyPlatformSteps) are
+        // always populated — this toggle just decides whether the whole
+        // numbered captive-portal flow is needed at all, vs. a real browser
+        // that reached this page directly.
+        if (!isCaptivePortalBrowser()) {
             document.getElementById('captiveControls').style.display = 'none';
             document.getElementById('directControls').style.display = 'block';
         }

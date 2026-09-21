@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>EF Tour Audio - Listen</title>
     <link rel="icon" type="image/png" href="EF-Logos_EF Logo Pink.png">
     <!-- PWA: lets travelers add this page to their home screen for one-tap
@@ -15,8 +15,15 @@
     <meta name="apple-mobile-web-app-title" content="Tour Audio">
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
     <style>
-        /* Full-bleed gradient on html prevents white overscroll flash */
-        html { background: #00243C; }
+        /* Full-bleed gradient on html prevents white overscroll flash.
+           iOS has no equivalent of apple-mobile-web-app-status-bar-style for
+           the BOTTOM safe area (home indicator strip) — that sliver is
+           painted from this element's own background-color, not whatever
+           #lockOverlay is currently showing. setRootBackground() (below)
+           keeps this in sync with lock/battery-save state so that strip
+           blends in instead of showing a stray navy bar over a black
+           lock/battery-save screen. */
+        html { background: #00243C; transition: background 0.5s ease; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'EF Circular', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -161,7 +168,7 @@
             align-items: center;
             justify-content: center;
             text-align: center;
-            padding: 40px 24px;
+            padding: calc(40px + env(safe-area-inset-top)) 24px calc(40px + env(safe-area-inset-bottom));
             touch-action: none;
             -webkit-user-select: none;
             user-select: none;
@@ -477,7 +484,12 @@
         /* ── Camera ───────────────────────────────────────────────────────── */
         #cameraBtn {
             position: fixed;
-            top: 24px;
+            /* viewport-fit=cover (see <meta name=viewport> above) lets the page draw
+               under the iOS status bar/notch — without accounting for that, a flat
+               24px top offset lands right under the battery/WiFi/cellular icons on
+               phones with a tall status bar/dynamic island. env(safe-area-inset-top)
+               is 0 on devices without a notch, so this is a no-op there. */
+            top: calc(24px + env(safe-area-inset-top));
             right: 24px;
             width: 56px;
             height: 56px;
@@ -540,6 +552,25 @@
             align-items: center;
             justify-content: center;
         }
+        .camera-flip {
+            /* Mirrors .camera-close's position on the opposite corner. Hidden
+               by default — openCamera() only reveals it once it's confirmed
+               (via enumerateDevices) that the device actually has more than
+               one camera, so it never appears as a dead control. */
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: rgba(0,0,0,0.5);
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .camera-flip svg { width: 22px; height: 22px; stroke: #fff; }
         .shutter-btn {
             /* Fixed to viewport; positionCameraUI() overrides top/left during zoom */
             position: fixed;
@@ -922,6 +953,14 @@
         <video id="cameraVideo" autoplay playsinline muted></video>
         <div class="camera-overlay-ui">
             <button class="camera-close" onclick="closeCamera()" aria-label="Close camera">✕</button>
+            <button class="camera-flip" id="cameraFlipBtn" style="display:none;" onclick="flipCamera()" aria-label="Switch camera">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M17 2l4 4-4 4"/>
+                    <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+                    <path d="M7 22l-4-4 4-4"/>
+                    <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+                </svg>
+            </button>
             <div id="recTimer" style="display:none;" class="rec-timer">
                 <span class="rec-dot"></span><span id="recTimerText">0:00</span>
             </div>
@@ -994,6 +1033,17 @@
         let telemetryIntervalId = null; // handle for 10 s traveler-telemetry report to server
         let pingIntervalId    = null;   // handle for 5 s heartbeat ping
         let pongTimeoutId     = null;   // 4 s timeout — close socket if pong never arrives
+        let lastPingSentAt    = 0;      // wall-clock time the last ping was sent (for RTT/offset calc)
+
+        // ── End-to-end latency measurement (capture → this speaker) ──────────
+        // See matching comment in guide.html — the guide and this listener
+        // don't share a clock, so each independently estimates its offset
+        // from the SERVER's clock (NTP-style, piggy-backed on the existing
+        // heartbeat ping/pong) and compares server-relative timestamps.
+        let listenerServerOffsetMs = 0;  // best estimate of (serverClock - thisDeviceClock)
+        let audioContextEpochWallMs = 0; // Date.now() equivalent of audioContext.currentTime === 0
+        let lastLatencyMs = null;        // most recent end-to-end measurement (null = none yet)
+        let latencySamples = [];         // small rolling window, reported/averaged every 10 s
 
         // Per-session counters (reset each time startListening() is called)
         let reconnectCount = 0;
@@ -1166,9 +1216,17 @@
                     wakeLock = await navigator.wakeLock.request('screen');
                     console.log('Wake Lock acquired - screen will stay on');
 
-                    // Re-acquire wake lock if it's released (e.g., user switches tabs)
+                    // The OS/browser can silently revoke the lock at any time (tab
+                    // backgrounded, system dialog/Control Center shown, low-power
+                    // mode, etc.) — a release here does NOT mean listening stopped.
+                    // Just clear our handle; re-acquisition on return to foreground
+                    // is handled by the visibilitychange listener below. (Previously
+                    // this handler only logged and never re-requested, so any
+                    // spurious release left the screen able to auto-lock for the
+                    // rest of the session.)
                     wakeLock.addEventListener('release', () => {
                         console.log('Wake Lock released');
+                        wakeLock = null;
                     });
                 } else {
                     console.log('Wake Lock API not supported on this device');
@@ -1191,6 +1249,47 @@
             }
         }
 
+        // Re-acquire the wake lock, and resume the AudioContext if the browser
+        // suspended it, whenever the page comes back to the foreground while
+        // still listening.
+        //
+        // Wake Lock: always releases when a page is hidden, and does NOT
+        // restore itself automatically when the page becomes visible again —
+        // that's the app's responsibility per the spec. Without this, any
+        // brief backgrounding (notification banner, Control Center, app
+        // switcher swipe) permanently forfeits the lock for the rest of the
+        // session, letting the phone's normal auto-lock timer take over
+        // silently.
+        //
+        // AudioContext: this is the fix for "audio drops the moment I tap
+        // Lock Screen" on Android specifically. entering Fullscreen via
+        // enterLockMode()'s requestFullscreen() call (which only succeeds on
+        // Android — it silently no-ops on iOS Safari, see enterLockMode) can
+        // cause Chrome/Android to briefly flip document.visibilityState to
+        // 'hidden' during the fullscreen transition. Android Chrome
+        // auto-suspends a page's Web-Audio AudioContext on that hidden
+        // transition to save power — the WebSocket stays open and the jitter
+        // queue keeps filling normally, but drainQueue()'s scheduled nodes
+        // never actually produce sound because the context is suspended, and
+        // nothing was resuming it again. That reads exactly like "audio
+        // silently stopped" even though every other counter (reconnects,
+        // flushes, wsDrops) looks completely normal. iOS doesn't hit this
+        // path because requestFullscreen() is a no-op there, which is
+        // consistent with this only being reported by Android travelers.
+        document.addEventListener('visibilitychange', async () => {
+            if (document.visibilityState !== 'visible' || !isListening) return;
+
+            if (wakeLock === null) {
+                console.log('[WakeLock] Page visible again while listening — re-acquiring');
+                await requestWakeLock();
+            }
+
+            if (audioContext && audioContext.state === 'suspended') {
+                console.log('[AudioContext] Page visible again while listening — resuming (was suspended)');
+                try { await audioContext.resume(); } catch (e) { /* best-effort */ }
+            }
+        });
+
         async function startListening() {
             try {
                 updateStatus('connecting', 'Connecting...');
@@ -1208,6 +1307,9 @@
                 lateArrivalRate = 0;
                 expectedArrivalTime = 0;
                 currentPlaybackRate = 1.0;
+                listenerServerOffsetMs = 0;
+                lastLatencyMs = null;
+                latencySamples = [];
 
                 // Create AudioContext (must be inside a user gesture for iOS)
                 audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
@@ -1224,6 +1326,17 @@
                     console.log('[AudioContext] state changed →', audioContext.state,
                                 'at', new Date().toISOString());
                     if (audioContext.state === 'suspended') suspendCount++;
+                    // currentTime freezes for the entire suspended interval while
+                    // Date.now() keeps advancing, so the anchor computed below goes
+                    // stale by exactly however long the suspension lasted. Left
+                    // uncorrected, every latency reading for the rest of the session
+                    // would under-estimate by that same amount (this is what produced
+                    // impossible sub-bufferMs readings after an Android Lock Mode
+                    // suspend). Recalibrating here on every resume keeps the anchor
+                    // accurate regardless of how many suspend/resume cycles occur.
+                    if (audioContext.state === 'running') {
+                        audioContextEpochWallMs = Date.now() - audioContext.currentTime * 1000;
+                    }
                 };
 
                 if (audioContext.state === 'suspended') {
@@ -1231,6 +1344,13 @@
                     await audioContext.resume();
                     console.log('AudioContext resumed, state:', audioContext.state);
                 }
+
+                // Anchor point for converting audioContext.currentTime (seconds since
+                // context start) to a wall-clock timestamp — needed to turn a scheduled
+                // playback time into something comparable against the guide's capture
+                // timestamp. This initial value covers the time before any suspend/
+                // resume cycle; onstatechange above keeps it accurate afterward.
+                audioContextEpochWallMs = Date.now() - audioContext.currentTime * 1000;
 
                 // Unlock iOS audio with a one-sample silent buffer
                 const silentBuffer = audioContext.createBuffer(1, 1, 16000);
@@ -1375,6 +1495,7 @@
                             console.log('[WS] Pong timeout (1st miss — tolerating)');
                         }
                     }, 4000);
+                    lastPingSentAt = Date.now();
                     try { ws.send(JSON.stringify({ type: 'ping' })); } catch(e) { /* ignore */ }
                 }, 5000);
             };
@@ -1392,10 +1513,33 @@
                             // the connection recovered, not that it's still degrading).
                             if (pongTimeoutId) { clearTimeout(pongTimeoutId); pongTimeoutId = null; }
                             missedPongs = 0;
+
+                            // NTP-style clock-offset estimate — see listenerServerOffsetMs
+                            // above. Smoothed rather than overwritten so one slow round-trip
+                            // doesn't yank every subsequent latency reading around.
+                            if (lastPingSentAt && typeof msg.ts === 'number') {
+                                const nowTs = Date.now();
+                                const rtt = nowTs - lastPingSentAt;
+                                if (rtt >= 0 && rtt < 1000) {
+                                    const sample = msg.ts - (lastPingSentAt + nowTs) / 2;
+                                    listenerServerOffsetMs = listenerServerOffsetMs === 0
+                                        ? sample
+                                        : (listenerServerOffsetMs * 0.7 + sample * 0.3);
+                                }
+                            }
                         } else if (msg.type === 'subtitle') {
                             showSubtitle(msg.text, msg.isFinal, msg.enabled);
                         } else if (msg.type === 'reaction') {
                             playReactionAnimation(msg.reaction);
+                        } else if (msg.type === 'latency_probe') {
+                            // Slot the probe into the jitter queue at its actual arrival
+                            // position so it experiences the exact same buffering delay
+                            // as real audio — see the marker handling in drainQueue().
+                            jitterQueue.push({
+                                marker: true,
+                                captureServerTime: msg.captureServerTime,
+                                arrivedAt: Date.now()
+                            });
                         }
                         return;
                     }
@@ -1485,13 +1629,24 @@
             // ── Drift micro-correction ──────────────────────────────────────────
             // Rather than doing nothing until drift crosses MAX_LOOKAHEAD_SEC and
             // then hard-flushing (an audible gap), gently speed up playback while
-            // moderately ahead so the lead bleeds off silently. 0.5–3s ahead is
-            // "catching up" territory — a 3% rate bump is imperceptible in pitch
-            // (~0.5 semitone) but clears ~30ms of lead per second of audio played,
-            // closing a 1s backlog in well under a minute without ever flushing.
-            // Below 0.5s ahead, playback runs at normal speed — that's within
-            // normal bufferMs hold territory and isn't worth correcting.
-            const targetRate = aheadSec > 0.5 ? 1.03 : 1.0;
+            // moderately ahead so the lead bleeds off silently. A 3% rate bump is
+            // imperceptible in pitch (~0.5 semitone) but clears ~30ms of lead per
+            // second of audio played, closing a 1s backlog in well under a minute
+            // without ever flushing.
+            //
+            // The trigger point is relative to bufferMs (current hold-time target),
+            // not a flat constant — a fixed 0.5s trigger (5x the 100ms good-network
+            // floor) was found in the field (2026-08 latency investigation) to leave
+            // a wide dead zone with zero correction, in which ordinary clock-rate
+            // mismatch between the guide's and a listener's independent audio clocks
+            // could silently build real lead all the way up to the trigger point —
+            // producing a steady, consistent ~450-500ms of extra end-to-end latency
+            // instead of holding near the intended ~100ms floor. Tying the trigger
+            // to bufferMs keeps the same margin (headroom against a hard flush)
+            // across all three buffer tiers while correcting much sooner.
+            const DRIFT_CORRECTION_MARGIN_SEC = 0.15;
+            const driftCorrectionThreshold = (bufferMs / 1000) + DRIFT_CORRECTION_MARGIN_SEC;
+            const targetRate = aheadSec > driftCorrectionThreshold ? 1.03 : 1.0;
             if (targetRate !== currentPlaybackRate) {
                 currentPlaybackRate = targetRate;
                 for (const src of activeSourceNodes) {
@@ -1507,6 +1662,35 @@
                 // Keep the scheduler slightly ahead of the playhead
                 if (nextPlayTime < audioContext.currentTime) {
                     nextPlayTime = audioContext.currentTime + 0.01;
+                }
+
+                // ── Latency probe marker ─────────────────────────────────────
+                // Not real audio — just passes through the same queue/timing
+                // logic as a chunk so nextPlayTime reflects exactly when audio
+                // at this position in the stream will actually reach the
+                // speaker. Measured here (not scheduled), so it adds no nodes
+                // and costs nothing on the audio graph.
+                if (item.marker) {
+                    if (typeof item.captureServerTime === 'number' && listenerServerOffsetMs !== undefined) {
+                        const playbackWallMs = audioContextEpochWallMs + nextPlayTime * 1000;
+                        const playbackServerTime = playbackWallMs + listenerServerOffsetMs;
+                        const latency = playbackServerTime - item.captureServerTime;
+                        // Sanity-bound — a bad/unconverged clock-offset sample could
+                        // otherwise produce a nonsense negative or huge value. The lower
+                        // bound is `bufferMs` (not 0): every item — marker or real audio
+                        // — is held in jitterQueue until it has aged at least bufferMs,
+                        // so true end-to-end latency can never legitimately come in
+                        // below the buffer's own hold time. A reading under that floor
+                        // is a sign the offset estimate hasn't converged yet (e.g. right
+                        // after connecting), not a genuinely fast measurement — discard
+                        // it rather than let it drag the rolling average down.
+                        if (latency >= bufferMs && latency < 10000) {
+                            lastLatencyMs = Math.round(latency);
+                            latencySamples.push(lastLatencyMs);
+                            if (latencySamples.length > 10) latencySamples.shift();
+                        }
+                    }
+                    continue;
                 }
 
                 const source = audioContext.createBufferSource();
@@ -1653,6 +1837,11 @@
         function reportTelemetry() {
             if (!ws || ws.readyState !== WebSocket.OPEN) return;
             try {
+                // Average of the recent latency-probe samples (see drainQueue's marker
+                // handling) — 0 if none have completed yet, e.g. just connected.
+                const avgLatency = latencySamples.length > 0
+                    ? Math.round(latencySamples.reduce((a, v) => a + v, 0) / latencySamples.length)
+                    : 0;
                 ws.send(JSON.stringify({
                     type: 'telemetry',
                     bufferMs,
@@ -1662,7 +1851,8 @@
                     flushes: flushCount,
                     wsDrops: wsDropCount,
                     suspends: suspendCount,
-                    audioState: audioContext ? audioContext.state : 'closed'
+                    audioState: audioContext ? audioContext.state : 'closed',
+                    endToEndLatencyMs: avgLatency
                 }));
             } catch (e) { /* ignore — best-effort diagnostics */ }
         }
@@ -1777,6 +1967,7 @@
         var _zoomTrack   = null;   // video track, if it exposes native optical/hybrid zoom
         var _zoomCaps    = null;   // {min, max, step} from track.getCapabilities().zoom
         var _cameraMode  = 'photo'; // 'photo' | 'video'
+        var _facingMode  = 'environment'; // 'environment' (back) | 'user' (front)
         var _previewBlob = null;   // blob currently shown in the preview card
         var _previewKind = null;   // 'photo' | 'video' — what _previewBlob contains
         var _micRequested = false; // whether a mic track has been requested/added for this camera session
@@ -1816,12 +2007,19 @@
         function setZoom(uiValue) {
             _cameraZoom = Math.min(5, Math.max(1, uiValue));
             var video = document.getElementById('cameraVideo');
+            // Front camera preview is mirrored to match the "selfie" framing
+            // users expect (move right, your reflection moves right). This is
+            // preview-only — canvas.drawImage() in takePhoto() reads the raw
+            // decoded frame, not the CSS-transformed render, so the saved
+            // photo/video is unaffected by this and always comes out
+            // unmirrored regardless of which camera was used.
+            var mirror = _facingMode === 'user' ? 'scaleX(-1) ' : '';
             if (_zoomTrack && _zoomCaps) {
                 var native = _zoomCaps.min + (_cameraZoom - 1) / 4 * (_zoomCaps.max - _zoomCaps.min);
                 _zoomTrack.applyConstraints({ advanced: [{ zoom: native }] }).catch(function () {});
-                video.style.transform = '';
+                video.style.transform = mirror;
             } else {
-                video.style.transform = 'scale(' + _cameraZoom + ')';
+                video.style.transform = mirror + 'scale(' + _cameraZoom + ')';
             }
             updateZoomLabel();
         }
@@ -1922,15 +2120,17 @@
             shutter.style.display = 'flex';
             video.style.display   = 'block';
             video.style.transform = '';
-            _cameraZoom = 1;
-            _zoomTrack  = null;
-            _zoomCaps   = null;
+            _cameraZoom  = 1;
+            _zoomTrack   = null;
+            _zoomCaps    = null;
+            _facingMode  = 'environment'; // always start on the back camera
             _micRequested = false;
             _micPromise   = null;
             updateZoomLabel();
             setCameraMode('photo');
             document.getElementById('zoomControls').style.display = 'flex';
             document.getElementById('modeToggle').style.display   = window.MediaRecorder ? 'flex' : 'none';
+            document.getElementById('cameraFlipBtn').style.display = 'none'; // shown below only if a front camera is confirmed present
             overlay.style.display = 'block';
 
             // The reaction bar is fixed to the bottom of the viewport and sits
@@ -1944,11 +2144,28 @@
             // This keeps the buttons fixed in place and prevents the app
             // from being left zoomed-in after the camera is closed.
             // Pinch gestures are re-routed to scale the <video> instead.
+            //
+            // iOS Safari has a known bug where mutating meta[name=viewport]'s
+            // content attribute in place leaves its internal touch hit-testing
+            // transform stale — the overlay's buttons (flip/close/shutter)
+            // render in the right place but taps silently miss until a
+            // scroll/resize forces a recompute, which is why they needed
+            // several taps right after opening the camera. Replacing the
+            // <meta> element itself (rather than just setting .content)
+            // forces WebKit to fully reprocess the viewport — see the mirror
+            // fix in closeCamera() below.
             var vpMeta = document.querySelector('meta[name=viewport]');
             if (vpMeta) {
-                vpMeta._savedContent = vpMeta.content;
-                vpMeta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+                var lockedVpMeta = vpMeta.cloneNode();
+                lockedVpMeta.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
+                lockedVpMeta._savedContent = vpMeta.content;
+                vpMeta.parentNode.replaceChild(lockedVpMeta, vpMeta);
             }
+            // Belt-and-braces: a zero-visible-effect 1px scroll nudge also
+            // forces iOS to recompute its hit-testing transform, in case the
+            // meta-element replacement above isn't enough on its own.
+            window.scrollBy(0, 1);
+            requestAnimationFrame(function () { window.scrollBy(0, -1); });
 
             overlay.addEventListener('touchmove', _onOverlayTouchMove, { passive: false });
             video.addEventListener('touchstart',  _onPinchStart, { passive: false });
@@ -1961,7 +2178,7 @@
             // match the hardware actually supports (native devices report
             // capabilities up to 4K+), instead of hard-failing like `min`/`exact`.
             var videoConstraints = {
-                facingMode: 'environment',
+                facingMode: _facingMode,
                 width:  { ideal: 3840 },
                 height: { ideal: 2160 }
             };
@@ -1988,12 +2205,98 @@
                         _zoomCaps  = caps.zoom;
                     }
                 } catch (e) { /* getCapabilities unsupported — CSS fallback stays active */ }
+
+                // Only reveal the flip control once a second camera is confirmed
+                // present — device labels/counts are reliably enumerable now
+                // that getUserMedia() above has granted permission. Devices
+                // with a single camera (some tablets, older hardware) never
+                // show a non-functional toggle.
+                try {
+                    var devices    = await navigator.mediaDevices.enumerateDevices();
+                    var videoCount = devices.filter(function (d) { return d.kind === 'videoinput'; }).length;
+                    document.getElementById('cameraFlipBtn').style.display = videoCount > 1 ? 'flex' : 'none';
+                } catch (e) { /* enumerateDevices unsupported — leave flip hidden */ }
             } catch (err) {
                 video.style.display   = 'none';
                 shutter.style.display = 'none';
                 denied.style.display  = 'block';
+                document.getElementById('cameraFlipBtn').style.display = 'none';
                 cameraStream = null;
                 console.warn('Camera access error:', err.name, err.message);
+            }
+        }
+
+        async function flipCamera() {
+            // Recording is bound to the specific MediaStream/track passed into
+            // MediaRecorder at startRecording() time — swapping the video
+            // track underneath it mid-recording isn't reliably supported
+            // across browsers, so just block the flip and tell the user why.
+            if (_isRecording) {
+                showCameraToast('Stop recording before switching cameras');
+                return;
+            }
+
+            var video = document.getElementById('cameraVideo');
+            _facingMode = _facingMode === 'environment' ? 'user' : 'environment';
+
+            // Stop the old tracks before requesting new ones — most devices
+            // only expose one active camera stream at a time, so the new
+            // getUserMedia() call can otherwise fail or hang on some Android
+            // hardware while the old track still holds the camera open.
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(function (t) { t.stop(); });
+                cameraStream = null;
+            }
+            _zoomTrack = null;
+            _zoomCaps  = null;
+
+            var videoConstraints = {
+                facingMode: _facingMode,
+                width:  { ideal: 3840 },
+                height: { ideal: 2160 }
+            };
+
+            try {
+                cameraStream = await navigator.mediaDevices.getUserMedia({
+                    video: videoConstraints,
+                    audio: false
+                });
+                video.srcObject = cameraStream;
+
+                try {
+                    var track = cameraStream.getVideoTracks()[0];
+                    var caps  = track.getCapabilities && track.getCapabilities();
+                    if (caps && caps.zoom) {
+                        _zoomTrack = track;
+                        _zoomCaps  = caps.zoom;
+                    }
+                } catch (e) { /* getCapabilities unsupported — CSS fallback stays active */ }
+
+                setZoom(1); // resets zoom to 1x and applies the mirror transform for the new facing mode
+
+                // VIDEO mode re-attaches the mic to whichever stream is
+                // current, since addTrack() in _ensureVideoAudio() only ever
+                // targeted the now-stopped previous stream.
+                if (_cameraMode === 'video') {
+                    _micRequested = false;
+                    _micPromise   = null;
+                    _ensureVideoAudio();
+                }
+            } catch (err) {
+                showCameraToast('Unable to switch camera');
+                // Fall back to re-requesting the previous facing mode so the
+                // preview doesn't end up frozen/blank after a failed switch.
+                _facingMode = _facingMode === 'environment' ? 'user' : 'environment';
+                try {
+                    cameraStream = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: _facingMode, width: { ideal: 3840 }, height: { ideal: 2160 } },
+                        audio: false
+                    });
+                    video.srcObject = cameraStream;
+                    setZoom(1);
+                } catch (e2) {
+                    console.warn('Camera flip fallback also failed:', e2.name, e2.message);
+                }
             }
         }
 
@@ -2009,12 +2312,27 @@
             video.removeEventListener('touchstart',  _onPinchStart);
             video.removeEventListener('touchmove',   _onPinchMove);
 
-            // Restore viewport meta so normal page zoom is allowed again
+            // Restore viewport meta so normal page zoom is allowed again.
+            // iOS Safari has a known bug where mutating meta[name=viewport]'s
+            // content attribute in place leaves its internal touch hit-testing
+            // transform stale — buttons render in the right place but the
+            // very first tap (sometimes several taps) silently miss until a
+            // scroll/resize forces a recompute. That's what caused the
+            // reaction bar to be unresponsive right after closing the camera.
+            // Replacing the <meta> element itself (rather than just setting
+            // .content) forces WebKit to fully reprocess the viewport, and
+            // is more reliable than an attribute mutation for this bug.
             var vpMeta = document.querySelector('meta[name=viewport]');
             if (vpMeta && vpMeta._savedContent) {
-                vpMeta.content      = vpMeta._savedContent;
-                vpMeta._savedContent = null;
+                var freshVpMeta = vpMeta.cloneNode();
+                freshVpMeta.setAttribute('content', vpMeta._savedContent);
+                vpMeta.parentNode.replaceChild(freshVpMeta, vpMeta);
             }
+            // Belt-and-braces: a zero-visible-effect 1px scroll nudge also
+            // forces iOS to recompute its hit-testing transform, in case the
+            // meta-element replacement above isn't enough on its own.
+            window.scrollBy(0, 1);
+            requestAnimationFrame(function () { window.scrollBy(0, -1); });
 
             if (cameraStream) {
                 cameraStream.getTracks().forEach(function (t) { t.stop(); });
@@ -2240,6 +2558,32 @@
 
         // ── Lock Screen ───────────────────────────────────────────────────────
 
+        // The browser's own UI (Android's toolbar, iOS 15+'s address-bar tint)
+        // colors itself from <meta name="theme-color">. On phones where the
+        // Fullscreen API doesn't apply (iOS always; Android before the
+        // transition completes) that bar sits above our fixed #lockOverlay,
+        // so if it's left at the page's normal theme-color it reads as an
+        // uncovered strip at the top of the screen instead of blending into
+        // the lock screen. Swapping it to match each lock-screen state makes
+        // that strip (when present) look like part of the background.
+        const THEME_COLOR_NORMAL       = '#003C64';
+        const THEME_COLOR_LOCKED       = '#0088CC';
+        const THEME_COLOR_BATTERY_SAVE = '#0A0A0A';
+        function setThemeColor(color) {
+            const meta = document.querySelector('meta[name=theme-color]');
+            if (meta) meta.setAttribute('content', color);
+        }
+
+        // iOS paints the bottom safe-area strip (behind the home indicator)
+        // from <html>'s own background-color, not from #lockOverlay — so it
+        // has to be updated in lockstep with every lock/battery-save state
+        // change, the same way setThemeColor() is, or that strip is left
+        // showing the wrong color (e.g. navy over an otherwise-black
+        // battery-save screen). See the comment on the html{} rule.
+        function setRootBackground(color) {
+            document.documentElement.style.background = color;
+        }
+
         function enterLockMode() {
             isLocked = true;
             lockTapCount = 0;
@@ -2247,6 +2591,8 @@
             document.getElementById('lockHint').textContent = '';
             document.getElementById('lockOverlay').style.display = 'flex';
             updateLockWave();
+            setThemeColor(THEME_COLOR_LOCKED);
+            setRootBackground(THEME_COLOR_LOCKED);
 
             // Fullscreen: hides browser chrome on Android (silently fails on iOS)
             const el = document.documentElement;
@@ -2273,6 +2619,8 @@
             deactivateBatterySave();
             document.getElementById('lockOverlay').style.display = 'none';
             document.getElementById('lockHint').textContent = '';
+            setThemeColor(THEME_COLOR_NORMAL);
+            setRootBackground('#00243C'); // restore html{}'s original declared value
 
             // Exit fullscreen if active
             try {
@@ -2599,11 +2947,15 @@
         function activateBatterySave() {
             isBatterySave = true;
             document.getElementById('lockOverlay').classList.add('battery-save');
+            setThemeColor(THEME_COLOR_BATTERY_SAVE);
+            setRootBackground(THEME_COLOR_BATTERY_SAVE);
         }
 
         function deactivateBatterySave() {
             isBatterySave = false;
             document.getElementById('lockOverlay').classList.remove('battery-save');
+            setThemeColor(isLocked ? THEME_COLOR_LOCKED : THEME_COLOR_NORMAL);
+            setRootBackground(isLocked ? THEME_COLOR_LOCKED : '#00243C');
         }
 
         // Run on page load

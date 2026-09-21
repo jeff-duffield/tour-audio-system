@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>EF Tour Audio - Guide</title>
     <link rel="icon" type="image/png" href="EF-Logos_EF Logo Pink.png">
     <!-- PWA: lets guides add this page to their home screen for one-tap
@@ -547,6 +547,212 @@
             color: rgba(255,255,255,0.6);
             margin-top: 2px;
         }
+
+        /* ── Connection Instructions Modal ────────────────────────── */
+        .instructions-modal-backdrop {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.6);
+            z-index: 11000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .instructions-modal-backdrop.visible { display: flex; }
+        .instructions-modal {
+            background: #FFFFFF;
+            border-radius: 20px;
+            max-width: 420px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            padding: 22px;
+            color: #222;
+        }
+        .instructions-modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 14px;
+        }
+        .instructions-modal-header h2 {
+            font-size: 19px;
+            color: #003C64;
+            font-weight: 700;
+        }
+        .instructions-close-btn {
+            width: 32px; height: 32px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(0,0,0,0.06);
+            color: #555;
+            font-size: 16px;
+            line-height: 1;
+            cursor: pointer;
+            margin-bottom: 0;
+            padding: 0;
+            flex-shrink: 0;
+        }
+        .instructions-close-btn:hover { background: rgba(0,0,0,0.12); }
+        .instructions-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+        .instructions-tab {
+            flex: 1;
+            padding: 10px;
+            border-radius: 50px;
+            border: 1.5px solid rgba(0,60,100,0.25);
+            background: transparent;
+            color: #003C64;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            margin-bottom: 0;
+        }
+        .instructions-tab.active { background: #003C64; color: #fff; border-color: #003C64; }
+        .instructions-modal .read-first {
+            background: rgba(255,193,7,0.15);
+            border: 1.5px solid rgba(255,193,7,0.6);
+            border-radius: 12px;
+            padding: 12px 14px;
+            font-size: 13px;
+            font-weight: 700;
+            color: #8a6800;
+            line-height: 1.5;
+            margin-bottom: 16px;
+        }
+        .instructions-steps { padding-left: 20px; margin-bottom: 16px; }
+        .instructions-steps li {
+            font-size: 14px;
+            line-height: 1.6;
+            color: #333;
+            margin-bottom: 8px;
+        }
+        .instructions-steps strong { color: #D0107A; }
+        .instructions-modal .url-copy-widget {
+            background: rgba(0,60,100,0.06);
+            border: 1.5px solid rgba(0,60,100,0.2);
+            border-radius: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 8px 10px 18px;
+            margin-bottom: 16px;
+        }
+        .instructions-modal .url-text { color: #003C64; font-weight: 700; font-size: 14px; }
+        .instructions-modal .copy-action {
+            background: #003C64;
+            color: #fff;
+            border: none;
+            border-radius: 50px;
+            padding: 8px 16px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            margin-bottom: 0;
+            width: auto;
+        }
+        .instructions-qr-wrap {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        .instructions-qr { width: 160px; height: 160px; }
+        .instructions-qr svg { width: 100%; height: 100%; display: block; }
+        .instructions-qr-label { font-size: 12px; color: #666; font-weight: 600; }
+        .instructions-present-btn { background: #D0107A; color: #fff; margin-bottom: 12px; }
+        .instructions-present-btn:hover { background: #B00D68; }
+        .instructions-modal .troubleshooting { text-align: left; }
+        .instructions-modal .troubleshooting summary {
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            color: rgba(0,0,0,0.45);
+            padding: 4px 0;
+            list-style: none;
+        }
+        .instructions-modal .troubleshooting summary::-webkit-details-marker { display: none; }
+        .instructions-modal .troubleshooting summary::before { content: '▸ '; }
+        .instructions-modal .troubleshooting[open] summary::before { content: '▾ '; }
+        .instructions-modal .troubleshooting[open] summary { color: rgba(0,0,0,0.75); margin-bottom: 10px; }
+        .instructions-modal .troubleshooting-body { display: flex; flex-direction: column; gap: 12px; }
+        .instructions-modal .relay-warning {
+            background: rgba(255,154,209,0.15);
+            border: 1.5px solid rgba(255,154,209,0.6);
+            border-radius: 12px;
+            padding: 12px 14px;
+            font-size: 13px;
+            color: #444;
+            line-height: 1.5;
+        }
+        .instructions-modal .relay-warning .relay-title { color: #D0107A; font-weight: 700; margin-bottom: 6px; }
+        .instructions-modal .relay-warning strong { color: #D0107A; }
+        .instructions-modal .relay-warning .relay-steps {
+            display: block;
+            margin-top: 8px;
+            padding: 8px 10px;
+            background: rgba(0,0,0,0.05);
+            border-radius: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+        .instructions-modal .portal-note { font-size: 12px; color: #777; margin-top: 10px; }
+
+        /* ── Present Mode (fullscreen QR + URL for showing the whole group) ── */
+        #presentOverlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(160deg, #FF69B4 0%, #FF1493 100%);
+            z-index: 12000;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            padding: 32px 24px;
+            text-align: center;
+        }
+        #presentOverlay.visible { display: flex; }
+        .present-close-btn {
+            position: absolute;
+            top: 20px; right: 20px;
+            width: 40px; height: 40px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(255,255,255,0.2);
+            color: #fff;
+            font-size: 18px;
+            cursor: pointer;
+            margin-bottom: 0;
+        }
+        .present-title { color: #fff; font-size: 22px; font-weight: 700; }
+        .present-qr {
+            background: #fff;
+            border-radius: 20px;
+            padding: 20px;
+            width: min(70vw, 280px);
+            height: min(70vw, 280px);
+        }
+        .present-qr svg { width: 100%; height: 100%; display: block; }
+        .present-url {
+            color: #fff;
+            font-size: 20px;
+            font-weight: 700;
+            letter-spacing: 0.01em;
+            background: rgba(255,255,255,0.15);
+            padding: 10px 20px;
+            border-radius: 50px;
+        }
+        .present-hints {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            color: rgba(255,255,255,0.85);
+            font-size: 14px;
+            max-width: 340px;
+        }
+        .present-hints strong { color: #fff; }
     </style>
 </head>
 <body>
@@ -556,6 +762,14 @@
             <h1>Tour Guide</h1>
         </div>
         <p class="subtitle">Broadcast to your group</p>
+
+        <!-- Always reachable, whether or not this guide is currently
+             broadcasting — lets a TD show a traveler (or the whole group)
+             the exact connection steps on the spot, without needing the
+             traveler to reopen their own already-dismissed captive portal. -->
+        <button class="test-btn" onclick="openInstructionsModal()" style="margin-bottom:14px;">
+            📋 Show Connection Instructions
+        </button>
 
         <!-- Captive portal warning -->
         <div class="captive-banner" id="captiveBanner">
@@ -821,6 +1035,11 @@
                                 <span class="metric-label">Audio Suspends</span>
                                 <span class="metric-value" id="metricDiagSuspends">—</span>
                             </div>
+                            <div class="metric-item">
+                                <span class="metric-dot" id="dotDiagLatency"></span>
+                                <span class="metric-label">Avg Latency</span>
+                                <span class="metric-value" id="metricDiagLatency">—</span>
+                            </div>
                         </div>
                         <div class="metrics-updated" id="travelerDiagUpdated">Waiting for traveler reports…</div>
                     </div>
@@ -829,6 +1048,11 @@
         </div>
     </div>
 
+    <!-- Offline QR generator (public/qrcode.js) — used only by the
+         connection-instructions modal/present mode below. Bundled locally
+         so it renders with zero network dependency (tour routers have no
+         internet, so a CDN-hosted copy would never load). -->
+    <script src="/qrcode.js"></script>
     <script>
         // Register a no-op service worker purely so the app qualifies as an
         // installable PWA (Android "Add to Home Screen" / iOS Share sheet).
@@ -942,6 +1166,29 @@
         let broadcastSilenceStart = 0;  // timestamp when silence began (0 = not silent)
         let broadcastIsSilent     = false;
 
+        // ── End-to-end latency measurement (capture → listener speaker) ──────
+        // The guide has no clock in common with any listener device, so we
+        // can't just compare Date.now() values directly. Instead both sides
+        // independently estimate their offset from the SERVER's clock via a
+        // lightweight NTP-style ping/pong (a few bytes every few seconds —
+        // negligible bandwidth, and entirely separate from the binary audio
+        // path so it can never add audio latency or jitter). Comparing two
+        // server-relative timestamps cancels out the guide/listener clock
+        // skew that would otherwise make a direct comparison meaningless.
+        let guideServerOffsetMs   = 0;     // best estimate of (serverClock - guideClock)
+        let clockPingIntervalId  = null;   // handle for the periodic offset-refresh ping
+        let lastClockPingSentAt  = 0;
+        const CLOCK_PING_INTERVAL_MS   = 8000;  // refresh offset roughly every 8 s
+        // Sent on its own timer (see latencyProbeIntervalId below) rather than every
+        // N audio packets — piggy-backing on packet count meant probes only fired
+        // while the guide was actively speaking AND not gated silent, so a guide who
+        // talks in short bursts with natural pauses (normal for a walking tour) could
+        // go the whole session without ever accumulating enough non-silent packets to
+        // trigger one, leaving the dashboard's latency field permanently stuck on "—"
+        // even though the stream itself was working fine (2026-08 field report).
+        let latencyProbeIntervalId = null; // handle for the periodic latency probe
+        const LATENCY_PROBE_INTERVAL_MS = 5000; // ~5 s, independent of speech/silence
+
         // ── Lock screen state ────────────────────────────────────────────────
         let isLocked          = false;
         let lockTapCount      = 0;
@@ -997,9 +1244,17 @@
                     wakeLock = await navigator.wakeLock.request('screen');
                     console.log('Wake Lock acquired - screen will stay on during broadcast');
 
-                    // Re-acquire wake lock if it's released (e.g., user switches tabs)
+                    // The OS/browser can silently revoke the lock at any time (tab
+                    // backgrounded, system dialog/Control Center shown, low-power
+                    // mode, etc.) — a release here does NOT mean broadcasting
+                    // stopped. Just clear our handle; re-acquisition on return to
+                    // foreground is handled by the visibilitychange listener below.
+                    // (Previously this handler only logged and never re-requested,
+                    // so any spurious release left the screen able to auto-lock
+                    // for the rest of the broadcast — including while in Lock Mode.)
                     wakeLock.addEventListener('release', () => {
                         console.log('Wake Lock released');
+                        wakeLock = null;
                     });
                 } else {
                     console.log('Wake Lock API not supported on this device');
@@ -1021,6 +1276,43 @@
                 }
             }
         }
+
+        // Re-acquire the wake lock, and resume the capture AudioContext if the
+        // browser suspended it, whenever the page comes back to the foreground
+        // while still broadcasting (covers both the normal broadcast screen and
+        // Lock Mode — isStreaming stays true the whole time in both).
+        //
+        // Wake Lock: always releases when a page is hidden, and does NOT
+        // restore itself automatically when the page becomes visible again —
+        // that's the app's responsibility per the spec. Without this, any
+        // brief backgrounding (notification banner, Control Center, app
+        // switcher swipe) permanently forfeits the lock for the rest of the
+        // broadcast, letting the phone's normal auto-lock timer take over
+        // silently.
+        //
+        // AudioContext: entering Lock Mode calls enterLockMode()'s
+        // requestFullscreen(), which only succeeds on Android (it silently
+        // no-ops on iOS Safari). On Android Chrome, the fullscreen transition
+        // can briefly flip document.visibilityState to 'hidden', which
+        // auto-suspends the capture AudioContext to save power. The
+        // ScriptProcessor feeding the mic → server pipeline then stops
+        // producing chunks even though the WebSocket stays open — silencing
+        // the broadcast for every listener with no obvious error on the
+        // guide's screen. Same root cause as the traveler-side Android drop
+        // in index.html; resuming here mirrors that fix.
+        document.addEventListener('visibilitychange', async () => {
+            if (document.visibilityState !== 'visible' || !isStreaming) return;
+
+            if (wakeLock === null) {
+                console.log('[WakeLock] Page visible again while broadcasting — re-acquiring');
+                await requestWakeLock();
+            }
+
+            if (audioContext && audioContext.state === 'suspended') {
+                console.log('[AudioContext] Page visible again while broadcasting — resuming (was suspended)');
+                try { await audioContext.resume(); } catch (e) { /* best-effort */ }
+            }
+        });
 
         const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
 
@@ -1366,6 +1658,36 @@
                         }));
                     } catch (e) { /* best-effort diagnostics */ }
 
+                    // ── Clock-offset ping (see guideServerOffsetMs above) ──────────
+                    // Reuses the server's existing generic ping/pong handler (also
+                    // used by listeners for heartbeat) — the server just echoes back
+                    // its own Date.now() in `ts`, which is all an NTP-style offset
+                    // estimate needs.
+                    if (clockPingIntervalId) clearInterval(clockPingIntervalId);
+                    clockPingIntervalId = setInterval(() => {
+                        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+                        lastClockPingSentAt = Date.now();
+                        try { ws.send(JSON.stringify({ type: 'ping' })); } catch (e) { /* ignore */ }
+                    }, CLOCK_PING_INTERVAL_MS);
+                    lastClockPingSentAt = Date.now();
+                    try { ws.send(JSON.stringify({ type: 'ping' })); } catch (e) { /* ignore */ }
+
+                    // ── End-to-end latency probe (see latencyProbeIntervalId above) ──
+                    // Runs on its own timer so it keeps measuring during natural
+                    // pauses between sentences, not just while actively transmitting
+                    // audio — captureServerTime is just "now" in server-clock terms,
+                    // so it doesn't need a real audio packet to ride along with.
+                    if (latencyProbeIntervalId) clearInterval(latencyProbeIntervalId);
+                    latencyProbeIntervalId = setInterval(() => {
+                        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+                        try {
+                            ws.send(JSON.stringify({
+                                type: 'latency_probe',
+                                captureServerTime: Date.now() + guideServerOffsetMs
+                            }));
+                        } catch (e) { /* best-effort diagnostics */ }
+                    }, LATENCY_PROBE_INTERVAL_MS);
+
                     scriptProcessor.onaudioprocess = (e) => {
                         if (!ws || ws.readyState !== WebSocket.OPEN) return;
                         const inputData = e.inputBuffer.getChannelData(0);
@@ -1447,6 +1769,23 @@
                                                     message.totalParticipants);
                         } else if (message.type === 'traveler-diagnostics') {
                             updateTravelerDiagnostics(message);
+                        } else if (message.type === 'pong') {
+                            // NTP-style offset estimate: offset ≈ serverTs - (sendTs + receiveTs) / 2.
+                            // Smoothed (not overwritten outright) so one slow WiFi round-trip
+                            // doesn't yank the offset — and therefore every latency reading
+                            // derived from it — around.
+                            if (lastClockPingSentAt && typeof message.ts === 'number') {
+                                const now = Date.now();
+                                const rtt = now - lastClockPingSentAt;
+                                // Discard outliers — a slow/retried round-trip makes the
+                                // symmetric-delay assumption behind the estimate unreliable.
+                                if (rtt >= 0 && rtt < 1000) {
+                                    const sample = message.ts - (lastClockPingSentAt + now) / 2;
+                                    guideServerOffsetMs = guideServerOffsetMs === 0
+                                        ? sample
+                                        : (guideServerOffsetMs * 0.7 + sample * 0.3);
+                                }
+                            }
                         }
                     } catch (e) {
                         // Not JSON — ignore
@@ -1492,6 +1831,8 @@
             if (noiseGateTimer)  { clearInterval(noiseGateTimer);  noiseGateTimer   = null; }
             if (gateOpenDebounce){ clearTimeout(gateOpenDebounce); gateOpenDebounce  = null; }
             if (gateHoldTimer)   { clearTimeout(gateHoldTimer);    gateHoldTimer     = null; }
+            if (clockPingIntervalId) { clearInterval(clockPingIntervalId); clockPingIntervalId = null; }
+            if (latencyProbeIntervalId) { clearInterval(latencyProbeIntervalId); latencyProbeIntervalId = null; }
             if (micSource)  { try { micSource.disconnect();  } catch(e) {} micSource  = null; }
             if (preamp)     { try { preamp.disconnect();     } catch(e) {} preamp     = null; }
             if (hpFilter)   { try { hpFilter.disconnect();   } catch(e) {} hpFilter   = null; }
@@ -1532,6 +1873,8 @@
             if (noiseGateTimer)  { clearInterval(noiseGateTimer);  noiseGateTimer   = null; }
             if (gateOpenDebounce){ clearTimeout(gateOpenDebounce); gateOpenDebounce  = null; }
             if (gateHoldTimer)   { clearTimeout(gateHoldTimer);    gateHoldTimer     = null; }
+            if (clockPingIntervalId) { clearInterval(clockPingIntervalId); clockPingIntervalId = null; }
+            if (latencyProbeIntervalId) { clearInterval(latencyProbeIntervalId); latencyProbeIntervalId = null; }
             if (preamp)     { try { preamp.disconnect();     } catch(e) {} preamp     = null; }
             if (noiseGate)  { try { noiseGate.disconnect();  } catch(e) {} noiseGate  = null; }
             if (scriptProcessor) { scriptProcessor.disconnect(); scriptProcessor = null; }
@@ -2102,6 +2445,20 @@
             document.getElementById('metricDiagSuspends').textContent = msg.totalSuspends ?? '—';
             colorDot('dotDiagSuspends', msg.totalSuspends || 0, 1, 5);
 
+            // End-to-end (capture-to-speaker) latency — null until at least one
+            // listener has completed a measurement (see latency_probe in
+            // guide.html / index.html's drainQueue). Shown as "avg (max Nms)"
+            // so a single outlier device doesn't hide behind a calm average.
+            const latencyEl = document.getElementById('metricDiagLatency');
+            if (msg.avgLatencyMs != null) {
+                latencyEl.textContent = msg.avgLatencyMs + 'ms' +
+                    (msg.maxLatencyMs != null ? ' (max ' + msg.maxLatencyMs + 'ms)' : '');
+                colorDot('dotDiagLatency', msg.avgLatencyMs, 300, 600);
+            } else {
+                latencyEl.textContent = '—';
+                document.getElementById('dotDiagLatency').style.background = '#999';
+            }
+
             document.getElementById('travelerDiagUpdated').textContent =
                 'Updated ' + new Date().toLocaleTimeString();
         }
@@ -2182,6 +2539,22 @@
             handleLockTap();
         }
 
+        // The browser's own UI (Android's toolbar, iOS 15+'s address-bar tint)
+        // colors itself from <meta name="theme-color">. On phones where the
+        // Fullscreen API doesn't apply (iOS always; Android before the
+        // transition completes) that bar sits above our fixed #lockOverlay,
+        // so if it's left at the page's normal theme-color it reads as an
+        // uncovered strip at the top of the screen instead of blending into
+        // the lock screen. Swapping it to match each lock-screen state makes
+        // that strip (when present) look like part of the background.
+        const THEME_COLOR_NORMAL       = '#D0107A';
+        const THEME_COLOR_LOCKED       = '#FF69B4';
+        const THEME_COLOR_BATTERY_SAVE = '#0A0A0A';
+        function setThemeColor(color) {
+            const meta = document.querySelector('meta[name=theme-color]');
+            if (meta) meta.setAttribute('content', color);
+        }
+
         function enterLockMode() {
             isLocked     = true;
             lockTapCount = 0;
@@ -2190,6 +2563,7 @@
             document.getElementById('lockHint').textContent = '';
             document.getElementById('lockOverlay').style.display = 'flex';
             updateLockWave();
+            setThemeColor(THEME_COLOR_LOCKED);
 
             // Listen on document so taps on child elements are never missed
             document.addEventListener('touchend', _onLockTouchEnd, { passive: false });
@@ -2220,6 +2594,7 @@
             deactivateBatterySave();
             document.getElementById('lockOverlay').style.display = 'none';
             document.getElementById('lockHint').textContent      = '';
+            setThemeColor(THEME_COLOR_NORMAL);
 
             // Remove the document-level tap listeners
             document.removeEventListener('touchend', _onLockTouchEnd);
@@ -2284,11 +2659,13 @@
         function activateBatterySave() {
             isBatterySave = true;
             document.getElementById('lockOverlay').classList.add('battery-save');
+            setThemeColor(THEME_COLOR_BATTERY_SAVE);
         }
 
         function deactivateBatterySave() {
             isBatterySave = false;
             document.getElementById('lockOverlay').classList.remove('battery-save');
+            setThemeColor(isLocked ? THEME_COLOR_LOCKED : THEME_COLOR_NORMAL);
         }
 
         // Prevent scroll/pull-to-refresh inside the lock overlay.
@@ -2305,11 +2682,176 @@
             }
         });
 
+        // ── Connection Instructions Modal / Present Mode ──────────────────────
+        // Lets a guide/TD show a traveler (or the whole group) the exact
+        // captive-portal dismiss steps and connection URL on the spot, fully
+        // offline — the printed instruction card is the source of truth, so
+        // this mirrors its wording as closely as possible rather than
+        // introducing new phrasing. Useful when a traveler already dismissed
+        // (or lost) their own captive portal screen and can't get it back.
+        const CONNECT_URL = 'audio.eftours.travel';
+        let instructionsQrRendered = false;
+        let presentQrRendered = false;
 
+        function renderQrInto(containerId, cellSize) {
+            const el = document.getElementById(containerId);
+            if (!el || typeof qrcode !== 'function') return;
+            try {
+                const qr = qrcode(0, 'M');
+                qr.addData('https://' + CONNECT_URL + '/');
+                qr.make();
+                el.innerHTML = qr.createSvgTag({ cellSize: cellSize || 6, margin: 4, scalable: true });
+            } catch (e) {
+                console.error('QR render failed:', e);
+                el.textContent = CONNECT_URL;
+            }
+        }
+
+        function openInstructionsModal() {
+            if (!instructionsQrRendered) {
+                renderQrInto('instructionsQr', 6);
+                instructionsQrRendered = true;
+            }
+            document.getElementById('instructionsModalBackdrop').classList.add('visible');
+        }
+
+        // Clicking the dimmed backdrop closes the modal; clicking inside the
+        // card itself must not (event.target === event.currentTarget only
+        // when the backdrop element itself was the click target).
+        function closeInstructionsModal(e) {
+            if (e && e.target !== e.currentTarget) return;
+            document.getElementById('instructionsModalBackdrop').classList.remove('visible');
+        }
+
+        function switchInstructionsTab(platform) {
+            const isIPhoneTab = platform === 'iphone';
+            document.getElementById('tabIPhone').classList.toggle('active', isIPhoneTab);
+            document.getElementById('tabAndroid').classList.toggle('active', !isIPhoneTab);
+            document.getElementById('instructionsStepsIPhone').style.display = isIPhoneTab ? '' : 'none';
+            document.getElementById('instructionsStepsAndroid').style.display = isIPhoneTab ? 'none' : '';
+        }
+
+        function copyInstructionsUrl(btn) {
+            const original = btn.textContent;
+            function done(ok) {
+                btn.textContent = ok ? 'Copied!' : 'Copy failed';
+                setTimeout(() => { btn.textContent = original; }, 2000);
+            }
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(CONNECT_URL).then(() => done(true), () => done(false));
+            } else {
+                try {
+                    const ta = document.createElement('textarea');
+                    ta.value = CONNECT_URL;
+                    ta.style.position = 'fixed';
+                    ta.style.opacity = '0';
+                    document.body.appendChild(ta);
+                    ta.focus();
+                    ta.select();
+                    const ok = document.execCommand('copy');
+                    document.body.removeChild(ta);
+                    done(ok);
+                } catch (e) {
+                    done(false);
+                }
+            }
+        }
+
+        // Present mode: a large-print, fullscreen QR + URL view meant to be
+        // held up / shown to the whole group at once, rather than handed to
+        // one traveler at a time like the modal above.
+        function openPresentMode() {
+            if (!presentQrRendered) {
+                renderQrInto('presentQr', 8);
+                presentQrRendered = true;
+            }
+            document.getElementById('presentOverlay').classList.add('visible');
+        }
+
+        function closePresentMode() {
+            document.getElementById('presentOverlay').classList.remove('visible');
+        }
     </script>
 
     <!-- Subtitle error/status toast -->
     <div class="subtitle-toast" id="subtitleToast"></div>
+
+    <!-- ── Connection Instructions Modal ─────────────────────────────
+         Mirrors the printed instruction card's wording as closely as
+         possible: read/save-before-leaving warning, exact iPhone (✕, "Use
+         Without Internet") and Android (⋮, "Use this network as is") dismiss
+         steps, URL + copy, offline QR code, and a present mode for showing
+         the group. General troubleshooting (Private Relay, camera) is kept
+         separate from the required setup steps. -->
+    <div class="instructions-modal-backdrop" id="instructionsModalBackdrop" onclick="closeInstructionsModal(event)">
+        <div class="instructions-modal">
+            <div class="instructions-modal-header">
+                <h2>Connect to Tour Audio</h2>
+                <button class="instructions-close-btn" onclick="closeInstructionsModal()">✕</button>
+            </div>
+
+            <div class="instructions-tabs">
+                <button class="instructions-tab active" id="tabIPhone" onclick="switchInstructionsTab('iphone')">iPhone / iPad</button>
+                <button class="instructions-tab" id="tabAndroid" onclick="switchInstructionsTab('android')">Android</button>
+            </div>
+
+            <div class="read-first">
+                Read or save this now — the captive portal screen won't reopen once you leave it.
+            </div>
+
+            <ol class="instructions-steps" id="instructionsStepsIPhone">
+                <li>Join this tour's Wi-Fi network (name and password are on your printed instruction card).</li>
+                <li>When the Wi-Fi sign-in screen pops up, tap the <strong>✕</strong> in the top-right corner.</li>
+                <li>Choose <strong>"Use Without Internet."</strong></li>
+                <li>Open <strong>Safari</strong> and go to the address below, or scan the QR code.</li>
+            </ol>
+            <ol class="instructions-steps" id="instructionsStepsAndroid" style="display:none;">
+                <li>Join this tour's Wi-Fi network (name and password are on your printed instruction card).</li>
+                <li>When the "Sign in to network" notification appears, tap <strong>⋮</strong> (three dots) in the top-right corner.</li>
+                <li>Choose <strong>"Use this network as is."</strong></li>
+                <li>Open <strong>Chrome</strong> and go to the address below, or scan the QR code.</li>
+            </ol>
+
+            <div class="url-copy-widget">
+                <span class="url-text">audio.eftours.travel</span>
+                <button class="copy-action" onclick="copyInstructionsUrl(this)">Copy</button>
+            </div>
+
+            <div class="instructions-qr-wrap">
+                <div class="instructions-qr" id="instructionsQr"></div>
+                <div class="instructions-qr-label">Or scan with your camera app</div>
+            </div>
+
+            <button class="test-btn instructions-present-btn" onclick="openPresentMode()">
+                📽️ Present to Group (Fullscreen)
+            </button>
+
+            <details class="troubleshooting">
+                <summary>Troubleshooting</summary>
+                <div class="troubleshooting-body">
+                    <div class="relay-warning">
+                        <div class="relay-title">Want to use the camera or mic?</div>
+                        This tour's Wi-Fi has no internet connection. On <strong>iPhone</strong>, if Private Relay is on, Safari won't be able to load the app.
+                        <span class="relay-steps">Settings → Wi-Fi → ⓘ next to this network → Limit IP Address Tracking → Off</span>
+                    </div>
+                    <p class="portal-note">Camera isn't available in the captive portal's popup window — open the address in a full browser tab for camera/mic features.</p>
+                </div>
+            </details>
+        </div>
+    </div>
+
+    <!-- ── Present Mode Overlay ────────────────────────────────────── -->
+    <div id="presentOverlay">
+        <button class="present-close-btn" onclick="closePresentMode()">✕</button>
+        <img src="EF-Logos_EF Logo Pink.png" alt="EF Tours" class="lock-logo-lg">
+        <div class="present-title">Scan to Connect</div>
+        <div class="present-qr" id="presentQr"></div>
+        <div class="present-url">audio.eftours.travel</div>
+        <div class="present-hints">
+            <span><strong>iPhone:</strong> tap ✕ → "Use Without Internet"</span>
+            <span><strong>Android:</strong> tap ⋮ → "Use this network as is"</span>
+        </div>
+    </div>
 
     <!-- ── Lock Screen Overlay ────────────────────────────────────── -->
     <div id="lockOverlay">

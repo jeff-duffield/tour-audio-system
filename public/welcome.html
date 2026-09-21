@@ -63,37 +63,51 @@
             box-shadow: 0 8px 24px rgba(255,50,155,0.35);
         }
         .continue-btn:active { transform: translateY(0); box-shadow: none; }
-        .relay-warning {
-            background: rgba(255,50,155,0.10);
-            border: 1.5px solid rgba(255,50,155,0.4);
-            border-radius: 14px;
-            padding: 16px;
+        .setup-steps {
+            list-style: none;
+            counter-reset: step;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            width: 100%;
+            text-align: left;
+            margin-bottom: 20px;
+        }
+        .setup-steps > li {
+            counter-increment: step;
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+        }
+        .setup-steps > li::before {
+            content: counter(step);
+            flex-shrink: 0;
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            background: rgba(255,50,155,0.18);
+            border: 1.5px solid rgba(255,50,155,0.5);
+            color: #FF9AD1;
+            font-size: 13px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 1px;
+        }
+        .setup-steps .step-body {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            min-width: 0;
+        }
+        .setup-steps .step-text {
             font-size: 14px;
             color: rgba(255,255,255,0.85);
             line-height: 1.5;
-            text-align: left;
-            margin-bottom: 20px;
-            width: 100%;
         }
-        .relay-warning strong { color: #FF9AD1; }
-        .relay-warning .relay-title {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-weight: 700;
-            font-size: 15px;
-            color: #FF9AD1;
-            margin-bottom: 6px;
-        }
-        .relay-warning .relay-steps {
-            display: block;
-            margin-top: 10px;
-            padding: 10px 12px;
-            background: rgba(255,255,255,0.08);
-            border-radius: 8px;
-            font-weight: 600;
-            color: #fff;
-        }
+        .setup-steps .step-text strong { color: #FF9AD1; }
         .portal-btn {
             display: block;
             width: 100%;
@@ -111,18 +125,6 @@
         }
         .portal-btn:active { opacity: 0.7; }
         .or-sep { font-size: 12px; color: rgba(255,255,255,0.3); margin: 4px 0; }
-        .portal-note { font-size: 12px; color: rgba(255,255,255,0.35); margin-top: 4px; line-height: 1.4; }
-        .hint { font-size: 13px; color: rgba(255,255,255,0.45); line-height: 1.5; margin-top: 14px; }
-        .step-label {
-            font-size: 12px;
-            font-weight: 700;
-            letter-spacing: 0.3px;
-            text-transform: uppercase;
-            color: rgba(255,255,255,0.4);
-            text-align: left;
-            width: 100%;
-            margin-bottom: 8px;
-        }
         .url-copy-widget {
             display: flex;
             align-items: center;
@@ -133,7 +135,6 @@
             border: 1.5px solid rgba(255,255,255,0.18);
             border-radius: 50px;
             padding: 8px 8px 8px 20px;
-            margin-bottom: 20px;
         }
         .url-copy-widget .url-text {
             font-size: 15px;
@@ -173,28 +174,37 @@
         <h1 class="anim-1">Tour Audio</h1>
         <p class="subtitle anim-1">Listen to your guide in real-time</p>
         <div id="captiveControls">
-            <div id="relayStep" style="display:none;">
-                <div class="step-label anim-2">Step 1 · Turn off Private Relay</div>
-                <div class="relay-warning anim-2">
-                    This tour's Wi-Fi has no internet connection, so iPhone's <strong>Private Relay</strong> will block the app from loading unless it's turned off for this network.
-                    <span class="relay-steps">Settings → Wi-Fi → ⓘ next to this network → Limit IP Address Tracking → Off</span>
-                </div>
-            </div>
-            <div id="step2Label" class="step-label anim-2" style="display:none;">Step 2 · Open the app</div>
-            <div class="url-copy-widget anim-2">
-                <span class="url-text">audio.eftours.travel</span>
-                <button class="copy-action" onclick="copyUrl(this)">Copy</button>
-            </div>
-            <p class="hint anim-2">
-                Tap <strong style="color:rgba(255,255,255,0.7)">Copy</strong>, then tap
-                <strong style="color:rgba(255,255,255,0.7)">Cancel</strong> (top right), open
-                <strong style="color:rgba(255,255,255,0.7)">Safari</strong>, and paste it in.
-            </p>
+            <ol class="setup-steps anim-2">
+                <li>
+                    <div class="step-body">
+                        <span class="step-text">Read all instructions before closing this window — this screen won't reopen once you leave it.</span>
+                    </div>
+                </li>
+                <li>
+                    <div class="step-body">
+                        <span class="step-text">Copy this URL — you'll need it later.</span>
+                        <div class="url-copy-widget">
+                            <span class="url-text">audio.eftours.travel</span>
+                            <button class="copy-action" onclick="copyUrl(this)">Copy</button>
+                        </div>
+                    </div>
+                </li>
+                <li>
+                    <div class="step-body">
+                        <span class="step-text" id="closeStepText"></span>
+                    </div>
+                </li>
+                <li id="relayStep" style="display:none;">
+                    <div class="step-body">
+                        <span class="step-text">Turn off Limit IP Address Tracking for this network: <strong>Settings → Wi-Fi → ⓘ next to this network → Limit IP Address Tracking → Off</strong>. This lets the camera and microphone work.</span>
+                    </div>
+                </li>
+            </ol>
+
             <p class="or-sep anim-2">or</p>
             <a href="https://audio.eftours.travel/index.html" class="portal-btn anim-2">
                 Listen in this window
             </a>
-            <p class="portal-note anim-2">Camera isn't available in this window</p>
         </div>
         <div id="directControls" style="display:none;">
             <a href="https://audio.eftours.travel/index.html" class="continue-btn anim-2">
@@ -234,6 +244,27 @@
             }
         }
 
+        // Show only the steps for this traveler's own device (iPhone vs.
+        // Android) instead of listing both platforms — matches the printed
+        // card's per-device wording. Counter-based numbering (see
+        // .setup-steps CSS) automatically renumbers when relayStep is
+        // hidden, since a display:none <li> doesn't increment the CSS
+        // counter. Falls back to the Android-style flow for any UA that
+        // isn't recognizably iOS.
+        function applyPlatformSteps() {
+            var ua = navigator.userAgent || '';
+            var isIPhone = /iphone|ipad|ipod/i.test(ua);
+            var closeStepText = document.getElementById('closeStepText');
+            if (!closeStepText) return;
+            if (isIPhone) {
+                closeStepText.innerHTML = 'When you\'re ready to close this window, tap the <strong>✕</strong> in the top-right corner, then choose <strong>"Use Without Internet."</strong>';
+                document.getElementById('relayStep').style.display = '';
+            } else {
+                closeStepText.innerHTML = 'When you\'re ready to close this window, tap <strong>⋮</strong> (three dots) in the top-right corner, then choose <strong>"Use this network as is."</strong>';
+            }
+        }
+        applyPlatformSteps();
+
         // Detect whether this page is running inside the OS's captive-portal
         // mini-browser (iOS Captive Network Assistant / Android's equivalent)
         // vs. a real browser (Safari/Chrome) that reached this page directly —
@@ -267,21 +298,13 @@
             return storageBlocked || missingSafariToken;
         }
 
-        if (isCaptivePortalBrowser()) {
-            // Show iCloud Private Relay tip on iOS. Private Relay is temporarily
-            // suspended while this popup window is open, so it can't be
-            // detected directly — but it resumes once the user opens Safari, which
-            // can prevent audio.eftours.travel (a local-network-only hostname) from
-            // resolving. Warn iOS users up front so they know what to check if the
-            // browser app doesn't load.
-            if (/iphone|ipad|ipod/i.test(navigator.userAgent)) {
-                document.getElementById('relayStep').style.display = 'block';
-                document.getElementById('step2Label').style.display = 'block';
-            }
-        } else {
-            // Already in a real browser — the "open in browser" dance and the
-            // Private Relay warning (which only matters before escaping this
-            // popup window) are unnecessary and confusing here.
+        // The device-specific steps above (see applyPlatformSteps) are
+        // always populated — this toggle just decides whether the whole
+        // numbered captive-portal flow is needed at all, vs. a real browser
+        // that reached this page directly.
+        if (!isCaptivePortalBrowser()) {
+            // Already in a real browser — the "open in browser" dance is
+            // unnecessary and confusing here.
             document.getElementById('captiveControls').style.display = 'none';
             document.getElementById('directControls').style.display = 'block';
         }
