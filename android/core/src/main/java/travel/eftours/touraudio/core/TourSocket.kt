@@ -139,12 +139,12 @@ class TourSocket(
     }
 
     private fun schedulePing(gen: Int) {
-        handler.postDelayed({
-            if (!running || gen != generation || !open) return@postDelayed
+        handler.postDelayed(ping@{
+            if (!running || gen != generation || !open) return@ping
             pongSincePing = false
             socket?.send("""{"type":"ping"}""")
-            handler.postDelayed({
-                if (!running || gen != generation || pongSincePing) return@postDelayed
+            handler.postDelayed(check@{
+                if (!running || gen != generation || pongSincePing) return@check
                 missedPongs++
                 if (missedPongs >= 2) socket?.close(1000, "pong timeout")
             }, 4000)
