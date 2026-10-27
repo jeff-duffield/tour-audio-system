@@ -248,6 +248,12 @@ class MainActivity : AppCompatActivity() {
         view.text = text
     }
 
+    private fun showCount(id: Int, count: Int) {
+        val view = findViewById<TextView>(id)
+        view.text = count.toString()
+        view.setTextColor(if (count > 0) 0xFFFFD0EA.toInt() else 0xFFFFFFFF.toInt())
+    }
+
     private fun render(state: GuideService.State) {
         findViewById<TextView>(R.id.statusText).text = state.status
         findViewById<TextView>(R.id.wifiStatus).text = state.wifi
@@ -273,7 +279,11 @@ class MainActivity : AppCompatActivity() {
             visibility = live
             progress = state.level
         }
-        findViewById<TextView>(R.id.reactionCounts).text = state.reactions
+        showCount(R.id.countThumbsUp, state.thumbsUp)
+        showCount(R.id.countThumbsDown, state.thumbsDown)
+        showCount(R.id.countHeart, state.heart)
+        showCount(R.id.countLaugh, state.laugh)
+        showCount(R.id.countMind, state.mindBlown)
         findViewById<TextView>(R.id.reactionParticipation).text = state.participation
         findViewById<TextView>(R.id.lockLabel).text = state.status
         if (!state.broadcasting && locked) setLocked(false)

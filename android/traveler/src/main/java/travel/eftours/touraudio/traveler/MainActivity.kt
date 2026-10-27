@@ -163,7 +163,7 @@ class MainActivity : AppCompatActivity() {
             R.id.reactMind to "mind-blown"
         )
         map.forEach { (id, name) ->
-            findViewById<Button>(id).setOnClickListener {
+            findViewById<View>(id).setOnClickListener {
                 ContextCompat.startForegroundService(this, Intent(this, TravelerService::class.java).apply {
                     action = TravelerService.ACTION_REACT
                     putExtra(TravelerService.EXTRA_REACTION, name)

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#00243C">
@@ -47,7 +48,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:background="#1FFFFFFF"
+                android:background="@drawable/bg_pill_chip"
                 android:paddingLeft="12dp"
                 android:paddingTop="4dp"
                 android:paddingRight="12dp"
@@ -82,15 +83,15 @@
                 android:orientation="horizontal"
                 android:visibility="invisible">
 
-                <View android:layout_width="4dp" android:layout_height="9dp" android:layout_margin="2dp" android:background="#80FF329B" />
-                <View android:layout_width="4dp" android:layout_height="16dp" android:layout_margin="2dp" android:background="#80FF329B" />
-                <View android:layout_width="4dp" android:layout_height="23dp" android:layout_margin="2dp" android:background="#80FF329B" />
-                <View android:layout_width="4dp" android:layout_height="27dp" android:layout_margin="2dp" android:background="#80FF329B" />
-                <View android:layout_width="4dp" android:layout_height="28dp" android:layout_margin="2dp" android:background="#FF329B" />
-                <View android:layout_width="4dp" android:layout_height="27dp" android:layout_margin="2dp" android:background="#80FF329B" />
-                <View android:layout_width="4dp" android:layout_height="23dp" android:layout_margin="2dp" android:background="#80FF329B" />
-                <View android:layout_width="4dp" android:layout_height="16dp" android:layout_margin="2dp" android:background="#80FF329B" />
-                <View android:layout_width="4dp" android:layout_height="9dp" android:layout_margin="2dp" android:background="#80FF329B" />
+                <View android:layout_width="4dp" android:layout_height="9dp" android:layout_margin="2dp" android:background="@drawable/bg_wave_bar" />
+                <View android:layout_width="4dp" android:layout_height="16dp" android:layout_margin="2dp" android:background="@drawable/bg_wave_bar" />
+                <View android:layout_width="4dp" android:layout_height="23dp" android:layout_margin="2dp" android:background="@drawable/bg_wave_bar" />
+                <View android:layout_width="4dp" android:layout_height="27dp" android:layout_margin="2dp" android:background="@drawable/bg_wave_bar" />
+                <View android:layout_width="4dp" android:layout_height="28dp" android:layout_margin="2dp" android:background="@drawable/bg_wave_bar_center" />
+                <View android:layout_width="4dp" android:layout_height="27dp" android:layout_margin="2dp" android:background="@drawable/bg_wave_bar" />
+                <View android:layout_width="4dp" android:layout_height="23dp" android:layout_margin="2dp" android:background="@drawable/bg_wave_bar" />
+                <View android:layout_width="4dp" android:layout_height="16dp" android:layout_margin="2dp" android:background="@drawable/bg_wave_bar" />
+                <View android:layout_width="4dp" android:layout_height="9dp" android:layout_margin="2dp" android:background="@drawable/bg_wave_bar" />
             </LinearLayout>
 
             <Button
@@ -98,58 +99,71 @@
                 android:layout_width="match_parent"
                 android:layout_height="56dp"
                 android:layout_marginTop="20dp"
-                android:backgroundTint="#FF329B"
+                android:background="@drawable/bg_pill_pink"
+                android:stateListAnimator="@null"
                 android:text="Start Listening"
                 android:textAllCaps="false"
                 android:textColor="#FFFFFF"
-                android:textSize="18sp" />
+                android:textSize="17sp"
+                android:textStyle="bold"
+                app:backgroundTint="@null" />
 
             <Button
                 android:id="@+id/lockButton"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="48dp"
                 android:layout_marginTop="8dp"
+                android:background="@drawable/bg_pill_ghost"
+                android:stateListAnimator="@null"
                 android:text="Lock screen"
                 android:textAllCaps="false"
-                android:visibility="gone" />
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                android:visibility="gone"
+                app:backgroundTint="@null" />
 
-            <LinearLayout
+            <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
+                android:gravity="center"
+                android:letterSpacing="0.12"
+                android:text="VOLUME"
+                android:textColor="#E6FFFFFF"
+                android:textSize="11sp"
+                android:textStyle="bold" />
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Volume"
-                    android:textColor="#CCFFFFFF" />
+            <SeekBar
+                android:id="@+id/volumeSlider"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:max="100"
+                android:progress="80"
+                android:progressTint="#FF329B"
+                android:thumbTint="#FF329B" />
 
-                <SeekBar
-                    android:id="@+id/volumeSlider"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:max="100"
-                    android:progress="80" />
-
-                <TextView
-                    android:id="@+id/volumeValue"
-                    android:layout_width="42dp"
-                    android:layout_height="wrap_content"
-                    android:gravity="end"
-                    android:text="80%"
-                    android:textColor="#FFFFFF" />
-            </LinearLayout>
+            <TextView
+                android:id="@+id/volumeValue"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:text="80%"
+                android:textColor="#FF329B"
+                android:textSize="15sp"
+                android:textStyle="bold" />
 
             <Button
                 android:id="@+id/captionButton"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="48dp"
                 android:layout_marginTop="8dp"
+                android:background="@drawable/bg_pill_ghost"
+                android:stateListAnimator="@null"
                 android:text="Show captions"
-                android:textAllCaps="false" />
+                android:textAllCaps="false"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                app:backgroundTint="@null" />
 
             <TextView
                 android:id="@+id/captionText"
@@ -168,13 +182,29 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
+                android:gravity="center"
                 android:orientation="horizontal">
 
-                <Button android:id="@+id/reactUp" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="👍" android:textAllCaps="false" />
-                <Button android:id="@+id/reactDown" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="👎" android:textAllCaps="false" />
-                <Button android:id="@+id/reactHeart" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="❤️" android:textAllCaps="false" />
-                <Button android:id="@+id/reactLaugh" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="😂" android:textAllCaps="false" />
-                <Button android:id="@+id/reactMind" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="🤯" android:textAllCaps="false" />
+                <LinearLayout android:id="@+id/reactUp" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:background="?attr/selectableItemBackgroundBorderless" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingTop="6dp" android:paddingBottom="4dp">
+                    <ImageView android:layout_width="34dp" android:layout_height="34dp" android:contentDescription="Thumbs up" android:src="@drawable/ic_thumb_up" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:gravity="center" android:text="Thumbs Up" android:textColor="#A6FFFFFF" android:textSize="9sp" android:textStyle="bold" />
+                </LinearLayout>
+                <LinearLayout android:id="@+id/reactDown" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:background="?attr/selectableItemBackgroundBorderless" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingTop="6dp" android:paddingBottom="4dp">
+                    <ImageView android:layout_width="34dp" android:layout_height="34dp" android:contentDescription="Thumbs down" android:src="@drawable/ic_thumb_down" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:gravity="center" android:text="Thumbs Down" android:textColor="#A6FFFFFF" android:textSize="9sp" android:textStyle="bold" />
+                </LinearLayout>
+                <LinearLayout android:id="@+id/reactHeart" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:background="?attr/selectableItemBackgroundBorderless" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingTop="6dp" android:paddingBottom="4dp">
+                    <ImageView android:layout_width="34dp" android:layout_height="34dp" android:contentDescription="Heart" android:src="@drawable/ic_heart" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:gravity="center" android:text="Heart" android:textColor="#A6FFFFFF" android:textSize="9sp" android:textStyle="bold" />
+                </LinearLayout>
+                <LinearLayout android:id="@+id/reactLaugh" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:background="?attr/selectableItemBackgroundBorderless" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingTop="6dp" android:paddingBottom="4dp">
+                    <ImageView android:layout_width="34dp" android:layout_height="34dp" android:contentDescription="Laugh" android:src="@drawable/ic_laugh" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:gravity="center" android:text="Laugh" android:textColor="#A6FFFFFF" android:textSize="9sp" android:textStyle="bold" />
+                </LinearLayout>
+                <LinearLayout android:id="@+id/reactMind" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:background="?attr/selectableItemBackgroundBorderless" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingTop="6dp" android:paddingBottom="4dp">
+                    <ImageView android:layout_width="34dp" android:layout_height="34dp" android:contentDescription="Mind blown" android:src="@drawable/ic_mind_blown" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:gravity="center" android:text="Mind Blown" android:textColor="#A6FFFFFF" android:textSize="9sp" android:textStyle="bold" />
+                </LinearLayout>
             </LinearLayout>
 
             <TextView
@@ -208,9 +238,15 @@
             <Button
                 android:id="@+id/joinButton"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="48dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_pill_ghost"
+                android:stateListAnimator="@null"
                 android:text="Join Wi-Fi"
-                android:textAllCaps="false" />
+                android:textAllCaps="false"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                app:backgroundTint="@null" />
 
             <TextView
                 android:id="@+id/wifiStatus"

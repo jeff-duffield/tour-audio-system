@@ -26,7 +26,11 @@ class GuideService : Service() {
         val ended: Boolean = false,
         val listeners: Int = 0,
         val level: Int = 0,
-        val reactions: String = "👍 0    👎 0    ❤️ 0    😂 0    🤯 0",
+        val thumbsUp: Int = 0,
+        val thumbsDown: Int = 0,
+        val heart: Int = 0,
+        val laugh: Int = 0,
+        val mindBlown: Int = 0,
         val participation: String = "0 of 0 reacted",
         val wifi: String = ""
     )
@@ -189,7 +193,11 @@ class GuideService : Service() {
                 val counts = msg.optJSONObject("counts")
                 fun n(key: String) = counts?.optInt(key) ?: 0
                 publish(state.copy(
-                    reactions = "👍 ${n("thumbs-up")}    👎 ${n("thumbs-down")}    ❤️ ${n("heart")}    😂 ${n("laugh")}    🤯 ${n("mind-blown")}",
+                    thumbsUp = n("thumbs-up"),
+                    thumbsDown = n("thumbs-down"),
+                    heart = n("heart"),
+                    laugh = n("laugh"),
+                    mindBlown = n("mind-blown"),
                     participation = "${msg.optInt("uniqueParticipants")} of ${msg.optInt("totalParticipants")} reacted"
                 ))
             }
