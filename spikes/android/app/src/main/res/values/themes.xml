@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.TourAudioSpike" parent="Theme.AppCompat.Light.NoActionBar">
+        <item name="colorPrimary">#003C64</item>
+        <item name="colorPrimaryDark">#00243C</item>
+        <item name="colorAccent">#FF329B</item>
+    </style>
+</resources>

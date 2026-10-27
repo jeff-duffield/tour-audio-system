@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/hint"
+            android:textSize="13sp" />
+
+        <EditText
+            android:id="@+id/urlInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:hint="WebSocket URL"
+            android:inputType="textUri"
+            android:importantForAutofill="no" />
+
+        <CheckBox
+            android:id="@+id/trustCert"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:checked="true"
+            android:text="Trust router certificate (spike only)" />
+
+        <EditText
+            android:id="@+id/ssidInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Tour Wi-Fi name (one SSID, e.g. EF-TOUR-001)"
+            android:inputType="text"
+            android:importantForAutofill="no" />
+
+        <EditText
+            android:id="@+id/passwordInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Tour Wi-Fi password"
+            android:inputType="textPassword"
+            android:importantForAutofill="no" />
+
+        <CheckBox
+            android:id="@+id/voiceProcessing"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Voice processing (noise reduction / echo cancel)" />
+
+        <Button
+            android:id="@+id/joinWifi"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Join Wi-Fi" />
+
+        <Button
+            android:id="@+id/listen"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Listen" />
+
+        <Button
+            android:id="@+id/broadcast"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Broadcast" />
+
+        <Button
+            android:id="@+id/checkWifi"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Check Wi-Fi now" />
+
+        <Button
+            android:id="@+id/battery"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Allow background (battery)" />
+
+        <Button
+            android:id="@+id/stop"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Stop" />
+
+        <TextView
+            android:id="@+id/status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Idle"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/logView"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="280dp"
+            android:layout_marginTop="8dp"
+            android:background="#111111"
+            android:fontFamily="monospace"
+            android:padding="8dp"
+            android:scrollbars="vertical"
+            android:textColor="#EEEEEE"
+            android:textIsSelectable="true"
+            android:textSize="12sp" />
+    </LinearLayout>
+</ScrollView>

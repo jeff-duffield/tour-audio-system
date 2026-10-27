@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- The spike talks to the router on the LAN. Cleartext is only used if the URL is ws://. -->
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

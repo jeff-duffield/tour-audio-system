@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Tour Audio Spike</string>
+    <string name="hint">Throwaway test against the current router. No server change. Join the tour Wi-Fi, start Listen or Broadcast, then lock the screen for 30 minutes. Leave this notification up. This app sends audio continuously. The web guide stays quiet during silence, and those quiet stretches show up here as receive gaps. The router HTTPS port is 3000: use wss://192.168.8.1:3000 with Trust router certificate on, or wss://audio.eftours.travel when the phone is using the router DNS. If Join Wi-Fi does nothing, turn location on and try again.</string>
+    <string name="channel_name">Tour audio spike</string>
+</resources>
