@@ -1,0 +1,261 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#00243C">
+
+    <ScrollView
+        android:id="@+id/mainScroll"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_horizontal"
+            android:orientation="vertical"
+            android:padding="24dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="EF"
+                android:textColor="#FF329B"
+                android:textSize="28sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Tour Audio"
+                android:textColor="#FFFFFF"
+                android:textSize="26sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="Listen to your guide"
+                android:textColor="#99FFFFFF"
+                android:textSize="15sp" />
+
+            <TextView
+                android:id="@+id/travelerId"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="#1FFFFFFF"
+                android:paddingLeft="12dp"
+                android:paddingTop="4dp"
+                android:paddingRight="12dp"
+                android:paddingBottom="4dp"
+                android:textColor="#B3FFFFFF"
+                android:textSize="12sp"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/statusText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="Not connected"
+                android:textColor="#FFFFFF"
+                android:textSize="16sp" />
+
+            <TextView
+                android:id="@+id/batteryText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:textColor="#99FFFFFF"
+                android:textSize="12sp" />
+
+            <LinearLayout
+                android:id="@+id/waveform"
+                android:layout_width="wrap_content"
+                android:layout_height="28dp"
+                android:layout_marginTop="16dp"
+                android:gravity="bottom"
+                android:orientation="horizontal"
+                android:visibility="invisible">
+
+                <View android:layout_width="4dp" android:layout_height="9dp" android:layout_margin="2dp" android:background="#80FF329B" />
+                <View android:layout_width="4dp" android:layout_height="16dp" android:layout_margin="2dp" android:background="#80FF329B" />
+                <View android:layout_width="4dp" android:layout_height="23dp" android:layout_margin="2dp" android:background="#80FF329B" />
+                <View android:layout_width="4dp" android:layout_height="27dp" android:layout_margin="2dp" android:background="#80FF329B" />
+                <View android:layout_width="4dp" android:layout_height="28dp" android:layout_margin="2dp" android:background="#FF329B" />
+                <View android:layout_width="4dp" android:layout_height="27dp" android:layout_margin="2dp" android:background="#80FF329B" />
+                <View android:layout_width="4dp" android:layout_height="23dp" android:layout_margin="2dp" android:background="#80FF329B" />
+                <View android:layout_width="4dp" android:layout_height="16dp" android:layout_margin="2dp" android:background="#80FF329B" />
+                <View android:layout_width="4dp" android:layout_height="9dp" android:layout_margin="2dp" android:background="#80FF329B" />
+            </LinearLayout>
+
+            <Button
+                android:id="@+id/listenButton"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="20dp"
+                android:backgroundTint="#FF329B"
+                android:text="Start Listening"
+                android:textAllCaps="false"
+                android:textColor="#FFFFFF"
+                android:textSize="18sp" />
+
+            <Button
+                android:id="@+id/lockButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Lock screen"
+                android:textAllCaps="false"
+                android:visibility="gone" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Volume"
+                    android:textColor="#CCFFFFFF" />
+
+                <SeekBar
+                    android:id="@+id/volumeSlider"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:max="100"
+                    android:progress="80" />
+
+                <TextView
+                    android:id="@+id/volumeValue"
+                    android:layout_width="42dp"
+                    android:layout_height="wrap_content"
+                    android:gravity="end"
+                    android:text="80%"
+                    android:textColor="#FFFFFF" />
+            </LinearLayout>
+
+            <Button
+                android:id="@+id/captionButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Show captions"
+                android:textAllCaps="false" />
+
+            <TextView
+                android:id="@+id/captionText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:background="#33000000"
+                android:gravity="center"
+                android:minHeight="48dp"
+                android:padding="12dp"
+                android:textColor="#FFFFFF"
+                android:textSize="18sp"
+                android:visibility="gone" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:orientation="horizontal">
+
+                <Button android:id="@+id/reactUp" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="👍" android:textAllCaps="false" />
+                <Button android:id="@+id/reactDown" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="👎" android:textAllCaps="false" />
+                <Button android:id="@+id/reactHeart" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="❤️" android:textAllCaps="false" />
+                <Button android:id="@+id/reactLaugh" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="😂" android:textAllCaps="false" />
+                <Button android:id="@+id/reactMind" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="🤯" android:textAllCaps="false" />
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="28dp"
+                android:text="Tour Wi-Fi"
+                android:textColor="#FFFFFF"
+                android:textStyle="bold" />
+
+            <EditText
+                android:id="@+id/ssidInput"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Network name, e.g. EF-TOUR-001"
+                android:importantForAutofill="no"
+                android:inputType="text"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#88FFFFFF" />
+
+            <EditText
+                android:id="@+id/passwordInput"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Wi-Fi password"
+                android:importantForAutofill="no"
+                android:inputType="textPassword"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#88FFFFFF" />
+
+            <Button
+                android:id="@+id/joinButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Join Wi-Fi"
+                android:textAllCaps="false" />
+
+            <TextView
+                android:id="@+id/wifiStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:textColor="#CCFFFFFF"
+                android:textSize="13sp" />
+        </LinearLayout>
+    </ScrollView>
+
+    <LinearLayout
+        android:id="@+id/lockOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#000000"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="EF"
+            android:textColor="#FF329B"
+            android:textSize="42sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/lockLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="Audio playing"
+            android:textColor="#FFFFFF"
+            android:textSize="18sp" />
+
+        <TextView
+            android:id="@+id/lockHint"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="28dp"
+            android:text="Tap 3× to unlock"
+            android:textColor="#99FFFFFF" />
+    </LinearLayout>
+</FrameLayout>

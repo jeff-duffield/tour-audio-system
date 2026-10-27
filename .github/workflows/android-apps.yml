@@ -1,0 +1,42 @@
+name: Android apps
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "android/**"
+      - ".github/workflows/android-apps.yml"
+
+jobs:
+  apk:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      # v3 fails because it still installs the removed Android "tools" package.
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Install SDK packages
+        run: sdkmanager "platforms;android-34" "build-tools;34.0.0"
+
+      - name: Build debug APKs
+        working-directory: android
+        run: chmod +x ./gradlew && ./gradlew :traveler:assembleDebug :guide:assembleDebug --stacktrace
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tour-audio-traveler
+          path: android/traveler/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tour-audio-guide
+          path: android/guide/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
