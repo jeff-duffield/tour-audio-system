@@ -28,6 +28,7 @@ import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import okio.ByteString
+import okio.ByteString.Companion.toByteString
 import org.json.JSONObject
 import java.io.File
 import java.security.SecureRandom
@@ -319,7 +320,7 @@ class AudioSpikeService : Service() {
     private fun sendPcm(pcm: ByteArray) {
         val socket = webSocket
         if (!socketOpen || socket == null) return
-        val ok = socket.send(ByteString.of(pcm, 0, pcm.size))
+        val ok = socket.send(pcm.toByteString())
         if (ok) {
             sendFailLogged = false
         } else if (!sendFailLogged) {
