@@ -211,6 +211,46 @@
                 android:textColor="#FFFFFF"
                 android:textStyle="bold" />
 
+            <Button
+                android:id="@+id/scanButton"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_pill_navy"
+                android:stateListAnimator="@null"
+                android:text="Scan QR code"
+                android:textAllCaps="false"
+                android:textColor="#FFFFFF"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                app:backgroundTint="@null" />
+
+            <Button
+                android:id="@+id/showCodeButton"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_pill_ghost"
+                android:stateListAnimator="@null"
+                android:text="Show join code"
+                android:textAllCaps="false"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                app:backgroundTint="@null" />
+
+            <Button
+                android:id="@+id/findButton"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_pill_ghost"
+                android:stateListAnimator="@null"
+                android:text="Find EF-TOUR networks"
+                android:textAllCaps="false"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                app:backgroundTint="@null" />
+
             <EditText
                 android:id="@+id/ssidInput"
                 android:layout_width="match_parent"

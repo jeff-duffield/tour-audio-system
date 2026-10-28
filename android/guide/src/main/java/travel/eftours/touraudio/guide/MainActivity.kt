@@ -15,17 +15,25 @@ import android.speech.SpeechRecognizer
 import android.view.View
 import android.widget.Button
 import android.widget.EditText
+import android.widget.ImageView
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
+import travel.eftours.touraudio.core.TourCredentials
+import travel.eftours.touraudio.core.TourCredentialsStore
+import travel.eftours.touraudio.core.TourNetworks
 
 class MainActivity : AppCompatActivity() {
     private var service: GuideService? = null
     private var bound = false
     private var requestedBind = false
     private var pendingJoin = false
+    private var pendingNetworks = false
     private var locked = false
     private var taps = 0
     private var lastTap = 0L
@@ -37,9 +45,25 @@ class MainActivity : AppCompatActivity() {
         ActivityResultContracts.RequestMultiplePermissions()
     ) {
         if (hasMic()) ensureService()
-        if (pendingJoin) {
-            pendingJoin = false
-            sendJoin()
+        val join = pendingJoin
+        val networks = pendingNetworks
+        pendingJoin = false
+        pendingNetworks = false
+        if (join) sendJoin()
+        if (networks) showNetworks()
+    }
+    private val cameraPermission = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) launchScan() else setWifiStatus("Allow the camera to scan a tour code")
+    }
+    private val qrScan = registerForActivityResult(ScanContract()) { result ->
+        val contents = result.contents ?: return@registerForActivityResult
+        val credentials = TourCredentials.parse(contents)
+        if (credentials == null) {
+            setWifiStatus("That code is not a tour join code")
+        } else {
+            applyCredentials(credentials)
         }
     }
 
@@ -64,6 +88,9 @@ class MainActivity : AppCompatActivity() {
         findViewById<EditText>(R.id.ssidInput).setText(prefs.getString("ssid", ""))
         findViewById<EditText>(R.id.passwordInput).setText(prefs.getString("password", ""))
         findViewById<Button>(R.id.joinButton).setOnClickListener { joinWifi() }
+        findViewById<Button>(R.id.scanButton).setOnClickListener { scanCode() }
+        findViewById<Button>(R.id.showCodeButton).setOnClickListener { showCode() }
+        findViewById<Button>(R.id.findButton).setOnClickListener { findNetworks() }
         findViewById<Button>(R.id.broadcastButton).setOnClickListener { toggleBroadcast() }
         findViewById<Button>(R.id.lockButton).setOnClickListener { setLocked(true) }
         findViewById<Button>(R.id.ccButton).setOnClickListener { toggleCaptions() }
@@ -102,10 +129,115 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun joinWifi() {
-        val ssid = findViewById<EditText>(R.id.ssidInput).text.toString()
+        val existing = TourCredentialsStore(this).last()
+        applyCredentials(
+            TourCredentials(
+                ssid = findViewById<EditText>(R.id.ssidInput).text.toString().trim(),
+                password = findViewById<EditText>(R.id.passwordInput).text.toString(),
+                host = existing?.host ?: TourCredentials.DEFAULT_HOST,
+                port = existing?.port ?: TourCredentials.DEFAULT_PORT
+            )
+        )
+    }
+
+    private fun scanCode() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+            launchScan()
+        } else {
+            cameraPermission.launch(Manifest.permission.CAMERA)
+        }
+    }
+
+    private fun launchScan() {
+        qrScan.launch(ScanOptions().apply {
+            setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+            setPrompt("Scan the tour QR code")
+            setBeepEnabled(false)
+            setOrientationLocked(false)
+        })
+    }
+
+    private fun showCode() {
+        val ssid = findViewById<EditText>(R.id.ssidInput).text.toString().trim()
         val password = findViewById<EditText>(R.id.passwordInput).text.toString()
+        if (ssid.isBlank() || password.length < 8) {
+            setWifiStatus("Enter the network name and password, then show the code")
+            return
+        }
+        val existing = TourCredentialsStore(this).last()
+        val credentials = TourCredentials(
+            ssid,
+            password,
+            existing?.host ?: TourCredentials.DEFAULT_HOST,
+            existing?.port ?: TourCredentials.DEFAULT_PORT
+        )
+        TourCredentialsStore(this).save(credentials)
+        val bitmap = try {
+            TourQr.bitmap(credentials.encode())
+        } catch (_: Exception) {
+            setWifiStatus("Could not make a QR code")
+            return
+        }
+        val image = ImageView(this).apply {
+            setImageBitmap(bitmap)
+            setPadding(48, 48, 48, 48)
+            setBackgroundColor(android.graphics.Color.WHITE)
+        }
+        AlertDialog.Builder(this)
+            .setTitle(ssid)
+            .setMessage("Travelers scan this with the Tour Audio app")
+            .setView(image)
+            .setPositiveButton("Close", null)
+            .show()
+    }
+
+    private fun findNetworks() {
+        val needed = wifiPermissions()
+        if (needed.isEmpty()) showNetworks() else {
+            pendingNetworks = true
+            permissions.launch(needed.toTypedArray())
+        }
+    }
+
+    private fun showNetworks() {
+        setWifiStatus("Looking for EF-TOUR networks")
+        TourNetworks.find(this) { lookup ->
+            if (lookup.hint != null) {
+                setWifiStatus(lookup.hint)
+                return@find
+            }
+            if (lookup.names.size == 1) {
+                selectNetwork(lookup.names.first())
+            } else {
+                AlertDialog.Builder(this)
+                    .setTitle("Tour networks")
+                    .setItems(lookup.names.toTypedArray()) { _, which ->
+                        selectNetwork(lookup.names[which])
+                    }
+                    .show()
+            }
+        }
+    }
+
+    private fun selectNetwork(ssid: String) {
+        val saved = TourCredentialsStore(this).passwordFor(ssid)
+        findViewById<EditText>(R.id.ssidInput).setText(ssid)
+        if (saved != null) {
+            findViewById<EditText>(R.id.passwordInput).setText(saved)
+            joinWifi()
+        } else {
+            setWifiStatus("Enter the password for $ssid, or scan its QR code")
+        }
+    }
+
+    private fun applyCredentials(credentials: TourCredentials) {
+        findViewById<EditText>(R.id.ssidInput).setText(credentials.ssid)
+        findViewById<EditText>(R.id.passwordInput).setText(credentials.password)
         getSharedPreferences("guide", MODE_PRIVATE).edit()
-            .putString("ssid", ssid).putString("password", password).apply()
+            .putString("ssid", credentials.ssid)
+            .putString("password", credentials.password)
+            .apply()
+        TourCredentialsStore(this).save(credentials)
         val needed = wifiPermissions().toMutableList()
         if (!hasMic()) needed += Manifest.permission.RECORD_AUDIO
         if (needed.isEmpty()) {
@@ -115,6 +247,10 @@ class MainActivity : AppCompatActivity() {
             pendingJoin = true
             permissions.launch(needed.toTypedArray())
         }
+    }
+
+    private fun setWifiStatus(text: String) {
+        findViewById<TextView>(R.id.wifiStatus).text = text
     }
 
     private fun sendJoin() {

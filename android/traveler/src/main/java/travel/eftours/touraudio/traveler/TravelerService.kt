@@ -18,6 +18,7 @@ import android.os.Looper
 import android.os.PowerManager
 import org.json.JSONObject
 import travel.eftours.touraudio.core.PcmPlayer
+import travel.eftours.touraudio.core.TourCredentialsStore
 import travel.eftours.touraudio.core.TourSocket
 import travel.eftours.touraudio.core.TourWifi
 
@@ -114,7 +115,7 @@ class TravelerService : Service() {
         }, ::note)
         socket = next
         sessionPrefs().edit().putBoolean("listening", true).apply()
-        next.connect(url.ifBlank { TourSocket.DEFAULT_URL })
+        next.connect(url.ifBlank { TourCredentialsStore(this).audioUrl() })
         publish(state.copy(listening = true, status = "Connecting"))
         watchAudio()
     }

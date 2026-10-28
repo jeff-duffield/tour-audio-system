@@ -15,6 +15,7 @@ import android.os.Looper
 import android.os.PowerManager
 import org.json.JSONObject
 import travel.eftours.touraudio.core.PcmCapture
+import travel.eftours.touraudio.core.TourCredentialsStore
 import travel.eftours.touraudio.core.TourSocket
 import travel.eftours.touraudio.core.TourWifi
 
@@ -99,7 +100,7 @@ class GuideService : Service() {
         stopCapture()
         if (socket == null) {
             socket = TourSocket("guide", ::onJson, { }, ::note).also {
-                it.connect(TourSocket.DEFAULT_URL)
+                it.connect(TourCredentialsStore(this).audioUrl())
             }
         }
         val mic = PcmCapture(
