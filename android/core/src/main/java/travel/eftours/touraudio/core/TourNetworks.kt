@@ -109,13 +109,8 @@ object TourNetworks {
 
     private fun networkName(result: ScanResult): String? {
         if (Build.VERSION.SDK_INT >= 33) {
-            val modern = result.wifiSsid
-            if (modern != null) {
-                val utf8 = readable(modern.utf8Text)
-                if (utf8 != null) return utf8
-                val printed = readable(modern.toString())
-                if (printed != null) return printed
-            }
+            val printed = readable(result.wifiSsid?.toString())
+            if (printed != null) return printed
         }
         @Suppress("DEPRECATION")
         return readable(result.SSID)
