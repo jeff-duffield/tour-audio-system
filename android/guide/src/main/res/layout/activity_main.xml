@@ -17,13 +17,18 @@
             android:orientation="vertical"
             android:padding="24dp">
 
-            <TextView
+            <ImageView
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="EF"
-                android:textColor="#FFFFFF"
-                android:textSize="28sp"
-                android:textStyle="bold" />
+                android:layout_height="72dp"
+                android:adjustViewBounds="true"
+                android:background="@drawable/bg_logo_chip"
+                android:contentDescription="EF"
+                android:paddingLeft="14dp"
+                android:paddingTop="8dp"
+                android:paddingRight="14dp"
+                android:paddingBottom="8dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ef_logo_pink" />
 
             <TextView
                 android:layout_width="wrap_content"
@@ -349,13 +354,13 @@
         android:orientation="vertical"
         android:visibility="gone">
 
-        <TextView
+        <ImageView
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="EF"
-            android:textColor="#FF329B"
-            android:textSize="42sp"
-            android:textStyle="bold" />
+            android:layout_height="72dp"
+            android:adjustViewBounds="true"
+            android:contentDescription="EF"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ef_logo_pink" />
 
         <TextView
             android:id="@+id/lockLabel"
