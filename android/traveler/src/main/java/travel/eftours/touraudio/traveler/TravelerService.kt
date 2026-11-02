@@ -30,6 +30,7 @@ class TravelerService : Service() {
         val receiving: Boolean = false,
         val caption: String = "",
         val wifi: String = "",
+        val wifiConnected: Boolean = false,
         val battery: String = ""
     )
 
@@ -56,7 +57,8 @@ class TravelerService : Service() {
         createChannel()
         startForeground(41, notification("Tour audio"), playbackType())
         wifi.restore()
-        publish(state.copy(wifi = wifi.ssid?.let { "Holding $it" } ?: "Not joined"))
+        val saved = wifi.ssid
+        publish(state.copy(wifi = if (saved != null) "Reconnecting to $saved" else "Not joined"))
         if (sessionPrefs().getBoolean("listening", false)) startListening("")
     }
 
@@ -154,21 +156,26 @@ class TravelerService : Service() {
     }
 
     private fun publish(next: State) {
-        val withBattery = next.copy(battery = batteryLabel(), wifi = wifi.ssid?.let { "Holding $it" } ?: next.wifi)
-        state = withBattery
+        state = next.copy(battery = batteryLabel(), wifiConnected = wifi.isConnected)
         val callback = listener
         handler.post { callback?.invoke(state) }
     }
 
     private fun note(message: String) {
+        val wifiText = when {
+            message.startsWith("joined ") -> "Connected to ${message.removePrefix("joined ")}"
+            message.startsWith("requesting ") -> "Accept the connection prompt"
+            message.startsWith("Wi-Fi") || message.startsWith("tour Wi-Fi") || message.startsWith("released") -> message
+            else -> state.wifi
+        }
         val status = when {
-            message.startsWith("joined") -> "On tour Wi-Fi"
+            message.startsWith("joined") -> if (state.listening) state.status else "Ready to listen"
             message.startsWith("connection failed") -> "Could not reach the router"
             message == "connected" && state.listening -> "Connected"
             message == "disconnected" && state.listening -> "Reconnecting"
             else -> state.status
         }
-        publish(state.copy(status = status, wifi = message))
+        publish(state.copy(status = status, wifi = wifiText))
     }
 
     private fun sessionPrefs() = getSharedPreferences("traveler_session", MODE_PRIVATE)

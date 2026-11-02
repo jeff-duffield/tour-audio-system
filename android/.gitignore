@@ -7,3 +7,4 @@ local.properties
 captures/
 .cxx/
 guide/src/main/assets/sherpa-onnx-streaming-zipformer-en-2023-06-26/
+guide/src/main/assets/sherpa-onnx-nemotron-speech-streaming-en-0.6b-160ms-int8-2026-04-25/

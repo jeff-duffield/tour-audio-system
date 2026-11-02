@@ -24,6 +24,7 @@ class TourWifi(
     private var available = false
 
     val ssid: String? get() = prefs.getString(KEY_SSID, null)
+    val isConnected: Boolean get() = available
 
     fun restore() {
         val name = ssid ?: return
@@ -44,7 +45,7 @@ class TourWifi(
         }
         prefs.edit().putString(KEY_SSID, name).putString(KEY_PASSWORD, password).apply()
         if (callback != null && available && this.ssid == name) {
-            log("already holding $name")
+            log("joined $name")
             return
         }
         request(name, password)

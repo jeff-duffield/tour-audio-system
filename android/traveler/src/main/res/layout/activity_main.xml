@@ -43,6 +43,14 @@
                 android:textColor="#99FFFFFF"
                 android:textSize="15sp" />
 
+            <LinearLayout
+                android:id="@+id/sessionPanel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_horizontal"
+                android:orientation="vertical"
+                android:visibility="gone">
+
             <TextView
                 android:id="@+id/travelerId"
                 android:layout_width="wrap_content"
@@ -207,11 +215,31 @@
                 </LinearLayout>
             </LinearLayout>
 
+            <Button
+                android:id="@+id/changeNetwork"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="20dp"
+                android:background="@drawable/bg_pill_ghost"
+                android:stateListAnimator="@null"
+                android:text="Change network"
+                android:textAllCaps="false"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                app:backgroundTint="@null" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/connectPanel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="28dp"
-                android:text="Tour Wi-Fi"
+                android:text="Connect to the tour Wi-Fi"
                 android:textColor="#FFFFFF"
                 android:textStyle="bold" />
 
@@ -282,6 +310,21 @@
                 android:layout_marginTop="8dp"
                 android:textColor="#CCFFFFFF"
                 android:textSize="13sp" />
+
+            <Button
+                android:id="@+id/backToSession"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_pill_ghost"
+                android:stateListAnimator="@null"
+                android:text="Back"
+                android:textAllCaps="false"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                android:visibility="gone"
+                app:backgroundTint="@null" />
+            </LinearLayout>
         </LinearLayout>
     </ScrollView>
 

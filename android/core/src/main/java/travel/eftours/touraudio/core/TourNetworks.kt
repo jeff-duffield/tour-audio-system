@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.location.LocationManager
+import android.net.wifi.ScanResult
 import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Handler
@@ -26,13 +27,6 @@ object TourNetworks {
 
     fun find(context: Context, band: Band, onResult: (Lookup) -> Unit) {
         val app = context.applicationContext
-        if (Build.VERSION.SDK_INT < 33) {
-            val locationOn = app.getSystemService(LocationManager::class.java).isLocationEnabled
-            if (!locationOn) {
-                onResult(Lookup(emptyList(), "Turn on location so this phone can list tour networks, or scan the QR code."))
-                return
-            }
-        }
         val wifi = app.getSystemService(WifiManager::class.java) ?: run {
             onResult(Lookup(emptyList(), "This phone cannot scan Wi-Fi."))
             return
@@ -41,7 +35,16 @@ object TourNetworks {
         val done = booleanArrayOf(false)
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(ctx: Context, intent: Intent) {
-                finish(app, wifi, this, handler, done, band, onResult)
+                val updated = intent.getBooleanExtra(WifiManager.EXTRA_RESULTS_UPDATED, false)
+                val found = try {
+                    matching(wifi, band)
+                } catch (_: SecurityException) {
+                    finish(app, wifi, this, handler, done, band, onResult)
+                    return
+                }
+                if (found.isNotEmpty() || updated) {
+                    finish(app, wifi, this, handler, done, band, onResult)
+                }
             }
         }
         val filter = IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION)
@@ -50,18 +53,15 @@ object TourNetworks {
         } else {
             app.registerReceiver(receiver, filter)
         }
-        val started = try {
+        try {
             wifi.startScan()
         } catch (_: SecurityException) {
-            false
-        }
-        if (!started) {
             finish(app, wifi, receiver, handler, done, band, onResult)
             return
         }
         handler.postDelayed({
             finish(app, wifi, receiver, handler, done, band, onResult)
-        }, 4000)
+        }, 5000)
     }
 
     private fun finish(
@@ -80,33 +80,59 @@ object TourNetworks {
             app.unregisterReceiver(receiver)
         } catch (_: Exception) {
         }
-        val names = try {
-            names(wifi, band)
+        val seen = try {
+            seenNames(wifi)
         } catch (_: SecurityException) {
-            onResult(Lookup(emptyList(), "Allow nearby Wi-Fi access, then try again."))
+            onResult(Lookup(emptyList(), "Allow nearby devices and location, then try again."))
             return
         }
-        val hint = if (names.isEmpty()) {
-            val label = if (band == Band.GUIDE) "EF-TOUR-GUIDE" else "EF-TOUR"
-            "No $label networks found. Scan the QR code or type the network name."
-        } else {
-            null
+        val names = seen.filter { matches(it, band) }.distinct().sorted()
+        val hint = when {
+            names.isNotEmpty() -> null
+            !locationOn(app) -> "Turn location on. Android hides Wi-Fi names until location is on."
+            seen.isEmpty() -> "No Wi-Fi names came back. Allow nearby devices and location, then try again."
+            else -> {
+                val label = if (band == Band.GUIDE) "EF-TOUR-GUIDE" else "EF-TOUR"
+                "No $label network in this scan. Nearby: ${seen.take(4).joinToString()}."
+            }
         }
         onResult(Lookup(names, hint))
     }
 
-    private fun names(wifi: WifiManager, band: Band): List<String> {
-        return wifi.scanResults.mapNotNull { result ->
-            val raw = if (Build.VERSION.SDK_INT >= 33) {
-                result.wifiSsid?.toString()
-            } else {
-                @Suppress("DEPRECATION")
-                result.SSID
+    private fun matching(wifi: WifiManager, band: Band): List<String> {
+        return seenNames(wifi).filter { matches(it, band) }
+    }
+
+    private fun seenNames(wifi: WifiManager): List<String> {
+        return wifi.scanResults.mapNotNull { networkName(it) }.distinct().sorted()
+    }
+
+    private fun networkName(result: ScanResult): String? {
+        if (Build.VERSION.SDK_INT >= 33) {
+            val modern = result.wifiSsid
+            if (modern != null) {
+                val utf8 = readable(modern.utf8Text)
+                if (utf8 != null) return utf8
+                val printed = readable(modern.toString())
+                if (printed != null) return printed
             }
-            raw?.trim()?.removeSurrounding("\"")
-        }.filter { matches(it, band) }
-            .distinct()
-            .sorted()
+        }
+        @Suppress("DEPRECATION")
+        return readable(result.SSID)
+    }
+
+    private fun readable(raw: String?): String? {
+        if (raw.isNullOrBlank()) return null
+        var name = raw.trim().filter { it.code >= 32 }
+        if (name.length >= 2 && name.startsWith("\"") && name.endsWith("\"")) {
+            name = name.substring(1, name.length - 1).trim()
+        }
+        if (name.isBlank() || name.equals("<unknown ssid>", ignoreCase = true)) return null
+        return name
+    }
+
+    private fun locationOn(context: Context): Boolean {
+        return context.getSystemService(LocationManager::class.java).isLocationEnabled
     }
 
     private val TRAVELER_NAME = Regex("^EF-TOUR-\\d+$", RegexOption.IGNORE_CASE)

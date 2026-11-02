@@ -28,19 +28,19 @@ jobs:
       - name: Download English caption model
         run: |
           set -euo pipefail
-          dest="android/guide/src/main/assets/sherpa-onnx-streaming-zipformer-en-2023-06-26"
+          dest="android/guide/src/main/assets/sherpa-onnx-nemotron-speech-streaming-en-0.6b-160ms-int8-2026-04-25"
           mkdir -p "$dest"
           curl -fsSL -o /tmp/caption-model.tar.bz2 \
-            https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-en-2023-06-26.tar.bz2
+            https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemotron-speech-streaming-en-0.6b-160ms-int8-2026-04-25.tar.bz2
           tar -xjf /tmp/caption-model.tar.bz2 -C android/guide/src/main/assets
-          test -f "$dest/encoder-epoch-99-avg-1-chunk-16-left-128.int8.onnx"
-          test -f "$dest/decoder-epoch-99-avg-1-chunk-16-left-128.onnx"
-          test -f "$dest/joiner-epoch-99-avg-1-chunk-16-left-128.onnx"
+          test -f "$dest/encoder.int8.onnx"
+          test -f "$dest/decoder.int8.onnx"
+          test -f "$dest/joiner.int8.onnx"
           test -f "$dest/tokens.txt"
           find "$dest" -type f \
-            ! -name 'encoder-epoch-99-avg-1-chunk-16-left-128.int8.onnx' \
-            ! -name 'decoder-epoch-99-avg-1-chunk-16-left-128.onnx' \
-            ! -name 'joiner-epoch-99-avg-1-chunk-16-left-128.onnx' \
+            ! -name 'encoder.int8.onnx' \
+            ! -name 'decoder.int8.onnx' \
+            ! -name 'joiner.int8.onnx' \
             ! -name 'tokens.txt' -delete
 
       - name: Build debug APKs

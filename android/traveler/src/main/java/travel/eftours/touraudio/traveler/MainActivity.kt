@@ -35,6 +35,8 @@ class MainActivity : AppCompatActivity() {
 
     private var pendingJoin = false
     private var pendingNetworks = false
+    private var editingNetwork = false
+    private var connectedName = ""
     private val permissions = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) {
@@ -89,6 +91,14 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.joinButton).setOnClickListener { joinWifi() }
         findViewById<Button>(R.id.scanButton).setOnClickListener { scanCode() }
         findViewById<Button>(R.id.findButton).setOnClickListener { findNetworks() }
+        findViewById<Button>(R.id.changeNetwork).setOnClickListener {
+            editingNetwork = true
+            applyScreens(lastState.wifiConnected, connectedName)
+        }
+        findViewById<Button>(R.id.backToSession).setOnClickListener {
+            editingNetwork = false
+            applyScreens(lastState.wifiConnected, connectedName)
+        }
         findViewById<Button>(R.id.listenButton).setOnClickListener { toggleListen() }
         findViewById<Button>(R.id.lockButton).setOnClickListener { setLocked(true) }
         findViewById<Button>(R.id.captionButton).setOnClickListener {
@@ -160,10 +170,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun findNetworks() {
-        val needed = wifiPermissions()
+        val needed = wifiPermissions().toMutableList()
+        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            needed += Manifest.permission.ACCESS_FINE_LOCATION
+        }
         if (needed.isEmpty()) showNetworks() else {
             pendingNetworks = true
-            permissions.launch(needed)
+            permissions.launch(needed.toTypedArray())
         }
     }
 
@@ -309,6 +322,22 @@ class MainActivity : AppCompatActivity() {
         }
         findViewById<TextView>(R.id.lockLabel).text = if (state.receiving) "Audio playing" else state.status
         if (!state.listening && locked) setLocked(false)
+        val network = if (state.wifiConnected) state.wifi.removePrefix("Connected to ").trim() else ""
+        applyScreens(state.wifiConnected, network)
+    }
+
+    private fun applyScreens(connected: Boolean, name: String) {
+        if (!connected) {
+            editingNetwork = false
+            connectedName = ""
+        } else if (name.isNotBlank() && name != connectedName) {
+            editingNetwork = false
+            connectedName = name
+        }
+        val showConnect = !connected || editingNetwork
+        findViewById<View>(R.id.sessionPanel).visibility = if (showConnect) View.GONE else View.VISIBLE
+        findViewById<View>(R.id.connectPanel).visibility = if (showConnect) View.VISIBLE else View.GONE
+        findViewById<View>(R.id.backToSession).visibility = if (showConnect && connected) View.VISIBLE else View.GONE
     }
 
     private fun setLocked(value: Boolean) {

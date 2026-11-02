@@ -34,6 +34,7 @@ class GuideService : Service() {
         val mindBlown: Int = 0,
         val participation: String = "0 of 0 reacted",
         val wifi: String = "",
+        val wifiConnected: Boolean = false,
         val captionsOn: Boolean = false,
         val captionStatus: String = ""
     )
@@ -64,8 +65,9 @@ class GuideService : Service() {
         }
         wifi.restore()
         captionsWanted = sessionPrefs().getBoolean("captions", false)
+        val saved = wifi.ssid
         publish(state.copy(
-            wifi = wifi.ssid?.let { "Holding $it" } ?: "Not joined",
+            wifi = if (saved != null) "Reconnecting to $saved" else "Not joined",
             captionsOn = captionsWanted,
             captionStatus = if (captionsWanted) "Captions will start with the broadcast" else ""
         ))
@@ -273,14 +275,22 @@ class GuideService : Service() {
     }
 
     private fun publish(next: State) {
-        state = next.copy(wifi = wifi.ssid?.let { "Holding $it" } ?: next.wifi)
+        state = next.copy(wifiConnected = wifi.isConnected)
         val callback = listener
         handler.post { callback?.invoke(state) }
     }
 
     private fun note(message: String) {
+        val wifiText = when {
+            message.startsWith("joined ") -> "Connected to ${message.removePrefix("joined ")}"
+            message.startsWith("requesting ") -> "Accept the connection prompt"
+            message.startsWith("Wi-Fi") || message.startsWith("tour Wi-Fi") || message.startsWith("released") -> message
+            else -> null
+        }
         if (message.startsWith("connection failed") && state.broadcasting) {
-            publish(state.copy(status = "Could not reach the router"))
+            publish(state.copy(status = "Could not reach the router", wifi = wifiText ?: state.wifi))
+        } else if (wifiText != null) {
+            publish(state.copy(wifi = wifiText))
         }
     }
 

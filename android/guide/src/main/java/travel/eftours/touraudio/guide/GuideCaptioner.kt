@@ -23,7 +23,7 @@ class GuideCaptioner(
     private val onStatus: (String) -> Unit
 ) {
     private val active = AtomicBoolean(false)
-    private val queue = ArrayBlockingQueue<ByteArray>(8)
+    private val queue = ArrayBlockingQueue<ByteArray>(32)
     private var worker: Thread? = null
 
     fun start() {
@@ -123,13 +123,12 @@ class GuideCaptioner(
         return OnlineRecognizerConfig(
             modelConfig = OnlineModelConfig(
                 transducer = OnlineTransducerModelConfig(
-                    encoder = "$MODEL_DIR/encoder-epoch-99-avg-1-chunk-16-left-128.int8.onnx",
-                    decoder = "$MODEL_DIR/decoder-epoch-99-avg-1-chunk-16-left-128.onnx",
-                    joiner = "$MODEL_DIR/joiner-epoch-99-avg-1-chunk-16-left-128.onnx"
+                    encoder = "$MODEL_DIR/encoder.int8.onnx",
+                    decoder = "$MODEL_DIR/decoder.int8.onnx",
+                    joiner = "$MODEL_DIR/joiner.int8.onnx"
                 ),
                 tokens = "$MODEL_DIR/tokens.txt",
-                numThreads = 2,
-                modelType = "zipformer2"
+                numThreads = 2
             ),
             endpointConfig = EndpointConfig(
                 rule1 = EndpointRule(false, 1.2f, 0.0f),
@@ -141,7 +140,7 @@ class GuideCaptioner(
     }
 
     private companion object {
-        const val MODEL_DIR = "sherpa-onnx-streaming-zipformer-en-2023-06-26"
+        const val MODEL_DIR = "sherpa-onnx-nemotron-speech-streaming-en-0.6b-160ms-int8-2026-04-25"
         const val SAMPLE_RATE = 16000
     }
 }
