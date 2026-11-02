@@ -8,7 +8,9 @@ import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.view.View
 import android.widget.Button
 import android.widget.EditText
@@ -37,6 +39,7 @@ class MainActivity : AppCompatActivity() {
     private var pendingNetworks = false
     private var editingNetwork = false
     private var connectedName = ""
+    private val reactionHandler = Handler(Looper.getMainLooper())
     private val permissions = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) {
@@ -291,11 +294,20 @@ class MainActivity : AppCompatActivity() {
             R.id.reactMind to "mind-blown"
         )
         map.forEach { (id, name) ->
-            findViewById<View>(id).setOnClickListener {
+            val reaction = findViewById<View>(id)
+            reaction.setOnClickListener {
+                if (!reaction.isEnabled) return@setOnClickListener
                 ContextCompat.startForegroundService(this, Intent(this, TravelerService::class.java).apply {
                     action = TravelerService.ACTION_REACT
                     putExtra(TravelerService.EXTRA_REACTION, name)
                 })
+                // Match the web app's per-reaction five-second cooldown.
+                reaction.isEnabled = false
+                reaction.alpha = 0.35f
+                reactionHandler.postDelayed({
+                    reaction.isEnabled = true
+                    reaction.alpha = 1f
+                }, REACTION_COOLDOWN_MS)
             }
         }
     }
@@ -356,5 +368,9 @@ class MainActivity : AppCompatActivity() {
             else -> "Tap 3× to unlock"
         }
         if (taps >= 3) setLocked(false)
+    }
+
+    private companion object {
+        const val REACTION_COOLDOWN_MS = 5_000L
     }
 }

@@ -9,6 +9,7 @@ import kotlin.math.sqrt
 /** Captures 16 kHz mono PCM Int16 in 2048-frame chunks, including silence. */
 class PcmCapture(
     private val voiceProcessing: Boolean,
+    private val gateThreshold: () -> Float = { 0f },
     private val onChunk: (ByteArray) -> Unit,
     private val onLevel: (Float) -> Unit,
     private val log: (String) -> Unit
@@ -70,8 +71,11 @@ class PcmCapture(
             while (running) {
                 val n = audioRecord.read(buf, 0, chunkBytes)
                 if (n > 0) {
-                    onLevel(level(buf, n))
-                    onChunk(buf.copyOf(n))
+                    val rms = level(buf, n)
+                    onLevel(rms)
+                    // Keep the PCM timing stable while silencing background noise
+                    // below the guide's selected pickup threshold.
+                    onChunk(if (rms < gateThreshold()) ByteArray(n) else buf.copyOf(n))
                 } else if (n < 0) {
                     log("microphone read error $n")
                     break

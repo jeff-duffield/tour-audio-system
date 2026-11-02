@@ -20,7 +20,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 class GuideCaptioner(
     private val context: Context,
     private val onText: (String, Boolean) -> Unit,
-    private val onStatus: (String) -> Unit
+    private val onStatus: (String, Boolean) -> Unit
 ) {
     private val active = AtomicBoolean(false)
     private val queue = ArrayBlockingQueue<ByteArray>(32)
@@ -60,18 +60,18 @@ class GuideCaptioner(
         Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND)
         val files = context.assets.list(MODEL_DIR)
         if (files == null || !files.contains("tokens.txt")) {
-            onStatus("Captions are not in this build. Broadcast continues.")
+            onStatus("CC could not start. Broadcast continues.", false)
             active.set(false)
             return
         }
         val recognizer = try {
             OnlineRecognizer(context.assets, config())
         } catch (_: Throwable) {
-            onStatus("Captions could not start. Broadcast continues.")
+            onStatus("CC could not start. Broadcast continues.", false)
             active.set(false)
             return
         }
-        onStatus("Captions on")
+        onStatus("CC is currently on", true)
         val stream = recognizer.createStream()
         var last = ""
         try {
@@ -95,7 +95,7 @@ class GuideCaptioner(
                 }
             }
         } catch (_: Throwable) {
-            onStatus("Captions stopped. Broadcast continues.")
+            onStatus("CC stopped. Broadcast continues.", false)
         } finally {
             stream.release()
             recognizer.release()
@@ -123,12 +123,13 @@ class GuideCaptioner(
         return OnlineRecognizerConfig(
             modelConfig = OnlineModelConfig(
                 transducer = OnlineTransducerModelConfig(
-                    encoder = "$MODEL_DIR/encoder.int8.onnx",
-                    decoder = "$MODEL_DIR/decoder.int8.onnx",
-                    joiner = "$MODEL_DIR/joiner.int8.onnx"
+                    encoder = "$MODEL_DIR/encoder-epoch-99-avg-1-chunk-16-left-128.int8.onnx",
+                    decoder = "$MODEL_DIR/decoder-epoch-99-avg-1-chunk-16-left-128.onnx",
+                    joiner = "$MODEL_DIR/joiner-epoch-99-avg-1-chunk-16-left-128.onnx"
                 ),
                 tokens = "$MODEL_DIR/tokens.txt",
-                numThreads = 2
+                numThreads = 2,
+                modelType = "zipformer2"
             ),
             endpointConfig = EndpointConfig(
                 rule1 = EndpointRule(false, 1.2f, 0.0f),
@@ -140,7 +141,7 @@ class GuideCaptioner(
     }
 
     private companion object {
-        const val MODEL_DIR = "sherpa-onnx-nemotron-speech-streaming-en-0.6b-160ms-int8-2026-04-25"
+        const val MODEL_DIR = "sherpa-onnx-streaming-zipformer-en-2023-06-26"
         const val SAMPLE_RATE = 16000
     }
 }

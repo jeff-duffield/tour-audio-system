@@ -36,7 +36,8 @@ class GuideService : Service() {
         val wifi: String = "",
         val wifiConnected: Boolean = false,
         val captionsOn: Boolean = false,
-        val captionStatus: String = ""
+        val captionStatus: String = "CC is currently off",
+        val sensitivity: Int = 8
     )
 
     inner class LocalBinder : Binder() {
@@ -53,6 +54,7 @@ class GuideService : Service() {
     private var wakeLock: PowerManager.WakeLock? = null
     private var captioner: GuideCaptioner? = null
     private var captionsWanted = false
+    @Volatile private var sensitivity = 8
 
     override fun onBind(intent: Intent?): IBinder = binder
 
@@ -65,11 +67,13 @@ class GuideService : Service() {
         }
         wifi.restore()
         captionsWanted = sessionPrefs().getBoolean("captions", false)
+        sensitivity = sessionPrefs().getInt("sensitivity", 8)
         val saved = wifi.ssid
         publish(state.copy(
             wifi = if (saved != null) "Reconnecting to $saved" else "Not joined",
             captionsOn = captionsWanted,
-            captionStatus = if (captionsWanted) "Captions will start with the broadcast" else ""
+            captionStatus = if (captionsWanted) "CC will start with the broadcast" else "CC is currently off",
+            sensitivity = sensitivity
         ))
         if (sessionPrefs().getBoolean("broadcasting", false)) startBroadcast()
     }
@@ -83,6 +87,7 @@ class GuideService : Service() {
             ACTION_START -> startBroadcast()
             ACTION_STOP -> stopBroadcast()
             ACTION_CAPTIONS -> setCaptions(intent.getBooleanExtra(EXTRA_ON, false))
+            ACTION_SENSITIVITY -> setSensitivity(intent.getIntExtra(EXTRA_SENSITIVITY, 8))
             ACTION_SUBTITLE -> sendSubtitle(
                 intent.getStringExtra(EXTRA_TEXT).orEmpty(),
                 intent.getBooleanExtra(EXTRA_FINAL, false),
@@ -118,6 +123,7 @@ class GuideService : Service() {
         }
         val mic = PcmCapture(
             voiceProcessing = false,
+            gateThreshold = { sensitivityThreshold(sensitivity) },
             onChunk = { pcm ->
                 socket?.sendPcm(pcm)
                 captioner?.offer(pcm)
@@ -137,6 +143,7 @@ class GuideService : Service() {
             watching = false,
             ended = false,
             captionsOn = captionsWanted,
+            sensitivity = sensitivity,
             status = "Broadcasting · ${state.listeners} listeners"
         ))
         if (captionsWanted) ensureCaptioner()
@@ -155,7 +162,7 @@ class GuideService : Service() {
             watching = false,
             level = 0,
             captionsOn = captionsWanted,
-            captionStatus = if (captionsWanted) "Captions will start with the broadcast" else "",
+            captionStatus = if (captionsWanted) "CC will start with the broadcast" else "CC is currently off",
             status = "Ready to broadcast · 0 listeners"
         ))
     }
@@ -174,7 +181,7 @@ class GuideService : Service() {
             broadcasting = false,
             watching = true,
             ended = false,
-            captionStatus = if (captionsWanted) "Captions will start with the broadcast" else "",
+            captionStatus = if (captionsWanted) "CC will start with the broadcast" else "CC is currently off",
             status = "Watching · ${state.listeners} listeners"
         ))
     }
@@ -185,15 +192,18 @@ class GuideService : Service() {
         if (!on) {
             stopCaptioner()
             sendSubtitle("", true, false)
-            publish(state.copy(captionsOn = false, captionStatus = ""))
+            publish(state.copy(captionsOn = false, captionStatus = "CC is currently off"))
             return
         }
         if (capture != null) {
+            // Tell every traveler CC is available while the model initializes,
+            // so the caption control appears before the first spoken phrase.
+            sendSubtitle("", true, true)
             ensureCaptioner()
         } else {
             publish(state.copy(
-                captionsOn = true,
-                captionStatus = "Captions will start with the broadcast"
+                captionsOn = false,
+                captionStatus = "CC will start with the broadcast"
             ))
         }
     }
@@ -207,16 +217,35 @@ class GuideService : Service() {
         val next = GuideCaptioner(
             this,
             onText = { text, isFinal -> sendSubtitle(text, isFinal, true) },
-            onStatus = { message -> publish(state.copy(captionsOn = true, captionStatus = message)) }
+            onStatus = { message, running ->
+                if (!running) {
+                    captionsWanted = false
+                    sessionPrefs().edit().putBoolean("captions", false).apply()
+                    sendSubtitle("", true, false)
+                } else {
+                    sendSubtitle("", true, true)
+                }
+                publish(state.copy(captionsOn = running, captionStatus = message))
+            }
         )
         captioner = next
-        publish(state.copy(captionsOn = true, captionStatus = "Loading captions"))
+        publish(state.copy(captionsOn = false, captionStatus = "Starting CC"))
         next.start()
     }
 
     private fun stopCaptioner() {
         captioner?.stop()
         if (captioner?.isRunning() != true) captioner = null
+    }
+
+    private fun setSensitivity(value: Int) {
+        sensitivity = value.coerceIn(1, 10)
+        sessionPrefs().edit().putInt("sensitivity", sensitivity).apply()
+        publish(state.copy(sensitivity = sensitivity))
+    }
+
+    private fun sensitivityThreshold(value: Int): Float {
+        return 0.045f - ((value - 1) / 9f) * 0.040f
     }
 
     private fun sendSubtitle(text: String, isFinal: Boolean, enabled: Boolean) {
@@ -331,10 +360,12 @@ class GuideService : Service() {
         const val ACTION_START = "travel.eftours.touraudio.guide.START"
         const val ACTION_STOP = "travel.eftours.touraudio.guide.STOP"
         const val ACTION_CAPTIONS = "travel.eftours.touraudio.guide.CAPTIONS"
+        const val ACTION_SENSITIVITY = "travel.eftours.touraudio.guide.SENSITIVITY"
         const val ACTION_SUBTITLE = "travel.eftours.touraudio.guide.SUBTITLE"
         const val EXTRA_SSID = "ssid"
         const val EXTRA_PASSWORD = "password"
         const val EXTRA_ON = "on"
+        const val EXTRA_SENSITIVITY = "sensitivity"
         const val EXTRA_TEXT = "text"
         const val EXTRA_FINAL = "final"
         const val EXTRA_ENABLED = "enabled"

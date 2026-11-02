@@ -14,6 +14,7 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.ImageView
 import android.widget.ProgressBar
+import android.widget.SeekBar
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
@@ -103,6 +104,18 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.lockButton).setOnClickListener { setLocked(true) }
         findViewById<Button>(R.id.ccButton).setOnClickListener { toggleCaptions() }
         findViewById<Button>(R.id.clearReactions).setOnClickListener { service?.clearReactions() }
+        findViewById<SeekBar>(R.id.sensitivitySlider).setOnSeekBarChangeListener(
+            object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                    val value = progress.coerceIn(1, 10)
+                    findViewById<TextView>(R.id.sensitivityValue).text =
+                        if (value <= 3) "Low" else if (value >= 8) "High" else "Medium"
+                    if (fromUser) setSensitivity(value)
+                }
+                override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
+                override fun onStopTrackingTouch(seekBar: SeekBar?) = Unit
+            }
+        )
         findViewById<View>(R.id.lockOverlay).setOnClickListener { unlockTap() }
         if (!hasMic()) {
             permissions.launch(arrayOf(Manifest.permission.RECORD_AUDIO))
@@ -309,10 +322,18 @@ class MainActivity : AppCompatActivity() {
 
     private fun toggleCaptions() {
         ensureService()
-        val turnOn = findViewById<Button>(R.id.ccButton).text != "CC on"
+        val turnOn = findViewById<Button>(R.id.ccButton).text != "Turn off CC"
         ContextCompat.startForegroundService(this, Intent(this, GuideService::class.java).apply {
             action = GuideService.ACTION_CAPTIONS
             putExtra(GuideService.EXTRA_ON, turnOn)
+        })
+    }
+
+    private fun setSensitivity(value: Int) {
+        ensureService()
+        ContextCompat.startForegroundService(this, Intent(this, GuideService::class.java).apply {
+            action = GuideService.ACTION_SENSITIVITY
+            putExtra(GuideService.EXTRA_SENSITIVITY, value)
         })
     }
 
@@ -342,6 +363,7 @@ class MainActivity : AppCompatActivity() {
         button.isEnabled = !state.watching
         val live = if (state.broadcasting) View.VISIBLE else View.GONE
         findViewById<View>(R.id.secondaryRow).visibility = live
+        findViewById<View>(R.id.sensitivityRow).visibility = live
         findViewById<View>(R.id.reactionDashboard).visibility = live
         findViewById<ProgressBar>(R.id.micLevel).apply {
             visibility = live
@@ -353,14 +375,14 @@ class MainActivity : AppCompatActivity() {
         showCount(R.id.countLaugh, state.laugh)
         showCount(R.id.countMind, state.mindBlown)
         findViewById<TextView>(R.id.reactionParticipation).text = state.participation
-        findViewById<Button>(R.id.ccButton).text = if (state.captionsOn) "CC on" else "CC off"
+        findViewById<Button>(R.id.ccButton).text =
+            if (state.captionsOn) "Turn off CC" else "Turn on CC"
         val caption = findViewById<TextView>(R.id.captionStatus)
-        if (state.captionStatus.isBlank()) {
-            caption.visibility = View.GONE
-        } else {
-            caption.visibility = View.VISIBLE
-            caption.text = state.captionStatus
-        }
+        caption.visibility = View.VISIBLE
+        caption.text = state.captionStatus
+        findViewById<SeekBar>(R.id.sensitivitySlider).progress = state.sensitivity
+        findViewById<TextView>(R.id.sensitivityValue).text =
+            if (state.sensitivity <= 3) "Low" else if (state.sensitivity >= 8) "High" else "Medium"
         findViewById<TextView>(R.id.lockLabel).text = state.status
         if (!state.broadcasting && locked) setLocked(false)
         onNetwork = state.wifiConnected

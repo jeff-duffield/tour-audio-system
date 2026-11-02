@@ -19,16 +19,12 @@
 
             <ImageView
                 android:layout_width="wrap_content"
-                android:layout_height="72dp"
+                android:layout_height="36dp"
                 android:adjustViewBounds="true"
-                android:background="@drawable/bg_logo_chip"
                 android:contentDescription="EF"
-                android:paddingLeft="14dp"
-                android:paddingTop="8dp"
-                android:paddingRight="14dp"
-                android:paddingBottom="8dp"
                 android:scaleType="fitCenter"
-                android:src="@drawable/ef_logo_pink" />
+                android:src="@drawable/ef_logo_pink"
+                android:tint="#FFFFFF" />
 
             <TextView
                 android:layout_width="wrap_content"
@@ -137,7 +133,53 @@
                 android:layout_marginTop="8dp"
                 android:textColor="#FFFFFF"
                 android:textSize="13sp"
-                android:visibility="gone" />
+                android:visibility="visible" />
+
+            <LinearLayout
+                android:id="@+id/sensitivityRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Sensitivity"
+                    android:textColor="#FFFFFF"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:text="Low"
+                    android:textColor="#CCFFFFFF"
+                    android:textSize="12sp" />
+
+                <SeekBar
+                    android:id="@+id/sensitivitySlider"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="8dp"
+                    android:layout_weight="1"
+                    android:max="10"
+                    android:min="1"
+                    android:progress="8"
+                    android:progressTint="#FFFFFF"
+                    android:thumbTint="#FFFFFF" />
+
+                <TextView
+                    android:id="@+id/sensitivityValue"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="High"
+                    android:textColor="#FFFFFF"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
 
             <LinearLayout
                 android:id="@+id/reactionDashboard"
