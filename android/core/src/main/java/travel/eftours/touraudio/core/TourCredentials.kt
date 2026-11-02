@@ -24,6 +24,22 @@ data class TourCredentials(
         const val DEFAULT_HOST = "192.168.8.1"
         const val DEFAULT_PORT = 3000
 
+        /**
+         * Shared tour Wi-Fi password. It keeps phones without the app off the
+         * router. Both the traveler and guide networks use it.
+         */
+        const val TOUR_PASSWORD = "EFLearnFun"
+
+        fun knownPassword(ssid: String): String? {
+            return if (TourNetworks.matches(ssid, TourNetworks.Band.TRAVELER) ||
+                TourNetworks.matches(ssid, TourNetworks.Band.GUIDE)
+            ) {
+                TOUR_PASSWORD
+            } else {
+                null
+            }
+        }
+
         fun parse(raw: String): TourCredentials? {
             val text = raw.trim()
             return when {

@@ -118,12 +118,20 @@ class MainActivity : AppCompatActivity() {
         super.onStop()
     }
 
+    private fun savedPassword(ssid: String): String {
+        val typed = findViewById<EditText>(R.id.passwordInput).text.toString()
+        if (typed.isNotBlank()) return typed
+        return TourCredentialsStore(this).passwordFor(ssid)
+            ?: TourCredentials.knownPassword(ssid)
+            ?: ""
+    }
+
     private fun joinWifi() {
         val existing = TourCredentialsStore(this).last()
         applyCredentials(
             TourCredentials(
                 ssid = findViewById<EditText>(R.id.ssidInput).text.toString().trim(),
-                password = findViewById<EditText>(R.id.passwordInput).text.toString(),
+                password = savedPassword(findViewById<EditText>(R.id.ssidInput).text.toString().trim()),
                 host = existing?.host ?: TourCredentials.DEFAULT_HOST,
                 port = existing?.port ?: TourCredentials.DEFAULT_PORT
             ),
@@ -158,7 +166,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun showNetworks() {
         setWifiStatus("Looking for EF-TOUR networks")
-        TourNetworks.find(this) { lookup ->
+        TourNetworks.find(this, TourNetworks.Band.TRAVELER) { lookup ->
             if (lookup.hint != null) {
                 setWifiStatus(lookup.hint)
                 return@find
@@ -177,7 +185,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun selectNetwork(ssid: String) {
-        val saved = TourCredentialsStore(this).passwordFor(ssid)
+        val saved = TourCredentialsStore(this).passwordFor(ssid) ?: TourCredentials.knownPassword(ssid)
         findViewById<EditText>(R.id.ssidInput).setText(ssid)
         if (saved != null) {
             findViewById<EditText>(R.id.passwordInput).setText(saved)

@@ -245,7 +245,7 @@
                 android:layout_marginTop="8dp"
                 android:background="@drawable/bg_pill_ghost"
                 android:stateListAnimator="@null"
-                android:text="Find EF-TOUR networks"
+                android:text="Find EF-TOUR-GUIDE networks"
                 android:textAllCaps="false"
                 android:textColor="#FFFFFF"
                 android:textSize="14sp"

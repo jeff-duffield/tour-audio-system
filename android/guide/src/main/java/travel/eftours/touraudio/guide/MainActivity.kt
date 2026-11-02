@@ -128,12 +128,20 @@ class MainActivity : AppCompatActivity() {
         return ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
     }
 
+    private fun savedPassword(ssid: String): String {
+        val typed = findViewById<EditText>(R.id.passwordInput).text.toString()
+        if (typed.isNotBlank()) return typed
+        return TourCredentialsStore(this).passwordFor(ssid)
+            ?: TourCredentials.knownPassword(ssid)
+            ?: ""
+    }
+
     private fun joinWifi() {
         val existing = TourCredentialsStore(this).last()
         applyCredentials(
             TourCredentials(
                 ssid = findViewById<EditText>(R.id.ssidInput).text.toString().trim(),
-                password = findViewById<EditText>(R.id.passwordInput).text.toString(),
+                password = savedPassword(findViewById<EditText>(R.id.ssidInput).text.toString().trim()),
                 host = existing?.host ?: TourCredentials.DEFAULT_HOST,
                 port = existing?.port ?: TourCredentials.DEFAULT_PORT
             )
@@ -159,7 +167,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun showCode() {
         val ssid = findViewById<EditText>(R.id.ssidInput).text.toString().trim()
-        val password = findViewById<EditText>(R.id.passwordInput).text.toString()
+        val password = savedPassword(ssid)
         if (ssid.isBlank() || password.length < 8) {
             setWifiStatus("Enter the network name and password, then show the code")
             return
@@ -200,8 +208,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showNetworks() {
-        setWifiStatus("Looking for EF-TOUR networks")
-        TourNetworks.find(this) { lookup ->
+        setWifiStatus("Looking for EF-TOUR-GUIDE networks")
+        TourNetworks.find(this, TourNetworks.Band.GUIDE) { lookup ->
             if (lookup.hint != null) {
                 setWifiStatus(lookup.hint)
                 return@find
@@ -220,7 +228,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun selectNetwork(ssid: String) {
-        val saved = TourCredentialsStore(this).passwordFor(ssid)
+        val saved = TourCredentialsStore(this).passwordFor(ssid) ?: TourCredentials.knownPassword(ssid)
         findViewById<EditText>(R.id.ssidInput).setText(ssid)
         if (saved != null) {
             findViewById<EditText>(R.id.passwordInput).setText(saved)
