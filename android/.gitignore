@@ -6,3 +6,4 @@ local.properties
 *.iml
 captures/
 .cxx/
+guide/src/main/assets/sherpa-onnx-streaming-zipformer-en-2023-06-26/

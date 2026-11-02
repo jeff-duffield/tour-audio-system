@@ -33,7 +33,9 @@ class GuideService : Service() {
         val laugh: Int = 0,
         val mindBlown: Int = 0,
         val participation: String = "0 of 0 reacted",
-        val wifi: String = ""
+        val wifi: String = "",
+        val captionsOn: Boolean = false,
+        val captionStatus: String = ""
     )
 
     inner class LocalBinder : Binder() {
@@ -48,6 +50,8 @@ class GuideService : Service() {
     private var listener: ((State) -> Unit)? = null
     private var state = State()
     private var wakeLock: PowerManager.WakeLock? = null
+    private var captioner: GuideCaptioner? = null
+    private var captionsWanted = false
 
     override fun onBind(intent: Intent?): IBinder = binder
 
@@ -59,7 +63,12 @@ class GuideService : Service() {
             startForeground(42, notification("Ready to broadcast"), micType())
         }
         wifi.restore()
-        publish(state.copy(wifi = wifi.ssid?.let { "Holding $it" } ?: "Not joined"))
+        captionsWanted = sessionPrefs().getBoolean("captions", false)
+        publish(state.copy(
+            wifi = wifi.ssid?.let { "Holding $it" } ?: "Not joined",
+            captionsOn = captionsWanted,
+            captionStatus = if (captionsWanted) "Captions will start with the broadcast" else ""
+        ))
         if (sessionPrefs().getBoolean("broadcasting", false)) startBroadcast()
     }
 
@@ -71,6 +80,7 @@ class GuideService : Service() {
             )
             ACTION_START -> startBroadcast()
             ACTION_STOP -> stopBroadcast()
+            ACTION_CAPTIONS -> setCaptions(intent.getBooleanExtra(EXTRA_ON, false))
             ACTION_SUBTITLE -> sendSubtitle(
                 intent.getStringExtra(EXTRA_TEXT).orEmpty(),
                 intent.getBooleanExtra(EXTRA_FINAL, false),
@@ -81,6 +91,7 @@ class GuideService : Service() {
     }
 
     override fun onDestroy() {
+        stopCaptioner()
         stopCapture()
         socket?.close()
         super.onDestroy()
@@ -105,7 +116,10 @@ class GuideService : Service() {
         }
         val mic = PcmCapture(
             voiceProcessing = false,
-            onChunk = { pcm -> socket?.sendPcm(pcm) },
+            onChunk = { pcm ->
+                socket?.sendPcm(pcm)
+                captioner?.offer(pcm)
+            },
             onLevel = { level ->
                 val percent = (level * 100).toInt()
                 if (percent != state.level) publish(state.copy(level = percent))
@@ -120,13 +134,17 @@ class GuideService : Service() {
             broadcasting = true,
             watching = false,
             ended = false,
+            captionsOn = captionsWanted,
             status = "Broadcasting · ${state.listeners} listeners"
         ))
+        if (captionsWanted) ensureCaptioner()
     }
 
     private fun stopBroadcast() {
         sessionPrefs().edit().putBoolean("broadcasting", false).apply()
         stopCapture()
+        stopCaptioner()
+        sendSubtitle("", true, false)
         socket?.close()
         socket = null
         releaseWakeLock()
@@ -134,6 +152,8 @@ class GuideService : Service() {
             broadcasting = false,
             watching = false,
             level = 0,
+            captionsOn = captionsWanted,
+            captionStatus = if (captionsWanted) "Captions will start with the broadcast" else "",
             status = "Ready to broadcast · 0 listeners"
         ))
     }
@@ -145,13 +165,56 @@ class GuideService : Service() {
 
     private fun enterWatch() {
         stopCapture()
+        stopCaptioner()
+        sendSubtitle("", true, false)
         sessionPrefs().edit().putBoolean("broadcasting", false).apply()
         publish(state.copy(
             broadcasting = false,
             watching = true,
             ended = false,
+            captionStatus = if (captionsWanted) "Captions will start with the broadcast" else "",
             status = "Watching · ${state.listeners} listeners"
         ))
+    }
+
+    private fun setCaptions(on: Boolean) {
+        captionsWanted = on
+        sessionPrefs().edit().putBoolean("captions", on).apply()
+        if (!on) {
+            stopCaptioner()
+            sendSubtitle("", true, false)
+            publish(state.copy(captionsOn = false, captionStatus = ""))
+            return
+        }
+        if (capture != null) {
+            ensureCaptioner()
+        } else {
+            publish(state.copy(
+                captionsOn = true,
+                captionStatus = "Captions will start with the broadcast"
+            ))
+        }
+    }
+
+    private fun ensureCaptioner() {
+        val current = captioner
+        if (current != null) {
+            current.start()
+            return
+        }
+        val next = GuideCaptioner(
+            this,
+            onText = { text, isFinal -> sendSubtitle(text, isFinal, true) },
+            onStatus = { message -> publish(state.copy(captionsOn = true, captionStatus = message)) }
+        )
+        captioner = next
+        publish(state.copy(captionsOn = true, captionStatus = "Loading captions"))
+        next.start()
+    }
+
+    private fun stopCaptioner() {
+        captioner?.stop()
+        if (captioner?.isRunning() != true) captioner = null
     }
 
     private fun sendSubtitle(text: String, isFinal: Boolean, enabled: Boolean) {
@@ -257,9 +320,11 @@ class GuideService : Service() {
         const val ACTION_JOIN = "travel.eftours.touraudio.guide.JOIN"
         const val ACTION_START = "travel.eftours.touraudio.guide.START"
         const val ACTION_STOP = "travel.eftours.touraudio.guide.STOP"
+        const val ACTION_CAPTIONS = "travel.eftours.touraudio.guide.CAPTIONS"
         const val ACTION_SUBTITLE = "travel.eftours.touraudio.guide.SUBTITLE"
         const val EXTRA_SSID = "ssid"
         const val EXTRA_PASSWORD = "password"
+        const val EXTRA_ON = "on"
         const val EXTRA_TEXT = "text"
         const val EXTRA_FINAL = "final"
         const val EXTRA_ENABLED = "enabled"

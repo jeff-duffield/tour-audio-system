@@ -9,9 +9,6 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
-import android.speech.RecognitionListener
-import android.speech.RecognizerIntent
-import android.speech.SpeechRecognizer
 import android.view.View
 import android.widget.Button
 import android.widget.EditText
@@ -37,9 +34,6 @@ class MainActivity : AppCompatActivity() {
     private var locked = false
     private var taps = 0
     private var lastTap = 0L
-    private var ccOn = false
-    private var ccErrors = 0
-    private var recognizer: SpeechRecognizer? = null
 
     private val permissions = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -86,7 +80,10 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
         val prefs = getSharedPreferences("guide", MODE_PRIVATE)
         findViewById<EditText>(R.id.ssidInput).setText(prefs.getString("ssid", ""))
-        findViewById<EditText>(R.id.passwordInput).setText(prefs.getString("password", ""))
+        val storedPassword = prefs.getString("password", "").orEmpty()
+            .ifBlank { TourCredentials.TOUR_PASSWORD }
+        findViewById<EditText>(R.id.passwordInput).setText(storedPassword)
+        prefs.edit().putString("password", storedPassword).apply()
         findViewById<Button>(R.id.joinButton).setOnClickListener { joinWifi() }
         findViewById<Button>(R.id.scanButton).setOnClickListener { scanCode() }
         findViewById<Button>(R.id.showCodeButton).setOnClickListener { showCode() }
@@ -104,11 +101,9 @@ class MainActivity : AppCompatActivity() {
     override fun onStart() {
         super.onStart()
         if (hasMic()) ensureService()
-        if (ccOn) startCaptions()
     }
 
     override fun onStop() {
-        stopCaptions()
         service?.setListener(null)
         if (bound) unbindService(connection)
         bound = false
@@ -295,101 +290,15 @@ class MainActivity : AppCompatActivity() {
         ContextCompat.startForegroundService(this, Intent(this, GuideService::class.java).setAction(
             if (stop) GuideService.ACTION_STOP else GuideService.ACTION_START
         ))
-        if (stop) {
-            ccOn = false
-            stopCaptions()
-            sendCaption("", true, false)
-        }
     }
 
     private fun toggleCaptions() {
-        ccOn = !ccOn
-        findViewById<Button>(R.id.ccButton).text = if (ccOn) "CC on" else "CC off"
-        if (ccOn) startCaptions() else {
-            stopCaptions()
-            sendCaption("", true, false)
-        }
-    }
-
-    private fun startCaptions() {
-        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
-            ccOn = false
-            showCaption("Captions are not available on this phone. Broadcast continues.")
-            findViewById<Button>(R.id.ccButton).text = "CC off"
-            return
-        }
-        if (recognizer != null) return
-        ccErrors = 0
-        val rec = SpeechRecognizer.createSpeechRecognizer(this)
-        recognizer = rec
-        rec.setRecognitionListener(object : RecognitionListener {
-            override fun onReadyForSpeech(params: Bundle?) {}
-            override fun onBeginningOfSpeech() {}
-            override fun onRmsChanged(rmsdB: Float) {}
-            override fun onBufferReceived(buffer: ByteArray?) {}
-            override fun onEndOfSpeech() {}
-            override fun onError(error: Int) {
-                ccErrors++
-                if (ccErrors >= 3) {
-                    ccOn = false
-                    window.decorView.post {
-                        stopCaptions()
-                        sendCaption("", true, false)
-                        showCaption("Captions stopped. Broadcast is still on.")
-                        findViewById<Button>(R.id.ccButton).text = "CC off"
-                    }
-                    return
-                }
-                if (ccOn) listen(rec)
-            }
-            override fun onResults(results: Bundle?) {
-                val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull().orEmpty()
-                if (text.isNotBlank()) sendCaption(text, true)
-                ccErrors = 0
-                if (ccOn) listen(rec)
-            }
-            override fun onPartialResults(partialResults: Bundle?) {
-                val text = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull().orEmpty()
-                if (text.isNotBlank()) sendCaption(text, false)
-            }
-            override fun onEvent(eventType: Int, params: Bundle?) {}
-        })
-        showCaption("Captions on. If they fail, the broadcast keeps going.")
-        listen(rec)
-    }
-
-    private fun listen(rec: SpeechRecognizer) {
-        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-US")
-            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
-        }
-        try {
-            rec.startListening(intent)
-        } catch (_: Exception) {
-            showCaption("Captions could not start. Broadcast is still on.")
-        }
-    }
-
-    private fun stopCaptions() {
-        recognizer?.destroy()
-        recognizer = null
-    }
-
-    private fun sendCaption(text: String, isFinal: Boolean, enabled: Boolean = true) {
+        ensureService()
+        val turnOn = findViewById<Button>(R.id.ccButton).text != "CC on"
         ContextCompat.startForegroundService(this, Intent(this, GuideService::class.java).apply {
-            action = GuideService.ACTION_SUBTITLE
-            putExtra(GuideService.EXTRA_TEXT, text)
-            putExtra(GuideService.EXTRA_FINAL, isFinal)
-            putExtra(GuideService.EXTRA_ENABLED, enabled)
+            action = GuideService.ACTION_CAPTIONS
+            putExtra(GuideService.EXTRA_ON, turnOn)
         })
-    }
-
-    private fun showCaption(text: String) {
-        val view = findViewById<TextView>(R.id.captionStatus)
-        view.visibility = View.VISIBLE
-        view.text = text
     }
 
     private fun showCount(id: Int, count: Int) {
@@ -429,6 +338,14 @@ class MainActivity : AppCompatActivity() {
         showCount(R.id.countLaugh, state.laugh)
         showCount(R.id.countMind, state.mindBlown)
         findViewById<TextView>(R.id.reactionParticipation).text = state.participation
+        findViewById<Button>(R.id.ccButton).text = if (state.captionsOn) "CC on" else "CC off"
+        val caption = findViewById<TextView>(R.id.captionStatus)
+        if (state.captionStatus.isBlank()) {
+            caption.visibility = View.GONE
+        } else {
+            caption.visibility = View.VISIBLE
+            caption.text = state.captionStatus
+        }
         findViewById<TextView>(R.id.lockLabel).text = state.status
         if (!state.broadcasting && locked) setLocked(false)
     }

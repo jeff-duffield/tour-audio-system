@@ -13,6 +13,9 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
     }
 
     buildTypes {
@@ -25,6 +28,10 @@ android {
     }
 
     kotlinOptions { jvmTarget = "17" }
+
+    androidResources {
+        noCompress += "onnx"
+    }
 }
 
 dependencies {
@@ -33,4 +40,5 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("androidx.activity:activity-ktx:1.9.2")
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
+    implementation("com.github.k2-fsa.sherpa-onnx:sherpa-onnx:1.13.5")
 }

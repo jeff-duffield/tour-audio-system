@@ -81,7 +81,10 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
         val prefs = getSharedPreferences("traveler", MODE_PRIVATE)
         findViewById<EditText>(R.id.ssidInput).setText(prefs.getString("ssid", ""))
-        findViewById<EditText>(R.id.passwordInput).setText(prefs.getString("password", ""))
+        val storedPassword = prefs.getString("password", "").orEmpty()
+            .ifBlank { TourCredentials.TOUR_PASSWORD }
+        findViewById<EditText>(R.id.passwordInput).setText(storedPassword)
+        prefs.edit().putString("password", storedPassword).apply()
 
         findViewById<Button>(R.id.joinButton).setOnClickListener { joinWifi() }
         findViewById<Button>(R.id.scanButton).setOnClickListener { scanCode() }
