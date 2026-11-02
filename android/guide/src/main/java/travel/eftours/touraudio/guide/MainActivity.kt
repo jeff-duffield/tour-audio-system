@@ -205,8 +205,9 @@ class MainActivity : AppCompatActivity() {
     private fun showNetworks() {
         setWifiStatus("Looking for EF-TOUR-GUIDE networks")
         TourNetworks.find(this, TourNetworks.Band.GUIDE) { lookup ->
-            if (lookup.hint != null) {
-                setWifiStatus(lookup.hint)
+            val hint = lookup.hint
+            if (hint != null) {
+                setWifiStatus(hint)
                 return@find
             }
             if (lookup.names.size == 1) {
