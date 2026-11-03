@@ -35,6 +35,7 @@ class GuideService : Service() {
         val participation: String = "0 of 0 reacted",
         val wifi: String = "",
         val wifiConnected: Boolean = false,
+        val ssid: String = "",
         val captionsOn: Boolean = false,
         val captionStatus: String = "CC is currently off",
         val sensitivity: Int = 8
@@ -124,8 +125,8 @@ class GuideService : Service() {
         val mic = PcmCapture(
             voiceProcessing = false,
             gateThreshold = { sensitivityThreshold(sensitivity) },
-            onChunk = { pcm ->
-                socket?.sendPcm(pcm)
+            onChunk = { pcm, transmit ->
+                if (transmit) socket?.sendPcm(pcm)
                 captioner?.offer(pcm)
             },
             onLevel = { level ->
@@ -304,7 +305,7 @@ class GuideService : Service() {
     }
 
     private fun publish(next: State) {
-        state = next.copy(wifiConnected = wifi.isConnected)
+        state = next.copy(wifiConnected = wifi.isConnected, ssid = wifi.ssid.orEmpty())
         val callback = listener
         handler.post { callback?.invoke(state) }
     }

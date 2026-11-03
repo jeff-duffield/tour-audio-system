@@ -25,6 +25,19 @@ object TourNetworks {
         }
     }
 
+    /**
+     * Traveler network paired with a guide network.
+     * EF-TOUR-GUIDE is the legacy router and pairs with EF-TOUR-001.
+     * EF-TOUR-GUIDE-002 pairs with EF-TOUR-002.
+     */
+    fun travelerSsid(guideSsid: String): String? {
+        val match = GUIDE_PAIR.matchEntire(guideSsid.trim()) ?: return null
+        val digits = match.groupValues[1]
+        val number = if (digits.isEmpty()) 1 else digits.toIntOrNull() ?: return null
+        if (number <= 0) return null
+        return "EF-TOUR-%03d".format(number)
+    }
+
     fun find(context: Context, band: Band, onResult: (Lookup) -> Unit) {
         val app = context.applicationContext
         val wifi = app.getSystemService(WifiManager::class.java) ?: run {
@@ -132,4 +145,5 @@ object TourNetworks {
 
     private val TRAVELER_NAME = Regex("^EF-TOUR-\\d+$", RegexOption.IGNORE_CASE)
     private val GUIDE_NAME = Regex("^EF-TOUR-GUIDE(-\\d+)?$", RegexOption.IGNORE_CASE)
+    private val GUIDE_PAIR = Regex("^EF-TOUR-GUIDE(?:-(\\d+))?$", RegexOption.IGNORE_CASE)
 }

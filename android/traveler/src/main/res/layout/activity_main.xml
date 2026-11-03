@@ -1,239 +1,386 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#00243C">
+    android:background="#00243C"
+    android:orientation="vertical"
+    android:padding="24dp">
+
+    <ImageView
+        android:id="@+id/headerLogo"
+        android:layout_width="wrap_content"
+        android:layout_height="36dp"
+        android:layout_gravity="center_horizontal"
+        android:adjustViewBounds="true"
+        android:contentDescription="EF"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ef_logo_pink" />
+
+    <TextView
+        android:id="@+id/headerTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="8dp"
+        android:text="Tour Audio"
+        android:textColor="#FFFFFF"
+        android:textSize="26sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/headerSubtitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="4dp"
+        android:text="Listen to your guide"
+        android:textColor="#99FFFFFF"
+        android:textSize="15sp" />
+
+    <LinearLayout
+        android:id="@+id/sessionPanel"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <ScrollView
+            android:id="@+id/sessionScroll"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:fillViewport="true">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_horizontal"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/travelerId"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/bg_pill_chip"
+                    android:paddingLeft="12dp"
+                    android:paddingTop="4dp"
+                    android:paddingRight="12dp"
+                    android:paddingBottom="4dp"
+                    android:textColor="#B3FFFFFF"
+                    android:textSize="12sp"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/statusText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="Not connected"
+                    android:textColor="#FFFFFF"
+                    android:textSize="16sp" />
+
+                <TextView
+                    android:id="@+id/batteryText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:textColor="#99FFFFFF"
+                    android:textSize="12sp" />
+
+                <LinearLayout
+                    android:id="@+id/waveform"
+                    android:layout_width="wrap_content"
+                    android:layout_height="28dp"
+                    android:layout_marginTop="16dp"
+                    android:gravity="bottom"
+                    android:orientation="horizontal"
+                    android:visibility="invisible">
+
+                    <View android:layout_width="4dp" android:layout_height="9dp" android:layout_margin="2dp" android:background="@drawable/bg_wave_bar" />
+                    <View android:layout_width="4dp" android:layout_height="16dp" android:layout_margin="2dp" android:background="@drawable/bg_wave_bar" />
+                    <View android:layout_width="4dp" android:layout_height="23dp" android:layout_margin="2dp" android:background="@drawable/bg_wave_bar" />
+                    <View android:layout_width="4dp" android:layout_height="27dp" android:layout_margin="2dp" android:background="@drawable/bg_wave_bar" />
+                    <View android:layout_width="4dp" android:layout_height="28dp" android:layout_margin="2dp" android:background="@drawable/bg_wave_bar_center" />
+                    <View android:layout_width="4dp" android:layout_height="27dp" android:layout_margin="2dp" android:background="@drawable/bg_wave_bar" />
+                    <View android:layout_width="4dp" android:layout_height="23dp" android:layout_margin="2dp" android:background="@drawable/bg_wave_bar" />
+                    <View android:layout_width="4dp" android:layout_height="16dp" android:layout_margin="2dp" android:background="@drawable/bg_wave_bar" />
+                    <View android:layout_width="4dp" android:layout_height="9dp" android:layout_margin="2dp" android:background="@drawable/bg_wave_bar" />
+                </LinearLayout>
+
+                <Button
+                    android:id="@+id/listenButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:layout_marginTop="20dp"
+                    android:background="@drawable/bg_pill_pink"
+                    android:stateListAnimator="@null"
+                    android:text="Start Listening"
+                    android:textAllCaps="false"
+                    android:textColor="#FFFFFF"
+                    android:textSize="17sp"
+                    android:textStyle="bold"
+                    app:backgroundTint="@null" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:gravity="center"
+                    android:letterSpacing="0.12"
+                    android:text="VOLUME"
+                    android:textColor="#E6FFFFFF"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+
+                <SeekBar
+                    android:id="@+id/volumeSlider"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:max="100"
+                    android:progress="80"
+                    android:progressTint="#FF329B"
+                    android:thumbTint="#FF329B" />
+
+                <TextView
+                    android:id="@+id/volumeValue"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:text="80%"
+                    android:textColor="#FF329B"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <Button
+                    android:id="@+id/captionButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/bg_pill_ghost"
+                    android:stateListAnimator="@null"
+                    android:text="Show captions"
+                    android:textAllCaps="false"
+                    android:textColor="#FFFFFF"
+                    android:textSize="14sp"
+                    android:visibility="gone"
+                    app:backgroundTint="@null" />
+
+                <Button
+                    android:id="@+id/changeNetwork"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/bg_pill_ghost"
+                    android:stateListAnimator="@null"
+                    android:text="Change network"
+                    android:textAllCaps="false"
+                    android:textColor="#FFFFFF"
+                    android:textSize="14sp"
+                    app:backgroundTint="@null" />
+            </LinearLayout>
+        </ScrollView>
+
+        <LinearLayout
+            android:id="@+id/captionPanel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:background="#33000000"
+            android:orientation="vertical"
+            android:padding="8dp"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/captionSmaller"
+                    android:layout_width="0dp"
+                    android:layout_height="36dp"
+                    android:layout_marginEnd="4dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_pill_ghost"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:stateListAnimator="@null"
+                    android:text="A−"
+                    android:textAllCaps="false"
+                    android:textColor="#FFFFFF"
+                    android:textSize="14sp"
+                    app:backgroundTint="@null" />
+
+                <Button
+                    android:id="@+id/captionLarger"
+                    android:layout_width="0dp"
+                    android:layout_height="36dp"
+                    android:layout_marginEnd="4dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_pill_ghost"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:stateListAnimator="@null"
+                    android:text="A+"
+                    android:textAllCaps="false"
+                    android:textColor="#FFFFFF"
+                    android:textSize="14sp"
+                    app:backgroundTint="@null" />
+
+                <Button
+                    android:id="@+id/captionFullButton"
+                    android:layout_width="0dp"
+                    android:layout_height="36dp"
+                    android:layout_marginEnd="4dp"
+                    android:layout_weight="2"
+                    android:background="@drawable/bg_pill_ghost"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:stateListAnimator="@null"
+                    android:text="Full screen"
+                    android:textAllCaps="false"
+                    android:textColor="#FFFFFF"
+                    android:textSize="13sp"
+                    app:backgroundTint="@null" />
+
+                <Button
+                    android:id="@+id/captionHide"
+                    android:layout_width="0dp"
+                    android:layout_height="36dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_pill_ghost"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:stateListAnimator="@null"
+                    android:text="Hide"
+                    android:textAllCaps="false"
+                    android:textColor="#FFFFFF"
+                    android:textSize="13sp"
+                    app:backgroundTint="@null" />
+            </LinearLayout>
+
+            <ScrollView
+                android:id="@+id/captionScroll"
+                android:layout_width="match_parent"
+                android:layout_height="140dp"
+                android:layout_marginTop="8dp"
+                android:fillViewport="true"
+                android:scrollbars="vertical">
+
+                <TextView
+                    android:id="@+id/captionText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:lineSpacingExtra="4dp"
+                    android:textColor="#FFFFFF"
+                    android:textSize="18sp" />
+            </ScrollView>
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/fullScreenControls"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <Button
+                android:id="@+id/volumeDown"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_marginEnd="6dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_pill_ghost"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:stateListAnimator="@null"
+                android:text="Vol −"
+                android:textAllCaps="false"
+                android:textColor="#FFFFFF"
+                android:textSize="13sp"
+                app:backgroundTint="@null" />
+
+            <Button
+                android:id="@+id/stopListening"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_marginEnd="6dp"
+                android:layout_weight="1.4"
+                android:background="@drawable/bg_pill_pink"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:stateListAnimator="@null"
+                android:text="Stop"
+                android:textAllCaps="false"
+                android:textColor="#FFFFFF"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                app:backgroundTint="@null" />
+
+            <Button
+                android:id="@+id/volumeUp"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_pill_ghost"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:stateListAnimator="@null"
+                android:text="Vol +"
+                android:textAllCaps="false"
+                android:textColor="#FFFFFF"
+                android:textSize="13sp"
+                app:backgroundTint="@null" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/reactionBar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:gravity="center"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <LinearLayout android:id="@+id/reactUp" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:background="?attr/selectableItemBackgroundBorderless" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingTop="6dp" android:paddingBottom="4dp">
+                <ImageView android:layout_width="34dp" android:layout_height="34dp" android:contentDescription="Thumbs up" android:src="@drawable/ic_thumb_up" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:gravity="center" android:text="Thumbs Up" android:textColor="#A6FFFFFF" android:textSize="9sp" android:textStyle="bold" />
+            </LinearLayout>
+            <LinearLayout android:id="@+id/reactDown" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:background="?attr/selectableItemBackgroundBorderless" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingTop="6dp" android:paddingBottom="4dp">
+                <ImageView android:layout_width="34dp" android:layout_height="34dp" android:contentDescription="Thumbs down" android:src="@drawable/ic_thumb_down" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:gravity="center" android:text="Thumbs Down" android:textColor="#A6FFFFFF" android:textSize="9sp" android:textStyle="bold" />
+            </LinearLayout>
+            <LinearLayout android:id="@+id/reactHeart" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:background="?attr/selectableItemBackgroundBorderless" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingTop="6dp" android:paddingBottom="4dp">
+                <ImageView android:layout_width="34dp" android:layout_height="34dp" android:contentDescription="Heart" android:src="@drawable/ic_heart" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:gravity="center" android:text="Heart" android:textColor="#A6FFFFFF" android:textSize="9sp" android:textStyle="bold" />
+            </LinearLayout>
+            <LinearLayout android:id="@+id/reactLaugh" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:background="?attr/selectableItemBackgroundBorderless" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingTop="6dp" android:paddingBottom="4dp">
+                <ImageView android:layout_width="34dp" android:layout_height="34dp" android:contentDescription="Laugh" android:src="@drawable/ic_laugh" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:gravity="center" android:text="Laugh" android:textColor="#A6FFFFFF" android:textSize="9sp" android:textStyle="bold" />
+            </LinearLayout>
+            <LinearLayout android:id="@+id/reactMind" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:background="?attr/selectableItemBackgroundBorderless" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingTop="6dp" android:paddingBottom="4dp">
+                <ImageView android:layout_width="34dp" android:layout_height="34dp" android:contentDescription="Mind blown" android:src="@drawable/ic_mind_blown" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:gravity="center" android:text="Mind Blown" android:textColor="#A6FFFFFF" android:textSize="9sp" android:textStyle="bold" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
 
     <ScrollView
-        android:id="@+id/mainScroll"
+        android:id="@+id/connectPanel"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
         android:fillViewport="true">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:gravity="center_horizontal"
-            android:orientation="vertical"
-            android:padding="24dp">
-
-            <ImageView
-                android:layout_width="wrap_content"
-                android:layout_height="36dp"
-                android:adjustViewBounds="true"
-                android:contentDescription="EF"
-                android:scaleType="fitCenter"
-                android:src="@drawable/ef_logo_pink" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="Tour Audio"
-                android:textColor="#FFFFFF"
-                android:textSize="26sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="Listen to your guide"
-                android:textColor="#99FFFFFF"
-                android:textSize="15sp" />
-
-            <LinearLayout
-                android:id="@+id/sessionPanel"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center_horizontal"
-                android:orientation="vertical"
-                android:visibility="gone">
-
-            <TextView
-                android:id="@+id/travelerId"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:background="@drawable/bg_pill_chip"
-                android:paddingLeft="12dp"
-                android:paddingTop="4dp"
-                android:paddingRight="12dp"
-                android:paddingBottom="4dp"
-                android:textColor="#B3FFFFFF"
-                android:textSize="12sp"
-                android:visibility="gone" />
-
-            <TextView
-                android:id="@+id/statusText"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:text="Not connected"
-                android:textColor="#FFFFFF"
-                android:textSize="16sp" />
-
-            <TextView
-                android:id="@+id/batteryText"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:textColor="#99FFFFFF"
-                android:textSize="12sp" />
-
-            <LinearLayout
-                android:id="@+id/waveform"
-                android:layout_width="wrap_content"
-                android:layout_height="28dp"
-                android:layout_marginTop="16dp"
-                android:gravity="bottom"
-                android:orientation="horizontal"
-                android:visibility="invisible">
-
-                <View android:layout_width="4dp" android:layout_height="9dp" android:layout_margin="2dp" android:background="@drawable/bg_wave_bar" />
-                <View android:layout_width="4dp" android:layout_height="16dp" android:layout_margin="2dp" android:background="@drawable/bg_wave_bar" />
-                <View android:layout_width="4dp" android:layout_height="23dp" android:layout_margin="2dp" android:background="@drawable/bg_wave_bar" />
-                <View android:layout_width="4dp" android:layout_height="27dp" android:layout_margin="2dp" android:background="@drawable/bg_wave_bar" />
-                <View android:layout_width="4dp" android:layout_height="28dp" android:layout_margin="2dp" android:background="@drawable/bg_wave_bar_center" />
-                <View android:layout_width="4dp" android:layout_height="27dp" android:layout_margin="2dp" android:background="@drawable/bg_wave_bar" />
-                <View android:layout_width="4dp" android:layout_height="23dp" android:layout_margin="2dp" android:background="@drawable/bg_wave_bar" />
-                <View android:layout_width="4dp" android:layout_height="16dp" android:layout_margin="2dp" android:background="@drawable/bg_wave_bar" />
-                <View android:layout_width="4dp" android:layout_height="9dp" android:layout_margin="2dp" android:background="@drawable/bg_wave_bar" />
-            </LinearLayout>
-
-            <Button
-                android:id="@+id/listenButton"
-                android:layout_width="match_parent"
-                android:layout_height="56dp"
-                android:layout_marginTop="20dp"
-                android:background="@drawable/bg_pill_pink"
-                android:stateListAnimator="@null"
-                android:text="Start Listening"
-                android:textAllCaps="false"
-                android:textColor="#FFFFFF"
-                android:textSize="17sp"
-                android:textStyle="bold"
-                app:backgroundTint="@null" />
-
-            <Button
-                android:id="@+id/lockButton"
-                android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:layout_marginTop="8dp"
-                android:background="@drawable/bg_pill_ghost"
-                android:stateListAnimator="@null"
-                android:text="Lock screen"
-                android:textAllCaps="false"
-                android:textColor="#FFFFFF"
-                android:textSize="14sp"
-                android:visibility="gone"
-                app:backgroundTint="@null" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:gravity="center"
-                android:letterSpacing="0.12"
-                android:text="VOLUME"
-                android:textColor="#E6FFFFFF"
-                android:textSize="11sp"
-                android:textStyle="bold" />
-
-            <SeekBar
-                android:id="@+id/volumeSlider"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:max="100"
-                android:progress="80"
-                android:progressTint="#FF329B"
-                android:thumbTint="#FF329B" />
-
-            <TextView
-                android:id="@+id/volumeValue"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center"
-                android:text="80%"
-                android:textColor="#FF329B"
-                android:textSize="15sp"
-                android:textStyle="bold" />
-
-            <Button
-                android:id="@+id/captionButton"
-                android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:layout_marginTop="8dp"
-                android:background="@drawable/bg_pill_ghost"
-                android:stateListAnimator="@null"
-                android:text="Show captions"
-                android:textAllCaps="false"
-                android:textColor="#FFFFFF"
-                android:textSize="14sp"
-                app:backgroundTint="@null" />
-
-            <TextView
-                android:id="@+id/captionText"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:background="#33000000"
-                android:gravity="center"
-                android:minHeight="48dp"
-                android:padding="12dp"
-                android:textColor="#FFFFFF"
-                android:textSize="18sp"
-                android:visibility="gone" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:gravity="center"
-                android:orientation="horizontal">
-
-                <LinearLayout android:id="@+id/reactUp" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:background="?attr/selectableItemBackgroundBorderless" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingTop="6dp" android:paddingBottom="4dp">
-                    <ImageView android:layout_width="34dp" android:layout_height="34dp" android:contentDescription="Thumbs up" android:src="@drawable/ic_thumb_up" />
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:gravity="center" android:text="Thumbs Up" android:textColor="#A6FFFFFF" android:textSize="9sp" android:textStyle="bold" />
-                </LinearLayout>
-                <LinearLayout android:id="@+id/reactDown" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:background="?attr/selectableItemBackgroundBorderless" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingTop="6dp" android:paddingBottom="4dp">
-                    <ImageView android:layout_width="34dp" android:layout_height="34dp" android:contentDescription="Thumbs down" android:src="@drawable/ic_thumb_down" />
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:gravity="center" android:text="Thumbs Down" android:textColor="#A6FFFFFF" android:textSize="9sp" android:textStyle="bold" />
-                </LinearLayout>
-                <LinearLayout android:id="@+id/reactHeart" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:background="?attr/selectableItemBackgroundBorderless" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingTop="6dp" android:paddingBottom="4dp">
-                    <ImageView android:layout_width="34dp" android:layout_height="34dp" android:contentDescription="Heart" android:src="@drawable/ic_heart" />
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:gravity="center" android:text="Heart" android:textColor="#A6FFFFFF" android:textSize="9sp" android:textStyle="bold" />
-                </LinearLayout>
-                <LinearLayout android:id="@+id/reactLaugh" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:background="?attr/selectableItemBackgroundBorderless" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingTop="6dp" android:paddingBottom="4dp">
-                    <ImageView android:layout_width="34dp" android:layout_height="34dp" android:contentDescription="Laugh" android:src="@drawable/ic_laugh" />
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:gravity="center" android:text="Laugh" android:textColor="#A6FFFFFF" android:textSize="9sp" android:textStyle="bold" />
-                </LinearLayout>
-                <LinearLayout android:id="@+id/reactMind" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:background="?attr/selectableItemBackgroundBorderless" android:clickable="true" android:focusable="true" android:gravity="center" android:orientation="vertical" android:paddingTop="6dp" android:paddingBottom="4dp">
-                    <ImageView android:layout_width="34dp" android:layout_height="34dp" android:contentDescription="Mind blown" android:src="@drawable/ic_mind_blown" />
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:gravity="center" android:text="Mind Blown" android:textColor="#A6FFFFFF" android:textSize="9sp" android:textStyle="bold" />
-                </LinearLayout>
-            </LinearLayout>
-
-            <Button
-                android:id="@+id/changeNetwork"
-                android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:layout_marginTop="20dp"
-                android:background="@drawable/bg_pill_ghost"
-                android:stateListAnimator="@null"
-                android:text="Change network"
-                android:textAllCaps="false"
-                android:textColor="#FFFFFF"
-                android:textSize="14sp"
-                app:backgroundTint="@null" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:id="@+id/connectPanel"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical">
+            android:orientation="vertical">
 
             <TextView
                 android:layout_width="match_parent"
@@ -244,27 +391,27 @@
                 android:textStyle="bold" />
 
             <Button
-                android:id="@+id/scanButton"
+                android:id="@+id/findButton"
                 android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:layout_marginTop="8dp"
+                android:layout_height="56dp"
+                android:layout_marginTop="12dp"
                 android:background="@drawable/bg_pill_pink"
                 android:stateListAnimator="@null"
-                android:text="Scan QR code"
+                android:text="Find EF-TOUR networks"
                 android:textAllCaps="false"
                 android:textColor="#FFFFFF"
-                android:textSize="15sp"
+                android:textSize="17sp"
                 android:textStyle="bold"
                 app:backgroundTint="@null" />
 
             <Button
-                android:id="@+id/findButton"
+                android:id="@+id/scanButton"
                 android:layout_width="match_parent"
-                android:layout_height="48dp"
+                android:layout_height="44dp"
                 android:layout_marginTop="8dp"
                 android:background="@drawable/bg_pill_ghost"
                 android:stateListAnimator="@null"
-                android:text="Find EF-TOUR networks"
+                android:text="Scan QR code"
                 android:textAllCaps="false"
                 android:textColor="#FFFFFF"
                 android:textSize="14sp"
@@ -274,6 +421,7 @@
                 android:id="@+id/ssidInput"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
                 android:hint="Network name, e.g. EF-TOUR-001"
                 android:importantForAutofill="no"
                 android:inputType="text"
@@ -324,44 +472,6 @@
                 android:textSize="14sp"
                 android:visibility="gone"
                 app:backgroundTint="@null" />
-            </LinearLayout>
         </LinearLayout>
     </ScrollView>
-
-    <LinearLayout
-        android:id="@+id/lockOverlay"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="#000000"
-        android:clickable="true"
-        android:focusable="true"
-        android:gravity="center"
-        android:orientation="vertical"
-        android:visibility="gone">
-
-        <ImageView
-            android:layout_width="wrap_content"
-            android:layout_height="72dp"
-            android:adjustViewBounds="true"
-            android:contentDescription="EF"
-            android:scaleType="fitCenter"
-            android:src="@drawable/ef_logo_pink" />
-
-        <TextView
-            android:id="@+id/lockLabel"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            android:text="Audio playing"
-            android:textColor="#FFFFFF"
-            android:textSize="18sp" />
-
-        <TextView
-            android:id="@+id/lockHint"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="28dp"
-            android:text="Tap 3× to unlock"
-            android:textColor="#99FFFFFF" />
-    </LinearLayout>
-</FrameLayout>
+</LinearLayout>

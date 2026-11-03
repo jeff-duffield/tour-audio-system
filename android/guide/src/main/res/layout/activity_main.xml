@@ -58,6 +58,32 @@
                 android:textSize="16sp" />
 
             <TextView
+                android:id="@+id/travelerHint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:gravity="center"
+                android:textColor="#FFFFFF"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+
+            <Button
+                android:id="@+id/showCodeButton"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_pill_navy"
+                android:stateListAnimator="@null"
+                android:text="Show traveler join code"
+                android:textAllCaps="false"
+                android:textColor="#FFFFFF"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:visibility="gone"
+                app:backgroundTint="@null" />
+
+            <TextView
                 android:id="@+id/watchBanner"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -90,41 +116,19 @@
                 android:textStyle="bold"
                 app:backgroundTint="@null" />
 
-            <LinearLayout
-                android:id="@+id/secondaryRow"
+            <Button
+                android:id="@+id/ccButton"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="48dp"
                 android:layout_marginTop="8dp"
-                android:visibility="gone">
-
-                <Button
-                    android:id="@+id/lockButton"
-                    android:layout_width="0dp"
-                    android:layout_height="48dp"
-                    android:layout_marginEnd="6dp"
-                    android:layout_weight="1"
-                    android:background="@drawable/bg_pill_ghost"
-                    android:stateListAnimator="@null"
-                    android:text="Lock screen"
-                    android:textAllCaps="false"
-                    android:textColor="#FFFFFF"
-                    android:textSize="14sp"
-                    app:backgroundTint="@null" />
-
-                <Button
-                    android:id="@+id/ccButton"
-                    android:layout_width="0dp"
-                    android:layout_height="48dp"
-                    android:layout_marginStart="6dp"
-                    android:layout_weight="1"
-                    android:background="@drawable/bg_pill_ghost"
-                    android:stateListAnimator="@null"
-                    android:text="CC off"
-                    android:textAllCaps="false"
-                    android:textColor="#FFFFFF"
-                    android:textSize="14sp"
-                    app:backgroundTint="@null" />
-            </LinearLayout>
+                android:background="@drawable/bg_pill_ghost"
+                android:stateListAnimator="@null"
+                android:text="Turn on CC"
+                android:textAllCaps="false"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                android:visibility="gone"
+                app:backgroundTint="@null" />
 
             <TextView
                 android:id="@+id/captionStatus"
@@ -287,40 +291,27 @@
                 android:textStyle="bold" />
 
             <Button
-                android:id="@+id/scanButton"
+                android:id="@+id/findButton"
                 android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:layout_marginTop="8dp"
+                android:layout_height="56dp"
+                android:layout_marginTop="12dp"
                 android:background="@drawable/bg_pill_navy"
                 android:stateListAnimator="@null"
-                android:text="Scan QR code"
+                android:text="Find EF-TOUR networks"
                 android:textAllCaps="false"
                 android:textColor="#FFFFFF"
-                android:textSize="15sp"
+                android:textSize="17sp"
                 android:textStyle="bold"
                 app:backgroundTint="@null" />
 
             <Button
-                android:id="@+id/showCodeButton"
+                android:id="@+id/scanButton"
                 android:layout_width="match_parent"
-                android:layout_height="48dp"
+                android:layout_height="44dp"
                 android:layout_marginTop="8dp"
                 android:background="@drawable/bg_pill_ghost"
                 android:stateListAnimator="@null"
-                android:text="Show join code"
-                android:textAllCaps="false"
-                android:textColor="#FFFFFF"
-                android:textSize="14sp"
-                app:backgroundTint="@null" />
-
-            <Button
-                android:id="@+id/findButton"
-                android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:layout_marginTop="8dp"
-                android:background="@drawable/bg_pill_ghost"
-                android:stateListAnimator="@null"
-                android:text="Find EF-TOUR-GUIDE networks"
+                android:text="Scan QR code"
                 android:textAllCaps="false"
                 android:textColor="#FFFFFF"
                 android:textSize="14sp"
@@ -330,6 +321,7 @@
                 android:id="@+id/ssidInput"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
                 android:hint="Network name, e.g. EF-TOUR-GUIDE"
                 android:importantForAutofill="no"
                 android:inputType="text"
@@ -384,41 +376,4 @@
             </LinearLayout>
         </LinearLayout>
     </ScrollView>
-
-    <LinearLayout
-        android:id="@+id/lockOverlay"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="#000000"
-        android:clickable="true"
-        android:focusable="true"
-        android:gravity="center"
-        android:orientation="vertical"
-        android:visibility="gone">
-
-        <ImageView
-            android:layout_width="wrap_content"
-            android:layout_height="72dp"
-            android:adjustViewBounds="true"
-            android:contentDescription="EF"
-            android:scaleType="fitCenter"
-            android:src="@drawable/ef_logo_pink" />
-
-        <TextView
-            android:id="@+id/lockLabel"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            android:text="Broadcasting"
-            android:textColor="#FFFFFF"
-            android:textSize="18sp" />
-
-        <TextView
-            android:id="@+id/lockHint"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="28dp"
-            android:text="Tap 3× to unlock"
-            android:textColor="#99FFFFFF" />
-    </LinearLayout>
 </FrameLayout>

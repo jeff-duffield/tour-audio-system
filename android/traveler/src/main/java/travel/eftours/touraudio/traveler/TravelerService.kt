@@ -29,6 +29,8 @@ class TravelerService : Service() {
         val travelerId: Int = 0,
         val receiving: Boolean = false,
         val caption: String = "",
+        val captionInterim: Boolean = false,
+        val captionsAvailable: Boolean = false,
         val wifi: String = "",
         val wifiConnected: Boolean = false,
         val battery: String = ""
@@ -48,6 +50,8 @@ class TravelerService : Service() {
     private var wakeLock: PowerManager.WakeLock? = null
     private var focus: AudioFocusRequest? = null
     private var lastAudioAt = 0L
+    private val captionLines = ArrayDeque<String>()
+    private var captionInterim = ""
 
     override fun onBind(intent: Intent?): IBinder = binder
 
@@ -130,15 +134,25 @@ class TravelerService : Service() {
         releaseWakeLock()
         abandonFocus()
         sessionPrefs().edit().putBoolean("listening", false).apply()
-        publish(state.copy(listening = false, receiving = false, status = "Not connected", caption = ""))
+        clearCaptions()
+        publish(state.copy(
+            listening = false,
+            receiving = false,
+            status = "Not connected",
+            caption = "",
+            captionInterim = false,
+            captionsAvailable = false
+        ))
     }
 
     private fun onJson(msg: JSONObject) {
         when (msg.optString("type")) {
             "client-id" -> publish(state.copy(travelerId = msg.optInt("id")))
             "subtitle" -> {
-                val text = if (msg.optBoolean("enabled", true)) msg.optString("text") else ""
-                publish(state.copy(caption = text))
+                val enabled = msg.optBoolean("enabled", true)
+                val text = msg.optString("text")
+                val isFinal = msg.optBoolean("isFinal", false)
+                handler.post { applySubtitle(enabled, text, isFinal) }
             }
             "client-count" -> Unit
         }
@@ -236,6 +250,41 @@ class TravelerService : Service() {
         if (wakeLock?.isHeld == true) wakeLock?.release()
     }
 
+    private fun clearCaptions() {
+        captionLines.clear()
+        captionInterim = ""
+    }
+
+    private fun applySubtitle(enabled: Boolean, text: String, isFinal: Boolean) {
+        if (!state.listening) return
+        if (!enabled) {
+            clearCaptions()
+            publish(state.copy(captionsAvailable = false, caption = "", captionInterim = false))
+            return
+        }
+        val clean = text.trim()
+        if (isFinal) {
+            if (clean.isNotEmpty() && captionLines.lastOrNull() != clean) {
+                captionLines.addLast(clean)
+                while (captionLines.size > MAX_CAPTION_LINES) captionLines.removeFirst()
+            }
+            captionInterim = ""
+        } else {
+            captionInterim = clean
+        }
+        publish(state.copy(
+            captionsAvailable = true,
+            caption = captionDisplay(),
+            captionInterim = captionInterim.isNotEmpty()
+        ))
+    }
+
+    private fun captionDisplay(): String {
+        val history = captionLines.joinToString("\n")
+        if (captionInterim.isEmpty()) return history
+        return if (history.isEmpty()) captionInterim else "$history\n$captionInterim"
+    }
+
     companion object {
         const val ACTION_JOIN = "travel.eftours.touraudio.traveler.JOIN"
         const val ACTION_LISTEN = "travel.eftours.touraudio.traveler.LISTEN"
@@ -249,5 +298,6 @@ class TravelerService : Service() {
         const val EXTRA_VOLUME = "volume"
         const val EXTRA_REACTION = "reaction"
         private const val CHANNEL = "traveler"
+        private const val MAX_CAPTION_LINES = 200
     }
 }

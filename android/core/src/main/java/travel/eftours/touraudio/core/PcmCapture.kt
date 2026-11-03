@@ -4,13 +4,20 @@ import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.os.Process
+import android.os.SystemClock
 import kotlin.math.sqrt
 
-/** Captures 16 kHz mono PCM Int16 in 2048-frame chunks, including silence. */
+/**
+ * Captures 16 kHz mono PCM Int16 in 2048-frame chunks.
+ * Quiet audio is replaced with silence. That silence is forwarded for a short
+ * hold so gaps between words stay intact, then forwarding stops until the
+ * guide speaks again. A slightly longer tail is still delivered locally so
+ * captions can finish the phrase.
+ */
 class PcmCapture(
     private val voiceProcessing: Boolean,
     private val gateThreshold: () -> Float = { 0f },
-    private val onChunk: (ByteArray) -> Unit,
+    private val onChunk: (pcm: ByteArray, transmit: Boolean) -> Unit,
     private val onLevel: (Float) -> Unit,
     private val log: (String) -> Unit
 ) {
@@ -68,14 +75,19 @@ class PcmCapture(
         thread = Thread({
             Process.setThreadPriority(Process.THREAD_PRIORITY_AUDIO)
             val buf = ByteArray(chunkBytes)
+            var lastVoiceAt = 0L
             while (running) {
                 val n = audioRecord.read(buf, 0, chunkBytes)
                 if (n > 0) {
                     val rms = level(buf, n)
                     onLevel(rms)
-                    // Keep the PCM timing stable while silencing background noise
-                    // below the guide's selected pickup threshold.
-                    onChunk(if (rms < gateThreshold()) ByteArray(n) else buf.copyOf(n))
+                    val now = SystemClock.elapsedRealtime()
+                    val loud = rms >= gateThreshold()
+                    if (loud) lastVoiceAt = now
+                    val quietFor = if (lastVoiceAt == 0L) Long.MAX_VALUE else now - lastVoiceAt
+                    if (loud || quietFor < CAPTION_TAIL_MS) {
+                        onChunk(if (loud) buf.copyOf(n) else ByteArray(n), loud || quietFor < SILENCE_HOLD_MS)
+                    }
                 } else if (n < 0) {
                     log("microphone read error $n")
                     break
@@ -118,5 +130,9 @@ class PcmCapture(
     companion object {
         const val SAMPLE_RATE = 16000
         const val CHUNK_FRAMES = 2048
+        /** Matches the web guide: keep sending briefly, then stop for long pauses. */
+        private const val SILENCE_HOLD_MS = 700L
+        /** Long enough for the caption endpoint's 0.8 s trailing-silence rule. */
+        private const val CAPTION_TAIL_MS = 1200L
     }
 }

@@ -13,6 +13,7 @@ import android.view.View
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.SeekBar
 import android.widget.TextView
@@ -35,9 +36,6 @@ class MainActivity : AppCompatActivity() {
     private var editingNetwork = false
     private var onNetwork = false
     private var connectedName = ""
-    private var locked = false
-    private var taps = 0
-    private var lastTap = 0L
 
     private val permissions = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -101,7 +99,6 @@ class MainActivity : AppCompatActivity() {
             applyScreens(onNetwork, connectedName)
         }
         findViewById<Button>(R.id.broadcastButton).setOnClickListener { toggleBroadcast() }
-        findViewById<Button>(R.id.lockButton).setOnClickListener { setLocked(true) }
         findViewById<Button>(R.id.ccButton).setOnClickListener { toggleCaptions() }
         findViewById<Button>(R.id.clearReactions).setOnClickListener { service?.clearReactions() }
         findViewById<SeekBar>(R.id.sensitivitySlider).setOnSeekBarChangeListener(
@@ -116,7 +113,6 @@ class MainActivity : AppCompatActivity() {
                 override fun onStopTrackingTouch(seekBar: SeekBar?) = Unit
             }
         )
-        findViewById<View>(R.id.lockOverlay).setOnClickListener { unlockTap() }
         if (!hasMic()) {
             permissions.launch(arrayOf(Manifest.permission.RECORD_AUDIO))
         }
@@ -185,35 +181,59 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showCode() {
-        val ssid = findViewById<EditText>(R.id.ssidInput).text.toString().trim()
-        val password = savedPassword(ssid)
-        if (ssid.isBlank() || password.length < 8) {
-            setWifiStatus("Enter the network name and password, then show the code")
+        val guideSsid = connectedName.ifBlank {
+            setWifiStatus("Join the guide network before showing a traveler code")
+            return
+        }
+        val travelerSsid = TourNetworks.travelerSsid(guideSsid) ?: run {
+            setWifiStatus("Join an EF-TOUR-GUIDE network before showing a traveler code")
             return
         }
         val existing = TourCredentialsStore(this).last()
+        val password = TourCredentialsStore(this).passwordFor(guideSsid)
+            ?: TourCredentials.knownPassword(guideSsid)
+            ?: TourCredentials.TOUR_PASSWORD
         val credentials = TourCredentials(
-            ssid,
+            travelerSsid,
             password,
             existing?.host ?: TourCredentials.DEFAULT_HOST,
             existing?.port ?: TourCredentials.DEFAULT_PORT
         )
-        TourCredentialsStore(this).save(credentials)
         val bitmap = try {
             TourQr.bitmap(credentials.encode())
         } catch (_: Exception) {
             setWifiStatus("Could not make a QR code")
             return
         }
-        val image = ImageView(this).apply {
-            setImageBitmap(bitmap)
-            setPadding(48, 48, 48, 48)
+        val panel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
             setBackgroundColor(android.graphics.Color.WHITE)
+            setPadding(48, 36, 48, 36)
         }
+        panel.addView(TextView(this).apply {
+            text = travelerSsid
+            setTextColor(android.graphics.Color.BLACK)
+            textSize = 22f
+            gravity = android.view.Gravity.CENTER
+        })
+        panel.addView(TextView(this).apply {
+            text = "Have travelers scan this with the Tour Audio app. It joins $travelerSsid, not the guide network."
+            setTextColor(0xFF333333.toInt())
+            textSize = 15f
+            gravity = android.view.Gravity.CENTER
+            setPadding(0, 16, 0, 16)
+        })
+        panel.addView(ImageView(this).apply {
+            setImageBitmap(bitmap)
+            adjustViewBounds = true
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        })
         AlertDialog.Builder(this)
-            .setTitle(ssid)
-            .setMessage("Travelers scan this with the Tour Audio app")
-            .setView(image)
+            .setTitle("Travelers join $travelerSsid")
+            .setView(panel)
             .setPositiveButton("Close", null)
             .show()
     }
@@ -240,9 +260,13 @@ class MainActivity : AppCompatActivity() {
             if (lookup.names.size == 1) {
                 selectNetwork(lookup.names.first())
             } else {
+                val labels = lookup.names.map { name ->
+                    val travelers = TourNetworks.travelerSsid(name)
+                    if (travelers == null) name else "$name — travelers join $travelers"
+                }.toTypedArray()
                 AlertDialog.Builder(this)
-                    .setTitle("Tour networks")
-                    .setItems(lookup.names.toTypedArray()) { _, which ->
+                    .setTitle("Which guide network?")
+                    .setItems(labels) { _, which ->
                         selectNetwork(lookup.names[which])
                     }
                     .show()
@@ -362,7 +386,7 @@ class MainActivity : AppCompatActivity() {
         button.text = if (state.broadcasting) "Stop Broadcasting" else "Start Broadcasting"
         button.isEnabled = !state.watching
         val live = if (state.broadcasting) View.VISIBLE else View.GONE
-        findViewById<View>(R.id.secondaryRow).visibility = live
+        findViewById<View>(R.id.ccButton).visibility = live
         findViewById<View>(R.id.sensitivityRow).visibility = live
         findViewById<View>(R.id.reactionDashboard).visibility = live
         findViewById<ProgressBar>(R.id.micLevel).apply {
@@ -383,10 +407,19 @@ class MainActivity : AppCompatActivity() {
         findViewById<SeekBar>(R.id.sensitivitySlider).progress = state.sensitivity
         findViewById<TextView>(R.id.sensitivityValue).text =
             if (state.sensitivity <= 3) "Low" else if (state.sensitivity >= 8) "High" else "Medium"
-        findViewById<TextView>(R.id.lockLabel).text = state.status
-        if (!state.broadcasting && locked) setLocked(false)
+        val travelerSsid = if (state.wifiConnected) TourNetworks.travelerSsid(state.ssid) else null
+        val hint = findViewById<TextView>(R.id.travelerHint)
+        val code = findViewById<Button>(R.id.showCodeButton)
+        if (travelerSsid != null) {
+            hint.visibility = View.VISIBLE
+            hint.text = "Tell travelers to select $travelerSsid"
+            code.visibility = View.VISIBLE
+        } else {
+            hint.visibility = View.GONE
+            code.visibility = View.GONE
+        }
         onNetwork = state.wifiConnected
-        val network = if (state.wifiConnected) state.wifi.removePrefix("Connected to ").trim() else ""
+        val network = if (state.wifiConnected) state.ssid.ifBlank { state.wifi.removePrefix("Connected to ").trim() } else ""
         applyScreens(state.wifiConnected, network)
     }
 
@@ -402,23 +435,5 @@ class MainActivity : AppCompatActivity() {
         findViewById<View>(R.id.sessionPanel).visibility = if (showConnect) View.GONE else View.VISIBLE
         findViewById<View>(R.id.connectPanel).visibility = if (showConnect) View.VISIBLE else View.GONE
         findViewById<View>(R.id.backToSession).visibility = if (showConnect && connected) View.VISIBLE else View.GONE
-    }
-
-    private fun setLocked(value: Boolean) {
-        locked = value
-        findViewById<View>(R.id.lockOverlay).visibility = if (value) View.VISIBLE else View.GONE
-        taps = 0
-    }
-
-    private fun unlockTap() {
-        val now = System.currentTimeMillis()
-        taps = if (now - lastTap < 700) taps + 1 else 1
-        lastTap = now
-        findViewById<TextView>(R.id.lockHint).text = when (taps) {
-            1 -> "Tap 2 more times"
-            2 -> "Tap 1 more time"
-            else -> "Tap 3× to unlock"
-        }
-        if (taps >= 3) setLocked(false)
     }
 }
